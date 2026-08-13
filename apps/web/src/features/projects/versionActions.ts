@@ -18,6 +18,14 @@ export function conflictStateFromError(
     : null
 }
 
+/**
+ * Task UI owns its localized context. Backend messages are diagnostic text and may be English,
+ * so they must not replace the Thai instruction exposed to the user.
+ */
+export function localizedTaskError(_error: unknown, thaiContext: string): string {
+  return thaiContext
+}
+
 interface HistoricalVersionDocument {
   number: number
   document: DesignDocument

@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ApiRequestError } from '@/api/client.ts'
 import {
   useDuplicateProject,
   useLoadVersion,
@@ -10,6 +9,7 @@ import {
 import {
   buildDuplicateCurrentInput,
   loadHistoricalVersion,
+  localizedTaskError,
 } from '@/features/projects/versionActions.ts'
 import { useDesignStoreApi } from './DesignStoreProvider.tsx'
 
@@ -28,10 +28,6 @@ const DATE_FORMAT = new Intl.DateTimeFormat('th-TH', {
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} ไบต์`
   return `${(bytes / 1024).toFixed(1)} KB`
-}
-
-function errorMessage(error: unknown, fallback: string) {
-  return error instanceof ApiRequestError ? error.message : fallback
 }
 
 export function VersionHistoryPanel({
@@ -75,17 +71,17 @@ export function VersionHistoryPanel({
       {versions.isPending && <p className="muted">กำลังโหลดประวัติ…</p>}
       {versions.error && (
         <p className="error" role="alert">
-          {errorMessage(versions.error, 'โหลดประวัติเวอร์ชันไม่สำเร็จ')}
+          {localizedTaskError(versions.error, 'โหลดประวัติเวอร์ชันไม่สำเร็จ')}
         </p>
       )}
       {loadVersion.error && (
         <p className="error" role="alert">
-          {errorMessage(loadVersion.error, 'เปิดเวอร์ชันนี้ไม่สำเร็จ')}
+          {localizedTaskError(loadVersion.error, 'เปิดเวอร์ชันนี้ไม่สำเร็จ')}
         </p>
       )}
       {renameVersion.error && (
         <p className="error" role="alert">
-          {errorMessage(renameVersion.error, 'เปลี่ยนชื่อเวอร์ชันไม่สำเร็จ')}
+          {localizedTaskError(renameVersion.error, 'เปลี่ยนชื่อเวอร์ชันไม่สำเร็จ')}
         </p>
       )}
       {loadedMessage && <p className="ok" role="status">{loadedMessage}</p>}
@@ -178,7 +174,7 @@ export function VersionHistoryPanel({
         />
         {duplicateProject.error && (
           <p className="error" role="alert">
-            {errorMessage(duplicateProject.error, 'ทำสำเนางานไม่สำเร็จ')}
+            {localizedTaskError(duplicateProject.error, 'ทำสำเนางานไม่สำเร็จ')}
           </p>
         )}
         <button

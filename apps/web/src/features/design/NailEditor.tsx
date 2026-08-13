@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { ApiRequestError } from '@/api/client.ts'
 import { NailScene } from '@/3d/scene/NailScene.tsx'
 import { DesignScene } from '@/3d/scene/DesignScene.tsx'
 import { WebGlGuard } from '@/3d/scene/WebGlGuard.tsx'
@@ -18,6 +17,7 @@ import {
 import {
   buildDuplicateCurrentInput,
   conflictStateFromError,
+  localizedTaskError,
   type ServerVersionConflict,
 } from '@/features/projects/versionActions.ts'
 import { useDesign, useDesignStoreApi } from './DesignStoreProvider.tsx'
@@ -90,9 +90,7 @@ export function NailEditor({ projectId, detail }: Props) {
       setConflict(null)
     } catch (error) {
       setConflictActionError(
-        error instanceof ApiRequestError
-          ? `โหลดเวอร์ชันล่าสุดไม่สำเร็จ — ${error.message}`
-          : 'โหลดเวอร์ชันล่าสุดไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
+        localizedTaskError(error, 'โหลดเวอร์ชันล่าสุดไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'),
       )
     } finally {
       setIsReloading(false)
@@ -108,11 +106,10 @@ export function NailEditor({ projectId, detail }: Props) {
       },
       {
         onSuccess: (project) => navigate(`/editor/${project.id}`),
-        onError: (error) => setConflictActionError(
-          error instanceof ApiRequestError
-            ? `ทำสำเนางานไม่สำเร็จ — ${error.message}`
-            : 'ทำสำเนางานไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
-        ),
+        onError: (error) => setConflictActionError(localizedTaskError(
+          error,
+          'ทำสำเนางานไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
+        )),
       },
     )
   }
@@ -135,9 +132,10 @@ export function NailEditor({ projectId, detail }: Props) {
           {autosave.message && <span className="error" role="alert">{autosave.message}</span>}
           {saveVersion.error && !conflict && (
             <span className="error" role="alert">
-              {saveVersion.error instanceof ApiRequestError
-                ? saveVersion.error.message
-                : 'บันทึกเวอร์ชันไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'}
+              {localizedTaskError(
+                saveVersion.error,
+                'บันทึกเวอร์ชันไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
+              )}
             </span>
           )}
           <button
