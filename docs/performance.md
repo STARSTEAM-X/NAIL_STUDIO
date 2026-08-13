@@ -11,6 +11,49 @@
 
 ---
 
+## M4 · ขนาดโครงสร้าง history — Command เทียบ full-document snapshot (A-10)
+
+**วันที่วัด**: 2026-08-13
+
+### สภาพแวดล้อมและวิธีวัด
+
+| รายการ | ค่า |
+|---|---|
+| ระบบปฏิบัติการ | Windows 11 Home Single Language 10.0.26200 |
+| Node | v24.19.0 (`win32` / x64) |
+| คำสั่ง | `node --expose-gc tools/measure-history-memory.mjs` |
+| เอกสารตัวแทน | schema v2, เล็บ 10 นิ้ว, นิ้วละ 3 เลเยอร์, เลเยอร์ละ 12 strokes, stroke ละ 24 points (รวม 360 strokes / 8,640 points) |
+| ขนาดเอกสารตัวแทน | 593,741 bytes เมื่อ serialize เป็น JSON UTF-8 |
+| การแก้ไข | เปลี่ยน `baseColor` ของ `right.index` ต่อเนื่อง 100 ครั้ง โดย snapshot และ Command เริ่มจากเอกสารเดียวกันและใช้ลำดับสีก่อน/หลังเดียวกัน |
+| วิธีนับ | เก็บ full-document clone 100 ชุด หรือ delta Command 100 ชุด แล้วนับ `Buffer.byteLength(JSON.stringify(retainedEntries), 'utf8')` |
+
+สคริปต์เรียก `global.gc()` ก่อนสร้างโครงสร้างและก่อน serialize และจะหยุดพร้อม error ถ้าไม่ได้เปิด
+`--expose-gc` อย่างไรก็ตามค่าที่รายงานมาจาก serialized structure โดยตรง จึงไม่แปรตามเวลาที่ GC ทำงาน
+
+### ผลที่วัดได้
+
+```json
+{"node":"v24.19.0","commands":100,"snapshotBytes":59374201,"commandBytes":10901,"ratio":5446.67}
+```
+
+รันคำสั่งซ้ำสองครั้งได้ JSON ตรงกันทุก field: full snapshots ใช้โครงสร้างที่ serialize ได้
+59,374,201 bytes ส่วน Command deltas ใช้ 10,901 bytes หรือ snapshot มากกว่า **5,446.67 เท่า**
+ในเอกสารตัวแทนและชุดแก้ไขนี้ ผลนี้สนับสนุน A-10 ว่าการเก็บ delta ไม่ทำสำเนาเนื้อหาเอกสารซ้ำใน history
+
+### ข้อจำกัด — ห้ามตีความเป็น browser heap snapshot
+
+- ตัวเลขนี้เป็น **repeatable serialized retained-size structural comparison** ไม่ใช่ heap snapshot ของ V8
+  และไม่ใช่ heap snapshot ของเบราว์เซอร์ จึงห้ามอ้างว่าเป็นจำนวน bytes ที่ JavaScript heap ใช้จริง
+- JSON ไม่นับ object/array headers, pointers, closures, prototypes, allocator overhead, string interning,
+  Zustand subscribers หรือข้อมูลภายใน runtime; ในทางกลับกัน JSON อาจนับข้อความที่ engine แชร์ไว้เพียงครั้งเดียวซ้ำ
+- ฝั่ง snapshot ในการทดลองเป็น full `structuredClone` ทุก revision ตามแบบที่ A-10 ต้องการเปรียบเทียบ
+  ถ้าระบบ snapshot อื่นใช้ persistent data structures หรือ structural sharing ผลจะต่างออกไป
+- การเก็บ heap snapshot ใน Node แล้วหาส่วนที่เป็นของ history อย่างน่าเชื่อถือมี noise จาก runtime,
+  module loader และ GC; การทดลองนี้จึงเลือก proxy ที่กำหนด input และวิธีนับได้แน่นอน
+  งาน profiling ภายหลังต้องใช้ browser DevTools heap snapshot แยกต่างหากถ้าต้องการยืนยันการใช้ heap จริง
+
+---
+
 ## M0 · Baseline — ก่อนการ optimize ใด ๆ
 
 **วันที่วัด**: 2026-08-12
@@ -188,7 +231,6 @@
 | M1 | fps / frame time ที่ถูกต้อง ในหน้าต่างเบราว์เซอร์ปกติ | Slice 1 |
 | M2 | เวลา rebuild เท็กซ์เจอร์ 1 เล็บ ที่ 1 / 6 เลเยอร์ | Slice 2 |
 | M3 | เวลา commit stroke ที่ลำดับ 1 / 50 / 200 (พิสูจน์ A-04) | Slice 2 |
-| M4 | heap: Command history vs snapshot (พิสูจน์ A-10) | Slice 3 |
 | M5 | raycast latency: baseline / BVH / proxy mesh (A-08) | Slice 8 |
 | M6 | เวลาสร้าง BVH + หน่วยความจำที่ใช้ | Slice 8 |
 | M7 | เวลาโหลด GLB: ปัจจุบัน / Draco / Draco+KTX2 | Slice 8 |

@@ -235,10 +235,15 @@ Sprint 0, งานทำคลัง asset จริง, และเวลา 
 6. เวอร์ชัน: ดูรายการ · โหลดกลับ · ตั้งชื่อ · ทำสำเนางาน
 7. Draft ใน IndexedDB — กันงานหายเมื่อออฟไลน์ (P1)
 
-**DoD**: **property test** — ทุก Command `do()` แล้ว `undo()` ต้องได้เอกสารเท่าเดิมทุก field ·
-ลากสไลเดอร์สี 1 ครั้ง history เพิ่ม 1 รายการ · undo/redo 100 ครั้งสถานะยังถูก ·
-heap snapshot เทียบ Command vs snapshot (พิสูจน์ A-10 ด้วยตัวเลขจริง) ·
-เปิด 2 แท็บบันทึกพร้อมกัน → แท็บที่สองได้ 409 พร้อม UI ให้เลือก
+**DoD**
+
+- [x] **property test** — ทุก Command `do()` แล้ว `undo()` ได้เอกสารเท่าเดิมทุก field
+- [x] ลากสไลเดอร์ความทึบ 1 gesture รวมเป็น history 1 รายการและ undo/redo ได้
+- [x] execute 100 ครั้ง → undo 100 ครั้ง → redo 100 ครั้ง แล้วยังได้สถานะตรงทุก field
+- [x] วัด Command เทียบ full-document snapshot ด้วย input เดียวกัน 100 edits แบบทำซ้ำได้
+  (serialized structural proxy: 10,901 vs 59,374,201 bytes, 5,446.67× — ดู M4 ใน `docs/performance.md`;
+  ตัวเลขนี้ไม่ใช่ browser heap snapshot)
+- [ ] เปิด 2 แท็บบันทึกพร้อมกันด้วยเบราว์เซอร์จริง → แท็บที่สองได้ 409 พร้อม UI ให้เลือก
 
 ### Slice 4 — ของตกแต่ง + ทรงเล็บ + สัดส่วนมือ (สัปดาห์ 11–13)
 
