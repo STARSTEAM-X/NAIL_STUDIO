@@ -4,6 +4,7 @@ import {
   NAIL_KEYS,
   createEmptyDocument,
   designDocumentSchema,
+  type Layer,
   type Stroke,
 } from '@nail-studio/contracts'
 import { EDITABLE_NAILS, createDesignStore, primaryOf } from './designStore.ts'
@@ -167,5 +168,77 @@ describe('การล้างและวัสดุ', () => {
     expect(store.getState().document.nails['right.little'].finish).toBe('chrome')
     expect(store.getState().document.nails['right.little'].baseColor).toBe('#123456')
     expect(store.getState().document.nails['right.ring'].finish).toBe('glossy')
+  })
+})
+
+describe('ประวัติการแก้ไขเอกสาร', () => {
+  it('increments revision once and records one successful command', () => {
+    const store = createDesignStore()
+    const before = store.getState().revision
+
+    store.getState().setBaseColor('#112233')
+
+    expect(store.getState().revision).toBe(before + 1)
+    expect(store.getState().history.state()).toMatchObject({ canUndo: true, canRedo: false })
+  })
+
+  it('does not change revision or history for a no-op command', () => {
+    const store = createDesignStore()
+
+    store.getState().setFinish('glossy')
+
+    expect(store.getState().revision).toBe(0)
+    expect(store.getState().history.state()).toMatchObject({ canUndo: false, canRedo: false })
+  })
+
+  it('increments revision once for undo and once for redo', () => {
+    const store = createDesignStore()
+    store.getState().setBaseColor('#112233')
+    const afterExecute = store.getState().revision
+
+    store.getState().undo()
+    expect(store.getState().document.nails['right.index'].baseColor).toBe('#ffffff')
+    expect(store.getState().revision).toBe(afterExecute + 1)
+
+    store.getState().redo()
+    expect(store.getState().document.nails['right.index'].baseColor).toBe('#112233')
+    expect(store.getState().revision).toBe(afterExecute + 2)
+  })
+
+  it('clears history when loading a document', () => {
+    const store = createDesignStore()
+    store.getState().setBaseColor('#112233')
+
+    store.getState().loadDocument(createEmptyDocument())
+
+    expect(store.getState().history.state()).toMatchObject({ canUndo: false, canRedo: false })
+  })
+
+  it('repairs an active layer ID to the nearest surviving layer after deletion', () => {
+    const store = createDesignStore()
+    const secondLayer: Layer = {
+      id: 'layer-2', name: 'Layer 2', visible: true, opacity: 1, blend: 'normal', strokes: [],
+    }
+    store.getState().addLayer('right.index', secondLayer, 1)
+    store.getState().selectLayer('right.index', 'layer-2')
+
+    store.getState().removeLayer('right.index', 'layer-2')
+
+    expect(store.getState().activeLayerId('right.index')).toBe('layer-1')
+  })
+
+  it('records copying the active nail to editable nails as one reversible command', () => {
+    const store = createDesignStore()
+    const leftBefore = structuredClone(store.getState().document.nails['left.index'])
+    store.getState().selectNail('right.index')
+    store.getState().addStroke(STROKE)
+
+    store.getState().copyActiveNailToAll()
+    store.getState().undo()
+
+    expect(strokesOf(store, 'right.middle')).toHaveLength(0)
+    expect(strokesOf(store, 'right.index')).toHaveLength(1)
+    expect(store.getState().document.nails['left.index']).toEqual(leftBefore)
+    expect(store.getState().history.state()).toMatchObject({ undoLabel: 'วาดเส้น', canRedo: true })
   })
 })

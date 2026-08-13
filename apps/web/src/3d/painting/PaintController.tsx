@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useThree } from '@react-three/fiber'
 import { Raycaster, Vector2 } from 'three'
 import type { NailKey, Point } from '@nail-studio/contracts'
+import { primaryOf } from '@/features/design/designStore.ts'
 import { useDesignStoreApi } from '@/features/design/DesignStoreProvider.tsx'
 import type { HandParts } from '@/3d/models/HandModel.tsx'
 import { settingsToDabs, settingsToStroke } from './brush.ts'
@@ -111,10 +112,16 @@ export function PaintController({ parts, textures }: Props) {
       if (!state.selection.has(target.key)) {
         state.selectNail(target.key, event.shiftKey ? 'toggle' : 'replace')
       }
-      const selection = store.getState().selection
+      const paintState = store.getState()
+      const selection = paintState.selection
+      const activeKey = primaryOf(selection)
+      const activeLayerIndex = paintState.document.nails[activeKey].layers.findIndex(
+        (layer) => layer.id === paintState.activeLayerId(activeKey),
+      )
+      if (activeLayerIndex < 0) return
       if (!textures.beginStroke(
         selection,
-        store.getState().activeLayerIndex,
+        activeLayerIndex,
         state.settings.tool === 'erase',
         OWNER,
       )) {

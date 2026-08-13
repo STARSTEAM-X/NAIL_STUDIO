@@ -168,8 +168,13 @@ export function NailCanvas2D({ parts, textures }: Props) {
       // แตะนอกรูปเล็บไม่เริ่มเส้น — นอกรูปเล็บไม่มีผิวให้ทา
       if (!point) return
       const state = store.getState()
+      const activeKey = primaryOf(state.selection)
+      const activeLayerIndex = state.document.nails[activeKey].layers.findIndex(
+        (layer) => layer.id === state.activeLayerId(activeKey),
+      )
+      if (activeLayerIndex < 0) return
       if (!textures.beginStroke(
-        state.selection, state.activeLayerIndex, state.settings.tool === 'erase', OWNER,
+        state.selection, activeLayerIndex, state.settings.tool === 'erase', OWNER,
       )) {
         return
       }

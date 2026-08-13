@@ -1,0 +1,133 @@
+import { describe, expect, it } from 'vitest'
+import {
+  NAIL_KEYS,
+  createEmptyDocument,
+  type DesignDocument,
+  type Layer,
+  type NailKey,
+  type Stroke,
+} from '@nail-studio/contracts'
+import { EDITABLE_NAILS } from '@/features/design/designStore.ts'
+import { CompositeCommand } from './CompositeCommand.ts'
+import {
+  AddStrokeCommand,
+  ClearNailCommand,
+  SetBaseColorCommand,
+  SetFinishCommand,
+} from './nailCommands.ts'
+import {
+  AddLayerCommand,
+  MoveLayerCommand,
+  RemoveLayerCommand,
+  RenameLayerCommand,
+  SetLayerBlendCommand,
+  SetLayerOpacityCommand,
+  SetLayerVisibilityCommand,
+} from './layerCommands.ts'
+
+const RIGHT_INDEX = 'right.index' as NailKey
+
+const STROKE: Stroke = {
+  kind: 'brush', brush: 'round', color: '#b5314c',
+  size: 100, opacity: 1, softness: 0.25,
+  points: [{ x: 0.5, y: 0.5, p: 0.7 }],
+}
+
+function layer(id: string, name = id): Layer {
+  return { id, name, visible: true, opacity: 1, blend: 'normal', strokes: [] }
+}
+
+function withTwoLayers(): DesignDocument {
+  const document = createEmptyDocument()
+  document.nails[RIGHT_INDEX] = {
+    ...document.nails[RIGHT_INDEX],
+    layers: [
+      { ...document.nails[RIGHT_INDEX].layers[0]!, strokes: [STROKE] },
+      layer('layer-2'),
+    ],
+  }
+  return document
+}
+
+function expectRoundTrip(document: DesignDocument, command: {
+  do: (current: DesignDocument) => { document: DesignDocument }
+  undo: (current: DesignDocument) => { document: DesignDocument }
+}): void {
+  const original = structuredClone(document)
+  const changed = command.do(original).document
+  expect(command.undo(changed).document).toEqual(original)
+}
+
+describe('document commands', () => {
+  it('restores a stroke appended to one layer', () => {
+    expectRoundTrip(createEmptyDocument(), new AddStrokeCommand(RIGHT_INDEX, 'layer-1', STROKE))
+  })
+
+  it('restores a nail base color', () => {
+    expectRoundTrip(
+      createEmptyDocument(),
+      new SetBaseColorCommand(RIGHT_INDEX, '#ffffff', '#112233'),
+    )
+  })
+
+  it('restores a nail finish', () => {
+    expectRoundTrip(createEmptyDocument(), new SetFinishCommand(RIGHT_INDEX, 'glossy', 'chrome'))
+  })
+
+  it('restores all cleared strokes from one nail', () => {
+    const document = withTwoLayers()
+    const strokes = document.nails[RIGHT_INDEX].layers.map((item) => item.strokes)
+    expectRoundTrip(document, new ClearNailCommand(RIGHT_INDEX, strokes))
+  })
+
+  it('restores an inserted layer at its original index', () => {
+    expectRoundTrip(createEmptyDocument(), new AddLayerCommand(RIGHT_INDEX, layer('layer-2'), 1))
+  })
+
+  it('restores a removed layer at its original index', () => {
+    const document = withTwoLayers()
+    expectRoundTrip(document, new RemoveLayerCommand(RIGHT_INDEX, layer('layer-2'), 1))
+  })
+
+  it('restores a layer name', () => {
+    expectRoundTrip(createEmptyDocument(), new RenameLayerCommand(RIGHT_INDEX, 'layer-1', 'เลเยอร์ 1', 'Accent'))
+  })
+
+  it('restores a layer visibility setting', () => {
+    expectRoundTrip(createEmptyDocument(), new SetLayerVisibilityCommand(RIGHT_INDEX, 'layer-1', true, false))
+  })
+
+  it('restores a layer opacity setting', () => {
+    expectRoundTrip(createEmptyDocument(), new SetLayerOpacityCommand(RIGHT_INDEX, 'layer-1', 1, 0.4))
+  })
+
+  it('restores a layer blend setting', () => {
+    expectRoundTrip(createEmptyDocument(), new SetLayerBlendCommand(RIGHT_INDEX, 'layer-1', 'normal', 'screen'))
+  })
+
+  it('restores a layer move', () => {
+    expectRoundTrip(withTwoLayers(), new MoveLayerCommand(RIGHT_INDEX, 'layer-2', 1, 0))
+  })
+
+  it('undoes composite children in reverse order', () => {
+    const document = createEmptyDocument()
+    expectRoundTrip(document, new CompositeCommand('Set appearance', [
+      new SetBaseColorCommand(RIGHT_INDEX, '#ffffff', '#112233'),
+      new SetFinishCommand(RIGHT_INDEX, 'glossy', 'chrome'),
+    ]))
+  })
+
+  it('keeps every left-hand nail unchanged when a bulk command targets editable nails', () => {
+    const original = structuredClone(createEmptyDocument())
+    const command = new CompositeCommand('Set color for editable nails', EDITABLE_NAILS.map((key) =>
+      new SetBaseColorCommand(key, '#ffffff', '#112233'),
+    ))
+
+    const changed = command.do(original).document
+
+    for (const key of NAIL_KEYS.filter((key) => key.startsWith('left.'))) {
+      expect(changed.nails[key]).toEqual(original.nails[key])
+    }
+    expect(command.undo(changed).document).toEqual(original)
+  })
+})

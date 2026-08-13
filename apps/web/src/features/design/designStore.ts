@@ -10,55 +10,41 @@ import {
   type NailKey,
   type Stroke,
 } from '@nail-studio/contracts'
+import { HistoryStack } from '@/3d/history/HistoryStack.ts'
+import type { Command } from '@/3d/history/Command.ts'
+import { CompositeCommand } from '@/3d/history/commands/CompositeCommand.ts'
+import {
+  AddStrokeCommand,
+  ClearNailCommand,
+  CopyNailCommand,
+  SetBaseColorCommand,
+  SetFinishCommand,
+} from '@/3d/history/commands/nailCommands.ts'
+import {
+  AddLayerCommand,
+  MoveLayerCommand,
+  RemoveLayerCommand,
+  RenameLayerCommand,
+  SetLayerBlendCommand,
+  SetLayerOpacityCommand,
+  SetLayerVisibilityCommand,
+} from '@/3d/history/commands/layerCommands.ts'
 import { DEFAULT_PAINT_SETTINGS, type PaintSettings } from '@/3d/painting/paintSettings.ts'
 
-/**
- * สถานะของหน้าแก้ไขงานหนึ่งชิ้น
- *
- * เป็น "โรงงาน" ไม่ใช่ store ก้อนเดียวทั้งแอป เพราะสถานะนี้ผูกกับงานที่เปิดอยู่
- * ถ้าเป็นก้อนเดียวทั้งแอป การเปิดงานชิ้นถัดไปจะเห็นเส้นของงานก่อนหน้าค้างอยู่ชั่วขณะ
- * และเทสแต่ละข้อจะแชร์สถานะกัน ต้องคอยรีเซ็ตเองซึ่งพลาดง่าย
- *
- * ค่าคงตัวที่ต้องเป็นจริงเสมอ:
- *   1. selection ไม่เคยว่าง — ต้องมีเล็บที่ถูกเลือกอย่างน้อยหนึ่งนิ้วเสมอ
- *   2. เล็บที่ไม่ได้ถูกแก้ต้องคง identity เดิม (===) เพื่อให้ชั้นแคชเท็กซ์เจอร์
- *      รู้ได้ในเวลาคงที่ว่าต้องวาดใหม่นิ้วไหน โดยไม่ต้องเทียบเนื้อในทั้งเอกสาร
- *   3. revision เพิ่มขึ้นทุกครั้งที่ document เปลี่ยน — เป็นฐานของ autosave
- */
-
-/**
- * มือเดียวที่แก้ไขได้ในตอนนี้ (Slice 2)
- *
- * เอกสารงานยังเก็บครบ 10 นิ้วตามเดิม — จงใจไม่ตัด schema ลงเหลือ 5 เพราะการเปลี่ยน
- * รูปแบบเอกสารต้องมี migration ของงานที่ผู้ใช้บันทึกไว้แล้ว ซึ่งเป็นราคาที่ไม่ควรจ่าย
- * เพื่อการตัดฟีเจอร์ชั่วคราว เล็บมือซ้ายจึงถูกเก็บไว้เป็นค่าเริ่มต้นและไม่ถูกแตะ
- *
- * การเปิดมือซ้ายกลับมาคือการแก้ค่านี้ให้เป็นรายการของมือ แล้วเพิ่ม UI สลับมือกลับเข้าไป
- * ส่วนการกลับด้านโมเดลมีบันทึกไว้ใน architecture.md D-23
- */
 export const EDITABLE_HAND: Hand = 'right'
-
-/** คีย์เล็บทั้งหมดที่แก้ไขได้ในตอนนี้ */
 export const EDITABLE_NAILS: NailKey[] = nailKeysOfHand(EDITABLE_HAND)
 
-/**
- * เป้าหมายที่อยากให้กล้องไปจ่อ — เป็นสถานะของมุมมอง ไม่ใช่ส่วนหนึ่งของงานออกแบบ
- * จึงไม่ถูกบันทึกลงเอกสารและไม่นับเป็นการแก้ไข (revision ไม่ขยับ)
- */
 export type FocusTarget = { kind: 'nail'; key: NailKey } | { kind: 'home' } | null
 
 export interface DesignState {
   document: DesignDocument
   focus: FocusTarget
-  /** เล็บที่ถูกเลือก — วาดหนึ่งครั้งลงทุกนิ้วที่เลือกไว้ */
   selection: Set<NailKey>
-  /** ใช้ดัชนีไม่ใช่ id เพราะเลเยอร์เป็นคนละชุดในแต่ละเล็บ id เดียวจึงชี้ข้ามเล็บไม่ได้ */
-  activeLayerIndex: number
+  activeLayerIds: Partial<Record<NailKey, string>>
   settings: PaintSettings
-  /** นับทุกการเปลี่ยนแปลงของ document — autosave เทียบตัวเลขนี้กับที่บันทึกไปแล้ว */
   revision: number
-  /** ข้อความบอกผู้ใช้เมื่อการกระทำถูกปฏิเสธ เช่น ชนเพดานจำนวนเส้น */
   notice: string | null
+  history: HistoryStack
 }
 
 export interface DesignActions {
@@ -69,50 +55,90 @@ export interface DesignActions {
   focusHome: () => void
   clearFocus: () => void
   setSettings: (patch: Partial<PaintSettings>) => void
+  activeLayerId: (key: NailKey) => string
+  selectLayer: (key: NailKey, id: string) => void
   addStroke: (stroke: Stroke) => void
   clearSelectedNails: () => void
-  setFinish: (finish: Nail['finish']) => void
-  setBaseColor: (color: string) => void
+  setFinish: (finish: Nail['finish'], mergeKey?: string) => void
+  setBaseColor: (color: string, mergeKey?: string) => void
   copyActiveNailToAll: () => void
+  addLayer: (key: NailKey, layer: Layer, index?: number) => void
+  removeLayer: (key: NailKey, layerId: string) => void
+  renameLayer: (key: NailKey, layerId: string, name: string, mergeKey?: string) => void
+  setLayerVisibility: (key: NailKey, layerId: string, visible: boolean) => void
+  setLayerOpacity: (key: NailKey, layerId: string, opacity: number, mergeKey?: string) => void
+  setLayerBlend: (key: NailKey, layerId: string, blend: Layer['blend']) => void
+  moveLayer: (key: NailKey, layerId: string, toIndex: number) => void
+  undo: () => void
+  redo: () => void
   dismissNotice: () => void
 }
 
 export type DesignStore = StoreApi<DesignState & DesignActions>
 
-/** เล็บที่ถือว่า "ต้นฉบับ" เมื่อสั่งคัดลอกไปทุกนิ้ว — นิ้วแรกตามลำดับมาตรฐาน */
 export function primaryOf(selection: Set<NailKey>): NailKey {
-  const first = EDITABLE_NAILS.find((key) => selection.has(key))
-  // selection ว่างไม่ควรเกิดขึ้นตามค่าคงตัวข้อ 1 แต่ถ้าเกิดก็ต้องไม่ทำให้ทั้งหน้าพัง
-  return first ?? EDITABLE_NAILS[0] ?? 'right.thumb'
+  return EDITABLE_NAILS.find((key) => selection.has(key)) ?? EDITABLE_NAILS[0] ?? 'right.thumb'
 }
 
-/** แก้เล็บที่เลือกไว้ทีละนิ้ว โดยเล็บที่ไม่ถูกแตะต้องคง identity เดิม (ค่าคงตัวข้อ 2) */
-function mapNails(
+function editableSelection(selection: Iterable<NailKey>): NailKey[] {
+  const selected = new Set(selection)
+  return EDITABLE_NAILS.filter((key) => selected.has(key))
+}
+
+function activeLayerIdOf(
   document: DesignDocument,
-  keys: Iterable<NailKey>,
-  update: (nail: Nail, key: NailKey) => Nail,
-): DesignDocument {
-  const nails = { ...document.nails }
-  let changed = false
-  for (const key of keys) {
-    const current = nails[key]
-    const next = update(current, key)
-    if (next !== current) {
-      nails[key] = next
-      changed = true
-    }
-  }
-  return changed ? { ...document, nails } : document
+  activeLayerIds: Partial<Record<NailKey, string>>,
+  key: NailKey,
+): string {
+  const layers = document.nails[key].layers
+  const activeId = activeLayerIds[key]
+  if (activeId !== undefined && layers.some((layer) => layer.id === activeId)) return activeId
+  return layers[0]!.id
 }
 
-function replaceLayer(nail: Nail, index: number, update: (layer: Layer) => Layer): Nail {
-  const target = nail.layers[index]
-  if (!target) return nail
-  const next = update(target)
-  if (next === target) return nail
-  const layers = [...nail.layers]
-  layers[index] = next
-  return { ...nail, layers }
+function initialActiveLayerIds(document: DesignDocument): Partial<Record<NailKey, string>> {
+  return Object.fromEntries(
+    Object.entries(document.nails).map(([key, nail]) => [key, nail.layers[0]!.id]),
+  ) as Partial<Record<NailKey, string>>
+}
+
+function repairActiveLayerIds(
+  before: DesignDocument,
+  after: DesignDocument,
+  activeLayerIds: Partial<Record<NailKey, string>>,
+): Partial<Record<NailKey, string>> {
+  const repaired = { ...activeLayerIds }
+  for (const key of Object.keys(after.nails) as NailKey[]) {
+    const currentId = repaired[key]
+    const afterLayers = after.nails[key].layers
+    if (currentId !== undefined && afterLayers.some((layer) => layer.id === currentId)) continue
+    const beforeIndex = currentId === undefined
+      ? 0
+      : before.nails[key].layers.findIndex((layer) => layer.id === currentId)
+    repaired[key] = afterLayers[Math.min(Math.max(beforeIndex, 0), afterLayers.length - 1)]!.id
+  }
+  return repaired
+}
+
+function commandFor(label: string, commands: Command[]): Command {
+  return commands.length === 1 ? commands[0]! : new CompositeCommand(label, commands)
+}
+
+function nailsMatch(first: Nail, second: Nail): boolean {
+  if (
+    first.shape !== second.shape
+    || first.length !== second.length
+    || first.finish !== second.finish
+    || first.baseColor !== second.baseColor
+    || first.layers.length !== second.layers.length
+    || first.decorations.length !== second.decorations.length
+  ) return false
+  return JSON.stringify(first.layers) === JSON.stringify(second.layers)
+    && JSON.stringify(first.decorations) === JSON.stringify(second.decorations)
+}
+
+function isEditable(key: NailKey): boolean {
+  return EDITABLE_NAILS.includes(key)
 }
 
 export interface CreateDesignStoreOptions {
@@ -122,122 +148,206 @@ export interface CreateDesignStoreOptions {
 
 export function createDesignStore(options: CreateDesignStoreOptions = {}): DesignStore {
   const document = options.document ?? createEmptyDocument()
-  return createStore<DesignState & DesignActions>((set, get) => ({
-    document,
-    focus: null,
-    selection: new Set<NailKey>([EDITABLE_NAILS[1] ?? 'right.index']),
-    activeLayerIndex: 0,
-    settings: options.settings ?? DEFAULT_PAINT_SETTINGS,
-    revision: 0,
-    notice: null,
+  const history = new HistoryStack()
 
-    loadDocument: (next) => {
-      set((state) => ({ document: next, revision: state.revision + 1, notice: null }))
-    },
-
-    selectNail: (key, mode = 'replace') => {
-      set((state) => {
-        if (mode === 'replace') return { selection: new Set([key]) }
-        const selection = new Set(state.selection)
-        if (selection.has(key)) {
-          // ห้ามเหลือศูนย์ (ค่าคงตัวข้อ 1) — ไม่งั้นแถบเครื่องมือจะสั่งงานอะไรไม่ได้เลย
-          if (selection.size === 1) return state
-          selection.delete(key)
-        } else {
-          selection.add(key)
-        }
-        return { selection }
+  return createStore<DesignState & DesignActions>((set, get) => {
+    const execute = (command: Command): boolean => {
+      const state = get()
+      const result = state.history.execute(state.document, command)
+      if (!result.recorded) return false
+      set({
+        document: result.document,
+        revision: state.revision + 1,
+        notice: null,
+        activeLayerIds: repairActiveLayerIds(state.document, result.document, state.activeLayerIds),
       })
-    },
+      return true
+    }
 
-    selectAll: () => {
-      set({ selection: new Set(EDITABLE_NAILS), focus: { kind: 'home' } })
-    },
+    return {
+      document,
+      focus: null,
+      selection: new Set<NailKey>([EDITABLE_NAILS[1] ?? 'right.index']),
+      activeLayerIds: initialActiveLayerIds(document),
+      settings: options.settings ?? DEFAULT_PAINT_SETTINGS,
+      revision: 0,
+      notice: null,
+      history,
 
-    focusNail: (key) => {
-      set({ focus: { kind: 'nail', key } })
-    },
+      loadDocument: (next) => {
+        history.clear()
+        set((state) => ({
+          document: next,
+          revision: state.revision + 1,
+          notice: null,
+          activeLayerIds: initialActiveLayerIds(next),
+        }))
+      },
 
-    focusHome: () => {
-      set({ focus: { kind: 'home' } })
-    },
+      selectNail: (key, mode = 'replace') => {
+        set((state) => {
+          if (mode === 'replace') return { selection: new Set([key]) }
+          const selection = new Set(state.selection)
+          if (selection.has(key)) {
+            if (selection.size === 1) return state
+            selection.delete(key)
+          } else {
+            selection.add(key)
+          }
+          return { selection }
+        })
+      },
 
-    clearFocus: () => {
-      // เขียนเฉพาะตอนที่มีอะไรให้ล้างจริง — ตัวยกเลิกถูกเรียกทุกครั้งที่แตะแคนวาส
-      // การ set ทุกครั้งจะทำให้ทั้งหน้า render ใหม่ทุกจังหวะที่เริ่มลากเส้น
-      if (get().focus !== null) set({ focus: null })
-    },
+      selectAll: () => {
+        set({ selection: new Set(EDITABLE_NAILS), focus: { kind: 'home' } })
+      },
 
-    setSettings: (patch) => {
-      set((state) => ({ settings: { ...state.settings, ...patch } }))
-    },
+      focusNail: (key) => set({ focus: { kind: 'nail', key } }),
+      focusHome: () => set({ focus: { kind: 'home' } }),
+      clearFocus: () => {
+        if (get().focus !== null) set({ focus: null })
+      },
+      setSettings: (patch) => set((state) => ({ settings: { ...state.settings, ...patch } })),
 
-    addStroke: (stroke) => {
-      const state = get()
-      const index = state.activeLayerIndex
-      const overflowing = [...state.selection].some(
-        (key) => (state.document.nails[key].layers[index]?.strokes.length ?? 0) >= MAX_STROKES_PER_LAYER,
-      )
-      if (overflowing) {
-        set({ notice: `เลเยอร์นี้เก็บได้สูงสุด ${MAX_STROKES_PER_LAYER} เส้น — รวมเลเยอร์หรือเริ่มเลเยอร์ใหม่ก่อน` })
-        return
-      }
-      // เส้นก้อนเดียวกันถูกใช้ร่วมกันได้ทุกนิ้ว เพราะเป็นข้อมูลอ่านอย่างเดียว
-      // ทั้งเส้นทาง (เอกสารงานถูกแก้ด้วยการสร้างใหม่เสมอ ไม่มีใครแก้เส้นในที่)
-      const document = mapNails(state.document, state.selection, (nail) =>
-        replaceLayer(nail, index, (layer) => ({ ...layer, strokes: [...layer.strokes, stroke] })),
-      )
-      set({ document, revision: state.revision + 1 })
-    },
+      activeLayerId: (key) => activeLayerIdOf(get().document, get().activeLayerIds, key),
 
-    clearSelectedNails: () => {
-      const state = get()
-      const document = mapNails(state.document, state.selection, (nail) =>
-        nail.layers.every((layer) => layer.strokes.length === 0)
-          ? nail
-          : { ...nail, layers: nail.layers.map((layer) => ({ ...layer, strokes: [] })) },
-      )
-      if (document === state.document) return
-      set({ document, revision: state.revision + 1 })
-    },
+      selectLayer: (key, id) => {
+        if (!get().document.nails[key].layers.some((layer) => layer.id === id)) return
+        set((state) => ({ activeLayerIds: { ...state.activeLayerIds, [key]: id } }))
+      },
 
-    setFinish: (finish) => {
-      const state = get()
-      const document = mapNails(state.document, state.selection, (nail) =>
-        nail.finish === finish ? nail : { ...nail, finish },
-      )
-      if (document === state.document) return
-      set({ document, revision: state.revision + 1 })
-    },
+      addStroke: (stroke) => {
+        const state = get()
+        const targets = editableSelection(state.selection).map((key) => ({
+          key,
+          layerId: activeLayerIdOf(state.document, state.activeLayerIds, key),
+        }))
+        const overflowing = targets.some(({ key, layerId }) => {
+          const layer = state.document.nails[key].layers.find((item) => item.id === layerId)
+          return layer === undefined || layer.strokes.length >= MAX_STROKES_PER_LAYER
+        })
+        if (overflowing) {
+          set({ notice: `เลเยอร์นี้เก็บได้สูงสุด ${MAX_STROKES_PER_LAYER} เส้น — รวมเลเยอร์หรือเริ่มเลเยอร์ใหม่ก่อน` })
+          return
+        }
+        if (targets.length > 0) execute(commandFor('วาดเส้น', targets.map(({ key, layerId }) =>
+          new AddStrokeCommand(key, layerId, stroke))))
+      },
 
-    setBaseColor: (color) => {
-      const state = get()
-      const document = mapNails(state.document, state.selection, (nail) =>
-        nail.baseColor === color ? nail : { ...nail, baseColor: color },
-      )
-      if (document === state.document) return
-      set({ document, revision: state.revision + 1 })
-    },
+      clearSelectedNails: () => {
+        const state = get()
+        const commands = editableSelection(state.selection)
+          .filter((key) => state.document.nails[key].layers.some((layer) => layer.strokes.length > 0))
+          .map((key) => new ClearNailCommand(
+            key,
+            state.document.nails[key].layers.map((layer) => layer.strokes),
+          ))
+        if (commands.length > 0) execute(commandFor('ล้างลายเล็บ', commands))
+      },
 
-    copyActiveNailToAll: () => {
-      const state = get()
-      const sourceKey = primaryOf(state.selection)
-      const source = state.document.nails[sourceKey]
-      // คัดลอกเฉพาะนิ้วที่ผู้ใช้มองเห็นและแก้ไขได้ — การไปเขียนเล็บมือที่ยังไม่ได้เปิด
-      // ใช้งานคือการเปลี่ยนข้อมูลที่ผู้ใช้ไม่มีทางเห็นว่าเปลี่ยน
-      const others = EDITABLE_NAILS.filter((key) => key !== sourceKey)
-      const document = mapNails(state.document, others, () => ({
-        ...source,
-        // ต้องสร้างอาร์เรย์ใหม่ให้แต่ละนิ้ว ไม่ใช่ใช้ก้อนเดียวกัน ไม่งั้นการวาดนิ้วเดียว
-        // หลังจากนี้จะไปเปลี่ยนทุกนิ้วพร้อมกัน (บั๊กเดียวกับที่ createEmptyDocument เคยมี)
-        layers: source.layers.map((layer) => ({ ...layer, strokes: [...layer.strokes] })),
-        decorations: source.decorations.map((decoration) => ({ ...decoration })),
-      }))
-      set({ document, revision: state.revision + 1, selection: new Set(EDITABLE_NAILS) })
-    },
+      setFinish: (finish, mergeKey) => {
+        const state = get()
+        const commands = editableSelection(state.selection)
+          .filter((key) => state.document.nails[key].finish !== finish)
+          .map((key) => new SetFinishCommand(key, state.document.nails[key].finish, finish, mergeKey))
+        if (commands.length > 0) execute(commandFor('เปลี่ยนผิวเล็บ', commands))
+      },
 
-    dismissNotice: () => {
-      set({ notice: null })
-    },
-  }))
+      setBaseColor: (color, mergeKey) => {
+        const state = get()
+        const commands = editableSelection(state.selection)
+          .filter((key) => state.document.nails[key].baseColor !== color)
+          .map((key) => new SetBaseColorCommand(key, state.document.nails[key].baseColor, color, mergeKey))
+        if (commands.length > 0) execute(commandFor('เปลี่ยนสีเล็บ', commands))
+      },
+
+      copyActiveNailToAll: () => {
+        const state = get()
+        const sourceKey = primaryOf(state.selection)
+        const source = state.document.nails[sourceKey]
+        const commands = EDITABLE_NAILS
+          .filter((key) => key !== sourceKey && !nailsMatch(state.document.nails[key], source))
+          .map((key) => new CopyNailCommand(key, state.document.nails[key], source))
+        if (commands.length > 0) execute(new CompositeCommand('คัดลอกเล็บไปทุกนิ้ว', commands))
+        set({ selection: new Set(EDITABLE_NAILS) })
+      },
+
+      addLayer: (key, layer, index) => {
+        if (!isEditable(key)) return
+        const current = get().document.nails[key]
+        execute(new AddLayerCommand(key, layer, index ?? current.layers.length))
+      },
+
+      removeLayer: (key, layerId) => {
+        if (!isEditable(key)) return
+        const layers = get().document.nails[key].layers
+        const index = layers.findIndex((layer) => layer.id === layerId)
+        const layer = layers[index]
+        if (!layer) return
+        execute(new RemoveLayerCommand(key, layer, index))
+      },
+
+      renameLayer: (key, layerId, name, mergeKey) => {
+        if (!isEditable(key) || name.length === 0 || name.length > 60) return
+        const layer = get().document.nails[key].layers.find((item) => item.id === layerId)
+        if (!layer) return
+        execute(new RenameLayerCommand(key, layerId, layer.name, name, mergeKey))
+      },
+
+      setLayerVisibility: (key, layerId, visible) => {
+        if (!isEditable(key)) return
+        const layer = get().document.nails[key].layers.find((item) => item.id === layerId)
+        if (!layer) return
+        execute(new SetLayerVisibilityCommand(key, layerId, layer.visible, visible))
+      },
+
+      setLayerOpacity: (key, layerId, opacity, mergeKey) => {
+        if (!isEditable(key) || opacity < 0 || opacity > 1) return
+        const layer = get().document.nails[key].layers.find((item) => item.id === layerId)
+        if (!layer) return
+        execute(new SetLayerOpacityCommand(key, layerId, layer.opacity, opacity, mergeKey))
+      },
+
+      setLayerBlend: (key, layerId, blend) => {
+        if (!isEditable(key)) return
+        const layer = get().document.nails[key].layers.find((item) => item.id === layerId)
+        if (!layer) return
+        execute(new SetLayerBlendCommand(key, layerId, layer.blend, blend))
+      },
+
+      moveLayer: (key, layerId, toIndex) => {
+        if (!isEditable(key)) return
+        const layers = get().document.nails[key].layers
+        const from = layers.findIndex((layer) => layer.id === layerId)
+        if (from < 0) return
+        execute(new MoveLayerCommand(key, layerId, from, toIndex))
+      },
+
+      undo: () => {
+        const state = get()
+        const result = state.history.undo(state.document)
+        if (result.document === state.document) return
+        set({
+          document: result.document,
+          revision: state.revision + 1,
+          notice: null,
+          activeLayerIds: repairActiveLayerIds(state.document, result.document, state.activeLayerIds),
+        })
+      },
+
+      redo: () => {
+        const state = get()
+        const result = state.history.redo(state.document)
+        if (result.document === state.document) return
+        set({
+          document: result.document,
+          revision: state.revision + 1,
+          notice: null,
+          activeLayerIds: repairActiveLayerIds(state.document, result.document, state.activeLayerIds),
+        })
+      },
+
+      dismissNotice: () => set({ notice: null }),
+    }
+  })
 }
