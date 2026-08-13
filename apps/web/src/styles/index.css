@@ -271,6 +271,57 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   touch-action: none;
 }
 
+/* ---------- ประวัติเวอร์ชัน ---------- */
+
+.version-panel {
+  width: 292px;
+  flex-shrink: 0;
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  overflow-y: auto;
+  background: var(--surface);
+  border-left: 1px solid var(--rule);
+}
+.version-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.version-panel-head h2 { margin: 0; font-size: 0.95rem; color: var(--deep); }
+.version-panel .hint { margin: 0; }
+.version-list { list-style: none; display: flex; flex-direction: column; gap: 0.65rem; margin: 0; padding: 0; }
+.version-card { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.65rem; border: 1px solid var(--rule); border-radius: 8px; }
+.version-meta { display: grid; grid-template-columns: 1fr auto; gap: 0.2rem 0.5rem; font-size: 0.78rem; color: var(--muted); }
+.version-meta strong { grid-column: 1 / -1; color: var(--deep); font-size: 0.9rem; }
+.version-label-form, .version-duplicate { display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.82rem; color: var(--muted); }
+.version-label-row { display: flex; gap: 0.35rem; }
+.version-label-row input { min-width: 0; flex: 1; }
+.version-label-row .btn { flex-shrink: 0; padding-inline: 0.55rem; }
+.version-duplicate { padding-top: 0.75rem; border-top: 1px solid var(--rule); }
+
+/* ---------- การแก้ไขเวอร์ชันขัดแย้ง ---------- */
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(23 18 15 / 68%);
+}
+.conflict-dialog {
+  width: min(520px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  padding: 1.25rem;
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 20px 60px rgb(23 18 15 / 28%);
+}
+.conflict-dialog h2, .conflict-dialog p { margin: 0; }
+.conflict-actions { display: grid; grid-template-columns: 1fr 1.4fr; gap: 0.8rem; align-items: end; }
+.conflict-actions form { display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.85rem; color: var(--muted); }
+
 /* ---------- แถบเลือกเล็บ ---------- */
 
 .nail-strip {
@@ -302,6 +353,12 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
     border-top: 1px solid var(--rule);
   }
   .canvas2d { width: 180px; }
+  .version-panel {
+    width: 100%;
+    max-height: 36vh;
+    border-left: none;
+    border-top: 1px solid var(--rule);
+  }
 }
 
 @media (max-width: 720px) {
@@ -319,6 +376,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   }
   .viewport { min-height: 38vh; }
   .canvas2d { width: 132px; }
+  .conflict-actions { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

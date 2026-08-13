@@ -1,11 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { DesignDocument, ProjectSummary } from '@nail-studio/contracts'
+import type {
+  DesignDocument,
+  DuplicateProjectInput,
+  ProjectSummary,
+  VersionSummary,
+} from '@nail-studio/contracts'
 import { apiFetch } from '@/api/client.ts'
 
 export const projectKeys = {
   all: ['projects'] as const,
   list: () => [...projectKeys.all, 'list'] as const,
   detail: (id: string) => [...projectKeys.all, 'detail', id] as const,
+  versions: (projectId: string) => [...projectKeys.all, 'versions', projectId] as const,
+  version: (projectId: string, number: number) =>
+    [...projectKeys.versions(projectId), number] as const,
 }
 
 export interface ProjectDetail {
@@ -13,6 +21,13 @@ export interface ProjectDetail {
   version: { number: number; document: DesignDocument; createdAt: string }
   /** งานที่ autosave เก็บไว้แต่ยังไม่ได้กดบันทึกเป็นเวอร์ชัน */
   draft: { document: DesignDocument; updatedAt: string } | null
+}
+
+export interface ProjectVersion {
+  number: number
+  label: string | null
+  createdAt: string
+  document: DesignDocument
 }
 
 /** เอกสารที่ควรเปิดขึ้นมาแก้ต่อ — งานค้างมาก่อนเวอร์ชันล่าสุดเสมอ */
@@ -32,6 +47,77 @@ export function useProject(id: string | undefined) {
     queryKey: projectKeys.detail(id ?? ''),
     queryFn: () => apiFetch<ProjectDetail>(`/projects/${id}`),
     enabled: Boolean(id),
+  })
+}
+
+export function fetchProjectDetail(projectId: string) {
+  return apiFetch<ProjectDetail>(`/projects/${projectId}`)
+}
+
+export function useVersions(projectId: string) {
+  return useQuery({
+    queryKey: projectKeys.versions(projectId),
+    queryFn: () => apiFetch<VersionSummary[]>(`/projects/${projectId}/versions`),
+    enabled: Boolean(projectId),
+  })
+}
+
+export interface LoadVersionInput {
+  projectId: string
+  versionNumber: number
+}
+
+export function useLoadVersion() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: LoadVersionInput) =>
+      apiFetch<ProjectVersion>(`/projects/${input.projectId}/versions/${input.versionNumber}`),
+    onSuccess: (version, input) => {
+      queryClient.setQueryData(projectKeys.version(input.projectId, input.versionNumber), version)
+    },
+  })
+}
+
+export interface RenameVersionInput extends LoadVersionInput {
+  label: string | null
+}
+
+export function useRenameVersion() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: RenameVersionInput) =>
+      apiFetch<{ number: number; label: string | null }>(
+        `/projects/${input.projectId}/versions/${input.versionNumber}`,
+        { method: 'PATCH', body: { label: input.label } },
+      ),
+    onSuccess: (_result, input) => {
+      void queryClient.invalidateQueries({
+        queryKey: projectKeys.versions(input.projectId),
+        exact: true,
+      })
+      void queryClient.invalidateQueries({
+        queryKey: projectKeys.version(input.projectId, input.versionNumber),
+        exact: true,
+      })
+    },
+  })
+}
+
+export interface DuplicateProjectRequest extends DuplicateProjectInput {
+  projectId: string
+}
+
+export function useDuplicateProject() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ projectId, name, document }: DuplicateProjectRequest) =>
+      apiFetch<ProjectSummary>(`/projects/${projectId}/duplicate`, {
+        method: 'POST',
+        body: { name, document },
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: projectKeys.list(), exact: true })
+    },
   })
 }
 
@@ -96,6 +182,10 @@ export function useSaveVersion() {
     onSuccess: (_result, input) => {
       void queryClient.invalidateQueries({ queryKey: projectKeys.detail(input.projectId) })
       void queryClient.invalidateQueries({ queryKey: projectKeys.list() })
+      void queryClient.invalidateQueries({
+        queryKey: projectKeys.versions(input.projectId),
+        exact: true,
+      })
     },
   })
 }

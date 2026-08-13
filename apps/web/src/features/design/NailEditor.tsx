@@ -1,16 +1,32 @@
 import { useCallback, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { ApiRequestError } from '@/api/client.ts'
 import { NailScene } from '@/3d/scene/NailScene.tsx'
 import { DesignScene } from '@/3d/scene/DesignScene.tsx'
 import { WebGlGuard } from '@/3d/scene/WebGlGuard.tsx'
 import type { HandParts } from '@/3d/models/HandModel.tsx'
 import { useNailTextures } from '@/3d/painting/useNailTextures.ts'
-import { useSaveVersion, type ProjectDetail } from '@/features/projects/useProjects.ts'
+import {
+  fetchProjectDetail,
+  openingDocument,
+  projectKeys,
+  useDuplicateProject,
+  useSaveVersion,
+  type ProjectDetail,
+} from '@/features/projects/useProjects.ts'
+import {
+  buildDuplicateCurrentInput,
+  conflictStateFromError,
+  type ServerVersionConflict,
+} from '@/features/projects/versionActions.ts'
 import { useDesign, useDesignStoreApi } from './DesignStoreProvider.tsx'
+import { ConflictDialog } from './ConflictDialog.tsx'
 import { NailCanvas2D } from './NailCanvas2D.tsx'
 import { NailStrip } from './NailStrip.tsx'
 import { PaintToolbar } from './PaintToolbar.tsx'
 import { HistoryControls } from './HistoryControls.tsx'
+import { VersionHistoryPanel } from './VersionHistoryPanel.tsx'
 import { useAutosave, type AutosaveStatus } from './useAutosave.ts'
 
 interface Props {
@@ -27,6 +43,8 @@ const AUTOSAVE_LABELS: Record<AutosaveStatus, string> = {
 }
 
 export function NailEditor({ projectId, detail }: Props) {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const store = useDesignStoreApi()
   const handScale = useDesign((state) => state.document.hand.proportions.handScale)
   const notice = useDesign((state) => state.notice)
@@ -39,9 +57,65 @@ export function NailEditor({ projectId, detail }: Props) {
   // identity ต้องคงที่ — HandModel เรียก onReady จาก effect ที่มี onReady ใน deps
   const handleReady = useCallback((next: HandParts) => setParts(next), [])
 
-  const autosave = useAutosave(projectId, detail.version.number)
+  // ฐานบันทึกเปลี่ยนเฉพาะเมื่อเราบันทึกสำเร็จหรือผู้ใช้เลือกโหลดล่าสุดอย่างชัดเจน
+  // การ refetch เบื้องหลังต้องไม่ทำให้เอกสารเก่าผ่าน optimistic concurrency โดยไม่ตั้งใจ
+  const [saveBaseVersion, setSaveBaseVersion] = useState(detail.version.number)
+  const autosave = useAutosave(projectId, saveBaseVersion)
   const saveVersion = useSaveVersion()
-  const [savedVersion, setSavedVersion] = useState<number | null>(null)
+  const duplicateProject = useDuplicateProject()
+  const [draftSourceVersion, setDraftSourceVersion] = useState<number | null>(null)
+  const [conflict, setConflict] = useState<ServerVersionConflict | null>(null)
+  const [isReloading, setIsReloading] = useState(false)
+  const [conflictActionError, setConflictActionError] = useState<string | null>(null)
+  const latestVersion = saveBaseVersion
+
+  const handleReloadServer = async () => {
+    setIsReloading(true)
+    setConflictActionError(null)
+    try {
+      await queryClient.invalidateQueries({
+        queryKey: projectKeys.detail(projectId),
+        exact: true,
+        refetchType: 'none',
+      })
+      const latest = await queryClient.fetchQuery({
+        queryKey: projectKeys.detail(projectId),
+        queryFn: () => fetchProjectDetail(projectId),
+      })
+      // loadDocument ล้าง undo/redo ด้วย จึงไม่มีทางย้อนกลับไปปนกับเอกสารที่ขัดแย้ง
+      store.getState().loadDocument(openingDocument(latest))
+      setSaveBaseVersion(latest.version.number)
+      setDraftSourceVersion(null)
+      saveVersion.reset()
+      setConflict(null)
+    } catch (error) {
+      setConflictActionError(
+        error instanceof ApiRequestError
+          ? `โหลดเวอร์ชันล่าสุดไม่สำเร็จ — ${error.message}`
+          : 'โหลดเวอร์ชันล่าสุดไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
+      )
+    } finally {
+      setIsReloading(false)
+    }
+  }
+
+  const handleDuplicateCurrent = (name: string) => {
+    setConflictActionError(null)
+    duplicateProject.mutate(
+      {
+        projectId,
+        ...buildDuplicateCurrentInput(name, () => store.getState().document),
+      },
+      {
+        onSuccess: (project) => navigate(`/editor/${project.id}`),
+        onError: (error) => setConflictActionError(
+          error instanceof ApiRequestError
+            ? `ทำสำเนางานไม่สำเร็จ — ${error.message}`
+            : 'ทำสำเนางานไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
+        ),
+      },
+    )
+  }
 
   return (
     <section className="editor">
@@ -49,7 +123,9 @@ export function NailEditor({ projectId, detail }: Props) {
         <div>
           <h1>{detail.project.name}</h1>
           <p className="muted">
-            เวอร์ชัน {savedVersion ?? detail.version.number}
+            {draftSourceVersion === null
+              ? `เวอร์ชัน ${latestVersion}`
+              : `ฉบับร่างจากเวอร์ชัน ${draftSourceVersion} · ฐานบันทึกเวอร์ชัน ${latestVersion}`}
             {autosave.status !== 'idle' ? ` · ${AUTOSAVE_LABELS[autosave.status]}` : ''}
             {detail.draft && autosave.status === 'idle' ? ' · เปิดจากงานค้างล่าสุด' : ''}
           </p>
@@ -57,8 +133,12 @@ export function NailEditor({ projectId, detail }: Props) {
         <div className="editor-actions">
           <HistoryControls />
           {autosave.message && <span className="error" role="alert">{autosave.message}</span>}
-          {saveVersion.error instanceof ApiRequestError && (
-            <span className="error" role="alert">{saveVersion.error.message}</span>
+          {saveVersion.error && !conflict && (
+            <span className="error" role="alert">
+              {saveVersion.error instanceof ApiRequestError
+                ? saveVersion.error.message
+                : 'บันทึกเวอร์ชันไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'}
+            </span>
           )}
           <button
             type="button"
@@ -71,9 +151,21 @@ export function NailEditor({ projectId, detail }: Props) {
                 {
                   projectId,
                   document: store.getState().document,
-                  expectedVersion: savedVersion ?? detail.version.number,
+                  expectedVersion: latestVersion,
                 },
-                { onSuccess: (result) => setSavedVersion(result.versionNumber) },
+                {
+                  onSuccess: (result) => {
+                    setSaveBaseVersion(result.versionNumber)
+                    setDraftSourceVersion(null)
+                  },
+                  onError: (error) => {
+                    const nextConflict = conflictStateFromError(error, 'explicit-save')
+                    if (nextConflict) {
+                      setConflictActionError(null)
+                      setConflict(nextConflict)
+                    }
+                  },
+                },
               )
             }}
           >
@@ -104,9 +196,26 @@ export function NailEditor({ projectId, detail }: Props) {
           </WebGlGuard>
         </div>
         {parts && textures && <NailCanvas2D parts={parts} textures={textures} />}
+        <VersionHistoryPanel
+          projectId={projectId}
+          projectName={detail.project.name}
+          latestVersion={latestVersion}
+          onLoadedVersion={setDraftSourceVersion}
+        />
       </div>
 
       <NailStrip />
+
+      {conflict && (
+        <ConflictDialog
+          projectName={detail.project.name}
+          isReloading={isReloading}
+          isDuplicating={duplicateProject.isPending}
+          errorMessage={conflictActionError}
+          onReloadServer={() => { void handleReloadServer() }}
+          onDuplicateCurrent={handleDuplicateCurrent}
+        />
+      )}
     </section>
   )
 }

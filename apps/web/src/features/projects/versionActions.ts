@@ -1,0 +1,43 @@
+import type { DesignDocument, DuplicateProjectInput } from '@nail-studio/contracts'
+import { ApiRequestError } from '@/api/client.ts'
+
+export type ConflictSource = 'explicit-save' | 'autosave'
+export type ConflictAction = 'reload-server' | 'duplicate-current'
+
+export interface ServerVersionConflict {
+  kind: 'server-version-conflict'
+  source: ConflictSource
+}
+
+export function conflictStateFromError(
+  error: unknown,
+  source: ConflictSource,
+): ServerVersionConflict | null {
+  return error instanceof ApiRequestError && error.status === 409
+    ? { kind: 'server-version-conflict', source }
+    : null
+}
+
+interface HistoricalVersionDocument {
+  number: number
+  document: DesignDocument
+}
+
+export function loadHistoricalVersion(
+  version: HistoricalVersionDocument,
+  latestServerVersion: number,
+  loadDocument: (document: DesignDocument) => void,
+) {
+  loadDocument(version.document)
+  return {
+    loadedVersion: version.number,
+    saveBaseVersion: latestServerVersion,
+  }
+}
+
+export function buildDuplicateCurrentInput(
+  name: string,
+  getCurrentDocument: () => DesignDocument,
+): DuplicateProjectInput {
+  return { name, document: getCurrentDocument() }
+}
