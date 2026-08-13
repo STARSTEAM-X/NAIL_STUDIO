@@ -27,6 +27,21 @@ export const FINISH_PRESETS: Record<FinishId, FinishSpec> = {
   glitter: { roughness: 0.38, metalness: 0.55, clearcoat: 1, clearcoatRoughness: 0.14, envMapIntensity: 1.4, sparkle: true },
 }
 
+/**
+ * The material map and normal-map presence affect shader state.  The map UUID
+ * is deliberately part of this key: one Three.js material can render only one
+ * colour map at a time, so separate nail textures must never share an entry.
+ */
+export function nailMaterialKey(
+  finish: FinishId,
+  map: Texture,
+  sparkle: Texture | null,
+): string {
+  const spec = FINISH_PRESETS[finish] ?? FINISH_PRESETS.glossy
+  const normalMapUuid = spec.sparkle ? (sparkle?.uuid ?? 'none') : 'none'
+  return `${finish}|map:${map.uuid}|sparkle:${spec.sparkle}|normal-map:${normalMapUuid}`
+}
+
 export const browserCanvasFactory: CanvasFactory = (size) => {
   const canvas = document.createElement('canvas')
   canvas.width = size
