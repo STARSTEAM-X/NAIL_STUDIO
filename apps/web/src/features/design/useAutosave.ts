@@ -20,6 +20,39 @@ export interface AutosaveResult {
   flush: () => void
 }
 
+export type AutosaveTrigger = 'debounce' | 'visibility' | 'cleanup' | 'flush'
+
+export function createAutosaveAttemptState(initialSavedRevision: number, initialBaseVersion: number) {
+  let savedRevision = initialSavedRevision
+  let currentBaseVersion = initialBaseVersion
+  let conflictBaseVersion: number | null = null
+  let inFlight = false
+
+  return {
+    start(revision: number, baseVersion: number, _trigger: AutosaveTrigger): boolean {
+      if (inFlight || revision === savedRevision || conflictBaseVersion === baseVersion) return false
+      inFlight = true
+      return true
+    },
+    succeed(revision: number) {
+      savedRevision = revision
+      inFlight = false
+    },
+    fail(baseVersion: number, conflict: boolean) {
+      inFlight = false
+      if (conflict) conflictBaseVersion = baseVersion
+    },
+    transitionBaseVersion(baseVersion: number) {
+      if (baseVersion === currentBaseVersion) return
+      currentBaseVersion = baseVersion
+      conflictBaseVersion = null
+    },
+    needsSave(revision: number): boolean {
+      return revision !== savedRevision
+    },
+  }
+}
+
 export function autosaveFailureFromError(error: unknown): {
   conflict: ServerVersionConflict | null
   message: string | null
@@ -54,29 +87,27 @@ export function useAutosave(projectId: string, baseVersion: number): AutosaveRes
 
   // เก็บใน ref เพราะ effect ด้านล่างต้องอ่านค่าล่าสุดโดยไม่ผูกเป็น dependency
   // ไม่งั้นตัวจับเวลาจะถูกตั้งใหม่ทุกครั้งที่สถานะเปลี่ยน แล้วไม่มีวันครบเวลา
-  const saved = useRef(store.getState().revision)
-  const inFlight = useRef(false)
+  const attempts = useRef(createAutosaveAttemptState(store.getState().revision, baseVersion))
+  attempts.current.transitionBaseVersion(baseVersion)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const save = useRef<() => void>(() => undefined)
+  const save = useRef<(trigger: AutosaveTrigger) => void>(() => undefined)
 
-  save.current = () => {
+  save.current = (trigger) => {
     const { revision, document } = store.getState()
-    if (inFlight.current || revision === saved.current) return
-    inFlight.current = true
+    if (!attempts.current.start(revision, baseVersion, trigger)) return
     setStatus('saving')
     saveDraft.mutate(
       { projectId, document, baseVersion },
       {
         onSuccess: () => {
-          saved.current = revision
-          inFlight.current = false
+          attempts.current.succeed(revision)
           setStatus('saved')
           setMessage(null)
           setConflict(null)
         },
         onError: (error: unknown) => {
           const failure = autosaveFailureFromError(error)
-          inFlight.current = false
+          attempts.current.fail(baseVersion, failure.conflict !== null)
           setStatus('error')
           setMessage(failure.message)
           setConflict(failure.conflict)
@@ -87,15 +118,15 @@ export function useAutosave(projectId: string, baseVersion: number): AutosaveRes
 
   useEffect(() => {
     const unsubscribe = store.subscribe((state) => {
-      if (state.revision === saved.current) return
+      if (!attempts.current.needsSave(state.revision)) return
       setStatus('pending')
       if (timer.current) clearTimeout(timer.current)
-      timer.current = setTimeout(() => save.current(), AUTOSAVE_DELAY_MS)
+      timer.current = setTimeout(() => save.current('debounce'), AUTOSAVE_DELAY_MS)
     })
 
     // ปิดแท็บระหว่างที่ยังหน่วงอยู่ต้องไม่ทำให้งานช่วงสุดท้ายหาย
     const onHide = () => {
-      if (window.document.visibilityState === 'hidden') save.current()
+      if (window.document.visibilityState === 'hidden') save.current('visibility')
     }
     window.document.addEventListener('visibilitychange', onHide)
 
@@ -104,7 +135,7 @@ export function useAutosave(projectId: string, baseVersion: number): AutosaveRes
       window.document.removeEventListener('visibilitychange', onHide)
       if (timer.current) clearTimeout(timer.current)
       // ออกจากหน้าแก้ไขก็เป็นการ "หยุดวาด" อย่างหนึ่ง — บันทึกก่อนไป
-      save.current()
+      save.current('cleanup')
     }
   }, [store])
 
@@ -114,7 +145,7 @@ export function useAutosave(projectId: string, baseVersion: number): AutosaveRes
     conflict,
     flush: () => {
       if (timer.current) clearTimeout(timer.current)
-      save.current()
+      save.current('flush')
     },
   }
 }

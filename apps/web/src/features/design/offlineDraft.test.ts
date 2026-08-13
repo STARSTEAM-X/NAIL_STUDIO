@@ -8,6 +8,7 @@ import {
 } from './offlineDraft.ts'
 import {
   applyOfflineDraftChoice,
+  createOfflineDraftRecoveryController,
   createOfflineDraftPersistence,
   inspectOfflineDraft,
   isOfflineDraftNewer,
@@ -147,6 +148,67 @@ describe('offline draft persistence', () => {
     await vi.advanceTimersByTimeAsync(500)
 
     expect(warnings).toEqual(['ไม่สามารถสำรองข้อมูลในเครื่องได้ งานยังบันทึกบนเซิร์ฟเวอร์ตามปกติ'])
+  })
+
+  it('cancels a pending debounce and ignores the server-load revision before the choice settles', async () => {
+    vi.useFakeTimers()
+    const writes: OfflineDraftRecord[] = []
+    const local = record('project-a', 2)
+    const serverDocument = documentWithColor('#eeeeee')
+    const persistence = createOfflineDraftPersistence({
+      store: {
+        get: async () => null,
+        put: async (draft) => { writes.push(draft) },
+        delete: async () => undefined,
+      },
+      userId: 'user-1',
+      projectId: 'project-a',
+      delayMs: 500,
+    })
+    let controller: ReturnType<typeof createOfflineDraftRecoveryController>
+    controller = createOfflineDraftRecoveryController({
+      persistence,
+      deleteLocal: async () => undefined,
+      loadDocument: (document) => {
+        controller.schedule(document, 4, 3)
+      },
+    })
+    controller.schedule(local.document, 4, 2)
+
+    await controller.useServer(local, serverDocument)
+    await vi.advanceTimersByTimeAsync(500)
+
+    expect(writes).toHaveLength(0)
+  })
+
+  it('serializes repeated server choices into one delete and load', async () => {
+    let releaseDelete!: () => void
+    const deletePending = new Promise<void>((resolve) => { releaseDelete = resolve })
+    let deleteCount = 0
+    let loadCount = 0
+    const persistence = createOfflineDraftPersistence({
+      store: memoryBackend(),
+      userId: 'user-1',
+      projectId: 'project-a',
+    })
+    const controller = createOfflineDraftRecoveryController({
+      persistence,
+      deleteLocal: async () => {
+        deleteCount += 1
+        await deletePending
+      },
+      loadDocument: () => { loadCount += 1 },
+    })
+    const local = record('project-a', 2)
+
+    const first = controller.useServer(local, documentWithColor('#eeeeee'))
+    const second = controller.useServer(local, documentWithColor('#dddddd'))
+
+    expect(second).toBe(first)
+    expect(deleteCount).toBe(1)
+    releaseDelete()
+    await first
+    expect(loadCount).toBe(1)
   })
 })
 

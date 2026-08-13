@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiRequestError } from '@/api/client.ts'
-import { autosaveFailureFromError } from './useAutosave.ts'
+import { autosaveFailureFromError, createAutosaveAttemptState } from './useAutosave.ts'
 
 function apiError(status: number): ApiRequestError {
   return new ApiRequestError(status, {
@@ -26,5 +26,25 @@ describe('autosave failures', () => {
       conflict: null,
       message: 'บันทึกอัตโนมัติไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
     })
+  })
+
+  it('blocks visibility and cleanup resends after a 409 conflict', () => {
+    const attempts = createAutosaveAttemptState(0, 4)
+
+    expect(attempts.start(1, 4, 'debounce')).toBe(true)
+    attempts.fail(4, true)
+
+    expect(attempts.start(1, 4, 'visibility')).toBe(false)
+    expect(attempts.start(1, 4, 'cleanup')).toBe(false)
+  })
+
+  it('allows the dirty revision again after the save base transitions', () => {
+    const attempts = createAutosaveAttemptState(0, 4)
+    expect(attempts.start(1, 4, 'debounce')).toBe(true)
+    attempts.fail(4, true)
+
+    attempts.transitionBaseVersion(5)
+
+    expect(attempts.start(1, 5, 'debounce')).toBe(true)
   })
 })

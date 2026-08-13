@@ -49,6 +49,59 @@ export function createOfflineDraftPersistence({
   }
 }
 
+interface CreateOfflineDraftRecoveryControllerInput {
+  persistence: ReturnType<typeof createOfflineDraftPersistence>
+  deleteLocal: (record: OfflineDraftRecord) => Promise<void>
+  loadDocument: (document: DesignDocument) => void
+  onWarning?: (warning: string) => void
+}
+
+export function createOfflineDraftRecoveryController({
+  persistence,
+  deleteLocal,
+  loadDocument,
+  onWarning = () => undefined,
+}: CreateOfflineDraftRecoveryControllerInput) {
+  let suspended = false
+  let disposed = false
+  let serverChoice: Promise<{ warning: string | null }> | null = null
+
+  return {
+    schedule(document: DesignDocument, baseVersion: number, revision: number) {
+      if (suspended || disposed) return
+      persistence.schedule(document, baseVersion, revision)
+    },
+    useServer(
+      record: OfflineDraftRecord,
+      serverDocument: DesignDocument,
+    ): Promise<{ warning: string | null }> {
+      if (serverChoice) return serverChoice
+      suspended = true
+      persistence.cancel()
+      const operation = (async () => {
+        let warning: string | null = null
+        try {
+          await deleteLocal(record)
+        } catch {
+          warning = OFFLINE_DRAFT_WARNING
+          onWarning(warning)
+        }
+        loadDocument(serverDocument)
+        return { warning }
+      })()
+      serverChoice = operation.finally(() => {
+        suspended = false
+        serverChoice = null
+      })
+      return serverChoice
+    },
+    cancel() {
+      disposed = true
+      persistence.cancel()
+    },
+  }
+}
+
 export interface ServerDraftMarker {
   baseVersion: number
   updatedAt: string
@@ -129,6 +182,7 @@ interface UseOfflineDraftInput {
 export interface OfflineDraftResult {
   recoveryRecord: OfflineDraftRecord | null
   warning: string | null
+  isUsingServer: boolean
   recoverLocal: () => void
   useServerDocument: (document?: DesignDocument) => Promise<void>
   dismissWarning: () => void
@@ -145,7 +199,8 @@ export function useOfflineDraft({
   const designStore = useDesignStoreApi()
   const [recoveryRecord, setRecoveryRecord] = useState<OfflineDraftRecord | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
-  const suppressNextRevision = useRef(false)
+  const [isUsingServer, setIsUsingServer] = useState(false)
+  const recoveryController = useRef<ReturnType<typeof createOfflineDraftRecoveryController> | null>(null)
 
   useEffect(() => {
     if (!userId) return
@@ -171,17 +226,21 @@ export function useOfflineDraft({
       projectId,
       onWarning: setWarning,
     })
+    const controller = createOfflineDraftRecoveryController({
+      persistence,
+      deleteLocal: (record) => draftStore.delete(record.userId, record.projectId),
+      loadDocument: designStore.getState().loadDocument,
+      onWarning: setWarning,
+    })
+    recoveryController.current = controller
     const unsubscribe = designStore.subscribe((state, previous) => {
       if (state.revision === previous.revision) return
-      if (suppressNextRevision.current) {
-        suppressNextRevision.current = false
-        return
-      }
-      persistence.schedule(state.document, baseVersion, state.revision)
+      controller.schedule(state.document, baseVersion, state.revision)
     })
     return () => {
       unsubscribe()
-      persistence.cancel()
+      controller.cancel()
+      if (recoveryController.current === controller) recoveryController.current = null
     }
   }, [baseVersion, designStore, draftStore, projectId, userId])
 
@@ -193,7 +252,6 @@ export function useOfflineDraft({
 
   const useServerDocument = useCallback(async (document = serverDocument) => {
     if (!userId) {
-      suppressNextRevision.current = true
       designStore.getState().loadDocument(document)
       setRecoveryRecord(null)
       return
@@ -207,16 +265,23 @@ export function useOfflineDraft({
       revision: designStore.getState().revision,
       updatedAt: serverUpdatedAt,
     }
-    suppressNextRevision.current = true
-    const result = await applyOfflineDraftChoice({
-      choice: 'use-server',
-      store: draftStore,
-      record,
-      serverDocument: document,
-      loadDocument: designStore.getState().loadDocument,
-    })
-    if (result.warning) setWarning(result.warning)
-    setRecoveryRecord(null)
+    setIsUsingServer(true)
+    try {
+      const controller = recoveryController.current
+      const result = controller
+        ? await controller.useServer(record, document)
+        : await applyOfflineDraftChoice({
+            choice: 'use-server',
+            store: draftStore,
+            record,
+            serverDocument: document,
+            loadDocument: designStore.getState().loadDocument,
+          })
+      if (result.warning) setWarning(result.warning)
+      setRecoveryRecord(null)
+    } finally {
+      setIsUsingServer(false)
+    }
   }, [
     baseVersion,
     designStore,
@@ -231,6 +296,7 @@ export function useOfflineDraft({
   return {
     recoveryRecord,
     warning,
+    isUsingServer,
     recoverLocal,
     useServerDocument,
     dismissWarning: () => setWarning(null),

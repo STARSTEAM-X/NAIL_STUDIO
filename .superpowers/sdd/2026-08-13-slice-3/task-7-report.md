@@ -66,3 +66,35 @@ exit 0; 757 modules transformed
 ```
 
 Vite emitted its existing advisory that the main minified chunk exceeds 500 kB; the build completed successfully.
+
+## Fix Round 1
+
+Addressed both Important review findings.
+
+### Autosave conflict retry block
+
+Root cause: a 409 cleared `inFlight` while leaving the revision different from `saved`, so debounce, visibility, cleanup, and flush paths could all resend the same stale request.
+
+RED command:
+
+```text
+npm test --workspace apps/web -- src/features/design/useAutosave.test.ts
+```
+
+Observed: 2/4 failed because `createAutosaveAttemptState` did not exist. The regressions covered visibility and cleanup suppression after a conflict plus reset after a base-version transition.
+
+GREEN: 4/4 autosave tests passed. Every trigger now passes through one attempt state. A 409 blocks that base version; only a base-version transition clears the block.
+
+### Server-choice debounce and concurrency
+
+Root cause: the hook effect owned the live debounce while `useServerDocument` independently deleted and loaded, so it could neither cancel queued work nor serialize repeated clicks.
+
+RED command:
+
+```text
+npm test --workspace apps/web -- src/features/design/offlineDraft.test.ts
+```
+
+Observed: 2/14 failed because `createOfflineDraftRecoveryController` did not exist. The regressions covered pending debounce cancellation, suppression of the revision emitted by the server load, and repeated-choice serialization.
+
+GREEN: the combined offline/autosave focused run passed 18/18 tests. The recovery controller suspends scheduling before cancellation/deletion/loading, returns the same promise to repeated choices, and the dialog disables both actions while that promise is pending.

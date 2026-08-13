@@ -1,9 +1,10 @@
 interface Props {
+  isUsingServer: boolean
   onRecoverLocal: () => void
   onUseServer: () => void
 }
 
-export function RecoveryDialog({ onRecoverLocal, onUseServer }: Props) {
+export function RecoveryDialog({ isUsingServer, onRecoverLocal, onUseServer }: Props) {
   return (
     <div className="dialog-backdrop">
       <section
@@ -22,6 +23,7 @@ export function RecoveryDialog({ onRecoverLocal, onUseServer }: Props) {
           <button
             type="button"
             className="btn btn-primary"
+            disabled={isUsingServer}
             data-recovery-action="recover-local"
             onClick={onRecoverLocal}
           >
@@ -30,10 +32,11 @@ export function RecoveryDialog({ onRecoverLocal, onUseServer }: Props) {
           <button
             type="button"
             className="btn btn-ghost"
+            disabled={isUsingServer}
             data-recovery-action="use-server"
             onClick={onUseServer}
           >
-            ใช้งานจากเซิร์ฟเวอร์
+            {isUsingServer ? 'กำลังใช้ข้อมูลจากเซิร์ฟเวอร์…' : 'ใช้งานจากเซิร์ฟเวอร์'}
           </button>
         </div>
       </section>

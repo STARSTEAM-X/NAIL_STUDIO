@@ -240,6 +240,7 @@ export function NailEditor({ projectId, detail }: Props) {
       )}
       {offlineDraft.recoveryRecord && !conflict && (
         <RecoveryDialog
+          isUsingServer={offlineDraft.isUsingServer}
           onRecoverLocal={offlineDraft.recoverLocal}
           onUseServer={() => { void offlineDraft.useServerDocument() }}
         />
