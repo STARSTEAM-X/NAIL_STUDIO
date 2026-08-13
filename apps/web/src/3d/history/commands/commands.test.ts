@@ -13,6 +13,7 @@ import { CompositeCommand } from './CompositeCommand.ts'
 import {
   AddStrokeCommand,
   ClearNailCommand,
+  CopyNailCommand,
   SetBaseColorCommand,
   SetFinishCommand,
 } from './nailCommands.ts'
@@ -120,6 +121,39 @@ describe('document commands', () => {
     const document = withTwoLayers()
     const strokes = document.nails[RIGHT_INDEX].layers.map((item) => item.strokes)
     expectRoundTrip(document, new ClearNailCommand(RIGHT_INDEX, strokes))
+  })
+
+  it('restores a copied target without changing the source or other nails', () => {
+    const original = createEmptyDocument()
+    original.nails['right.index'] = {
+      ...original.nails['right.index'],
+      baseColor: '#112233',
+      finish: 'chrome',
+      layers: [{ ...original.nails['right.index'].layers[0]!, strokes: [STROKE] }],
+    }
+    original.nails['right.middle'] = {
+      ...original.nails['right.middle'],
+      baseColor: '#445566',
+      finish: 'matte',
+    }
+    original.nails['left.index'] = {
+      ...original.nails['left.index'],
+      baseColor: '#778899',
+    }
+    const sourceBefore = structuredClone(original.nails['right.index'])
+    const otherBefore = structuredClone(original.nails['left.index'])
+    const command = new CopyNailCommand(
+      'right.middle',
+      original.nails['right.middle'],
+      original.nails['right.index'],
+    )
+
+    const changed = command.do(original).document
+
+    expect(changed.nails['right.middle']).toEqual(sourceBefore)
+    expect(changed.nails['right.index']).toEqual(sourceBefore)
+    expect(changed.nails['left.index']).toEqual(otherBefore)
+    expect(command.undo(changed).document).toEqual(original)
   })
 
   it('restores an inserted layer at its original index', () => {

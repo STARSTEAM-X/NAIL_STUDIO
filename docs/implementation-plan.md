@@ -237,7 +237,8 @@ Sprint 0, งานทำคลัง asset จริง, และเวลา 
 
 **DoD**
 
-- [x] **property test** — ทุก Command `do()` แล้ว `undo()` ได้เอกสารเท่าเดิมทุก field
+- [x] **fixture-based round-trip tests** — concrete Command ทุกตัว `do()` แล้ว `undo()`
+  ได้เอกสารเท่าเดิมทุก field รวม `CopyNailCommand`
 - [x] ลากสไลเดอร์ความทึบ 1 gesture รวมเป็น history 1 รายการและ undo/redo ได้
 - [x] execute 100 ครั้ง → undo 100 ครั้ง → redo 100 ครั้ง แล้วยังได้สถานะตรงทุก field
 - [x] วัด Command เทียบ full-document snapshot ด้วย input เดียวกัน 100 edits แบบทำซ้ำได้
