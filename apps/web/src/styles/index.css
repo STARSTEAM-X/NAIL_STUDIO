@@ -145,6 +145,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 }
 .editor-head h1 { margin: 0; font-size: 1.15rem; color: var(--deep); }
 .editor-actions { display: flex; align-items: center; gap: 0.75rem; }
+.history-controls { display: flex; gap: 0.4rem; }
 
 .editor-body { flex: 1; min-height: 0; display: flex; }
 
@@ -201,6 +202,19 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .field input[type="range"] { accent-color: var(--accent); width: 100%; }
 
 .tool-actions { display: flex; flex-direction: column; gap: 0.4rem; margin-top: auto; }
+
+.layer-panel { border-top: 1px solid var(--rule); padding-top: 0.8rem; display: flex; flex-direction: column; gap: 0.6rem; }
+.layer-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.layer-panel-head h2 { margin: 0; font-size: 0.95rem; color: var(--deep); }
+.layer-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.layer-card { padding: 0.6rem; border: 1px solid var(--rule); border-radius: 8px; display: flex; flex-direction: column; gap: 0.45rem; }
+.layer-card-active { border-color: var(--accent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent); }
+.layer-select { align-self: flex-start; border: 0; padding: 0; background: transparent; color: var(--deep); font: inherit; font-weight: 700; cursor: pointer; }
+.layer-row, .layer-actions { display: flex; align-items: end; gap: 0.4rem; }
+.layer-actions .btn { flex: 1; padding-inline: 0.45rem; }
+.layer-blend { flex: 1; }
+.check-field { display: flex; gap: 0.35rem; align-items: center; color: var(--muted); font-size: 0.85rem; }
+.check-field input { padding: 0; }
 
 .chip {
   font: inherit;

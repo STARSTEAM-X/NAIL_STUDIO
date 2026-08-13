@@ -10,6 +10,7 @@ import { useDesign, useDesignStoreApi } from './DesignStoreProvider.tsx'
 import { NailCanvas2D } from './NailCanvas2D.tsx'
 import { NailStrip } from './NailStrip.tsx'
 import { PaintToolbar } from './PaintToolbar.tsx'
+import { HistoryControls } from './HistoryControls.tsx'
 import { useAutosave, type AutosaveStatus } from './useAutosave.ts'
 
 interface Props {
@@ -54,6 +55,7 @@ export function NailEditor({ projectId, detail }: Props) {
           </p>
         </div>
         <div className="editor-actions">
+          <HistoryControls />
           {autosave.message && <span className="error" role="alert">{autosave.message}</span>}
           {saveVersion.error instanceof ApiRequestError && (
             <span className="error" role="alert">{saveVersion.error.message}</span>

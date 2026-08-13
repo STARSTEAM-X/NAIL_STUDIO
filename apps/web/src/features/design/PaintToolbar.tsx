@@ -2,6 +2,7 @@ import { BRUSHES, FINISHES, type Nail } from '@nail-studio/contracts'
 import type { BrushId } from '@/3d/painting/paintSettings.ts'
 import { useDesign } from './DesignStoreProvider.tsx'
 import { primaryOf } from './designStore.ts'
+import { LayerPanel } from './LayerPanel.tsx'
 
 const BRUSH_LABELS: Record<BrushId, string> = {
   round: 'กลม',
@@ -134,6 +135,7 @@ export function PaintToolbar() {
           ล้าง {selection.size} นิ้วที่เลือก
         </button>
       </div>
+      <LayerPanel />
     </aside>
   )
 }

@@ -1,6 +1,7 @@
 import { createStore, type StoreApi } from 'zustand/vanilla'
 import {
   MAX_STROKES_PER_LAYER,
+  MAX_LAYERS_PER_NAIL,
   createEmptyDocument,
   nailKeysOfHand,
   type DesignDocument,
@@ -275,12 +276,20 @@ export function createDesignStore(options: CreateDesignStoreOptions = {}): Desig
       addLayer: (key, layer, index) => {
         if (!isEditable(key)) return
         const current = get().document.nails[key]
+        if (current.layers.length >= MAX_LAYERS_PER_NAIL) {
+          set({ notice: `เล็บหนึ่งนิ้วมีได้สูงสุด ${MAX_LAYERS_PER_NAIL} เลเยอร์` })
+          return
+        }
         execute(new AddLayerCommand(key, layer, index ?? current.layers.length))
       },
 
       removeLayer: (key, layerId) => {
         if (!isEditable(key)) return
         const layers = get().document.nails[key].layers
+        if (layers.length <= 1) {
+          set({ notice: 'เล็บแต่ละนิ้วต้องมีอย่างน้อย 1 เลเยอร์' })
+          return
+        }
         const index = layers.findIndex((layer) => layer.id === layerId)
         const layer = layers[index]
         if (!layer) return

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   MAX_STROKES_PER_LAYER,
+  MAX_LAYERS_PER_NAIL,
   NAIL_KEYS,
   createEmptyDocument,
   designDocumentSchema,
@@ -267,6 +268,29 @@ describe('ประวัติการแก้ไขเอกสาร', () =
     store.getState().removeLayer('right.index', 'layer-2')
 
     expect(store.getState().activeLayerId('right.index')).toBe('layer-1')
+  })
+
+  it('keeps the document unchanged and notifies for invalid layer limits', () => {
+    const store = createDesignStore()
+    const key = 'right.index' as const
+    const beforeRemove = store.getState().document
+
+    store.getState().removeLayer(key, 'layer-1')
+    expect(store.getState().document).toBe(beforeRemove)
+    expect(store.getState().notice).toContain('อย่างน้อย')
+
+    for (let index = 2; index <= MAX_LAYERS_PER_NAIL; index += 1) {
+      store.getState().addLayer(key, {
+        id: `layer-${index}`, name: `Layer ${index}`, visible: true, opacity: 1, blend: 'normal', strokes: [],
+      })
+    }
+    const beforeAdd = store.getState().document
+    store.getState().addLayer(key, {
+      id: 'layer-overflow', name: 'Too many', visible: true, opacity: 1, blend: 'normal', strokes: [],
+    })
+
+    expect(store.getState().document).toBe(beforeAdd)
+    expect(store.getState().notice).toContain(String(MAX_LAYERS_PER_NAIL))
   })
 
   it('records copying the active nail to editable nails as one reversible command', () => {
