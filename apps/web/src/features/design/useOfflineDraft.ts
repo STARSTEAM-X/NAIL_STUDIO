@@ -25,26 +25,40 @@ export function createOfflineDraftPersistence({
   onWarning = () => undefined,
 }: CreateOfflineDraftPersistenceInput) {
   let timer: ReturnType<typeof setTimeout> | null = null
+  let pending: OfflineDraftRecord | null = null
+
+  const flush = async () => {
+    if (timer) clearTimeout(timer)
+    timer = null
+    const record = pending
+    pending = null
+    if (!record) return
+    try {
+      await store.put(record)
+    } catch {
+      onWarning(OFFLINE_DRAFT_WARNING)
+    }
+  }
 
   return {
     schedule(document: DesignDocument, baseVersion: number, revision: number) {
       if (timer) clearTimeout(timer)
-      timer = setTimeout(() => {
-        timer = null
-        void store.put({
-          key: `${userId}:${projectId}`,
-          userId,
-          projectId,
-          document,
-          baseVersion,
-          revision,
-          updatedAt: now().toISOString(),
-        }).catch(() => onWarning(OFFLINE_DRAFT_WARNING))
-      }, delayMs)
+      pending = {
+        key: `${userId}:${projectId}`,
+        userId,
+        projectId,
+        document,
+        baseVersion,
+        revision,
+        updatedAt: now().toISOString(),
+      }
+      timer = setTimeout(() => { void flush() }, delayMs)
     },
+    flush,
     cancel() {
       if (timer) clearTimeout(timer)
       timer = null
+      pending = null
     },
   }
 }
@@ -65,6 +79,7 @@ export function createOfflineDraftRecoveryController({
   let suspended = false
   let disposed = false
   let serverChoice: Promise<{ warning: string | null }> | null = null
+  let cleanup: Promise<void> | null = null
 
   return {
     schedule(document: DesignDocument, baseVersion: number, revision: number) {
@@ -96,8 +111,10 @@ export function createOfflineDraftRecoveryController({
       return serverChoice
     },
     cancel() {
+      if (cleanup) return cleanup
       disposed = true
-      persistence.cancel()
+      cleanup = persistence.flush()
+      return cleanup
     },
   }
 }
@@ -220,17 +237,18 @@ export function useOfflineDraft({
 
   useEffect(() => {
     if (!userId) return
+    let active = true
     const persistence = createOfflineDraftPersistence({
       store: draftStore,
       userId,
       projectId,
-      onWarning: setWarning,
+      onWarning: (nextWarning) => { if (active) setWarning(nextWarning) },
     })
     const controller = createOfflineDraftRecoveryController({
       persistence,
       deleteLocal: (record) => draftStore.delete(record.userId, record.projectId),
       loadDocument: designStore.getState().loadDocument,
-      onWarning: setWarning,
+      onWarning: (nextWarning) => { if (active) setWarning(nextWarning) },
     })
     recoveryController.current = controller
     const unsubscribe = designStore.subscribe((state, previous) => {
@@ -238,8 +256,9 @@ export function useOfflineDraft({
       controller.schedule(state.document, baseVersion, state.revision)
     })
     return () => {
+      active = false
       unsubscribe()
-      controller.cancel()
+      void controller.cancel()
       if (recoveryController.current === controller) recoveryController.current = null
     }
   }, [baseVersion, designStore, draftStore, projectId, userId])

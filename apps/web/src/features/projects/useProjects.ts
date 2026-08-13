@@ -161,14 +161,15 @@ export interface SaveDraftInput {
  * กำลังวาดอยู่ไม่ให้ประโยชน์อะไร (เรามีข้อมูลล่าสุดอยู่แล้ว) แต่จะทำให้ component
  * ทั้งชุด render ใหม่ทุก 3 วินาที ซึ่งรู้สึกได้ตอนลากเส้น
  */
-export function useSaveDraft() {
-  return useMutation({
-    mutationFn: (input: SaveDraftInput) =>
-      apiFetch<{ savedAt: string }>(`/projects/${input.projectId}/draft`, {
-        method: 'PUT',
-        body: { document: input.document, baseVersion: input.baseVersion },
-      }),
+export function saveDraftRequest(input: SaveDraftInput) {
+  return apiFetch<{ savedAt: string }>(`/projects/${input.projectId}/draft`, {
+    method: 'PUT',
+    body: { document: input.document, baseVersion: input.baseVersion },
   })
+}
+
+export function useSaveDraft() {
+  return useMutation({ mutationFn: saveDraftRequest })
 }
 
 export function useSaveVersion() {

@@ -210,6 +210,33 @@ describe('offline draft persistence', () => {
     await first
     expect(loadCount).toBe(1)
   })
+
+  it('flushes the latest pending snapshot exactly once when cleanup repeats', async () => {
+    vi.useFakeTimers()
+    const writes: OfflineDraftRecord[] = []
+    const persistence = createOfflineDraftPersistence({
+      store: {
+        get: async () => null,
+        put: async (draft) => { writes.push(draft) },
+        delete: async () => undefined,
+      },
+      userId: 'user-1',
+      projectId: 'project-a',
+      delayMs: 500,
+    })
+    const controller = createOfflineDraftRecoveryController({
+      persistence,
+      deleteLocal: async () => undefined,
+      loadDocument: () => undefined,
+    })
+    controller.schedule(documentWithColor('#222222'), 4, 2)
+
+    await Promise.all([controller.cancel(), controller.cancel()])
+    await vi.advanceTimersByTimeAsync(500)
+
+    expect(writes).toHaveLength(1)
+    expect(writes[0]).toMatchObject({ baseVersion: 4, revision: 2 })
+  })
 })
 
 describe('offline draft recovery', () => {

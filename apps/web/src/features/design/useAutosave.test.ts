@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createEmptyDocument } from '@nail-studio/contracts'
 import { ApiRequestError } from '@/api/client.ts'
 import { AUTOSAVE_DELAY_MS, autosaveFailureFromError, createAutosaveAttemptState, createAutosavePersistenceGate } from './useAutosave.ts'
 
@@ -203,5 +204,106 @@ describe('autosave persistence ordering', () => {
     expect(attempts.start(revision, 1, 'flush')).toBe(false)
     attempts.transitionBaseVersion(2)
     expect(attempts.start(revision, 2, 'flush')).toBe(true)
+  })
+
+  it('hands an unmounted edit to persistence at N+1 after the pending version succeeds', async () => {
+    let resolveVersion!: (result: { versionNumber: number }) => void
+    const versionPending = new Promise<{ versionNumber: number }>((resolve) => { resolveVersion = resolve })
+    const gate = createAutosavePersistenceGate()
+    const document = createEmptyDocument()
+    const writes: Array<{ document: typeof document; baseVersion: number }> = []
+    let stateUpdates = 0
+    let newTimers = 0
+
+    const explicit = gate.runExclusive(
+      () => versionPending,
+      () => { stateUpdates += 1 },
+      () => { newTimers += 1 },
+      async (outcome) => {
+        if (outcome.status === 'success') {
+          writes.push({ document, baseVersion: outcome.result.versionNumber })
+        }
+      },
+    )
+    gate.dispose()
+    gate.dispose()
+    resolveVersion({ versionNumber: 5 })
+    await explicit
+
+    expect(writes).toEqual([{ document, baseVersion: 5 }])
+    expect(stateUpdates).toBe(0)
+    expect(newTimers).toBe(0)
+  })
+
+  it('hands an unmounted edit to the current base after a non-conflict version failure', async () => {
+    let rejectVersion!: (error: unknown) => void
+    const versionPending = new Promise<never>((_resolve, reject) => { rejectVersion = reject })
+    const gate = createAutosavePersistenceGate()
+    const writes: number[] = []
+    let stateUpdates = 0
+    let newTimers = 0
+
+    const explicit = gate.runExclusive(
+      () => versionPending,
+      () => { stateUpdates += 1 },
+      () => { newTimers += 1 },
+      async (outcome) => {
+        if (outcome.status === 'failure' && !autosaveFailureFromError(outcome.error).conflict) {
+          writes.push(4)
+        }
+      },
+    )
+    gate.dispose()
+    rejectVersion(new Error('version unavailable'))
+    await expect(explicit).rejects.toThrow('version unavailable')
+
+    expect(writes).toEqual([4])
+    expect(stateUpdates).toBe(0)
+    expect(newTimers).toBe(0)
+  })
+
+  it('keeps an unmounted edit offline and does not retry the server after a version 409', async () => {
+    let rejectVersion!: (error: unknown) => void
+    const versionPending = new Promise<never>((_resolve, reject) => { rejectVersion = reject })
+    const gate = createAutosavePersistenceGate()
+    let serverWrites = 0
+    let stateUpdates = 0
+    let newTimers = 0
+
+    const explicit = gate.runExclusive(
+      () => versionPending,
+      () => { stateUpdates += 1 },
+      () => { newTimers += 1 },
+      async (outcome) => {
+        if (outcome.status === 'failure' && !autosaveFailureFromError(outcome.error).conflict) {
+          serverWrites += 1
+        }
+      },
+    )
+    gate.dispose()
+    rejectVersion(apiError(409))
+    await expect(explicit).rejects.toMatchObject({ status: 409 })
+
+    expect(serverWrites).toBe(0)
+    expect(stateUpdates).toBe(0)
+    expect(newTimers).toBe(0)
+  })
+
+  it('reactivates after a StrictMode probe cleanup', async () => {
+    const gate = createAutosavePersistenceGate()
+    let activeSuccesses = 0
+    let disposedSettles = 0
+    gate.dispose()
+    gate.activate()
+
+    await gate.runExclusive(
+      async () => ({ versionNumber: 2 }),
+      () => { activeSuccesses += 1 },
+      undefined,
+      () => { disposedSettles += 1 },
+    )
+
+    expect(activeSuccesses).toBe(1)
+    expect(disposedSettles).toBe(0)
   })
 })

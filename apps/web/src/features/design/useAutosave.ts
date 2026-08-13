@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { DesignDocument } from '@nail-studio/contracts'
-import { useSaveDraft } from '@/features/projects/useProjects.ts'
+import { saveDraftRequest, useSaveDraft } from '@/features/projects/useProjects.ts'
 import {
   conflictStateFromError,
   localizedTaskError,
@@ -20,7 +20,7 @@ export interface AutosaveResult {
   /** ให้ผู้ใช้สั่งบันทึกทันทีโดยไม่ต้องรอครบเวลา */
   flush: () => void
   isVersionSavePending: boolean
-  runVersionSave: <T>(operation: (snapshot: VersionSaveSnapshot) => Promise<T>) => Promise<T | null>
+  runVersionSave: <T extends VersionSaveResult>(operation: (snapshot: VersionSaveSnapshot) => Promise<T>) => Promise<T | null>
 }
 
 export interface VersionSaveSnapshot {
@@ -28,11 +28,24 @@ export interface VersionSaveSnapshot {
   document: DesignDocument
 }
 
+export interface VersionSaveResult {
+  versionNumber: number
+}
+
+interface PendingUnmountSnapshot extends VersionSaveSnapshot {
+  baseVersion: number
+}
+
 export type AutosaveTrigger = 'debounce' | 'visibility' | 'cleanup' | 'flush'
+
+export type PersistenceOutcome<T> =
+  | { status: 'success'; result: T }
+  | { status: 'failure'; error: unknown }
 
 export function createAutosavePersistenceGate() {
   let inFlight: Promise<void> | null = null
   let paused = false
+  let disposed = false
   return {
     track(promise: Promise<unknown>) {
       const settled = promise.then(() => undefined, () => undefined)
@@ -40,21 +53,31 @@ export function createAutosavePersistenceGate() {
       void settled.finally(() => { if (inFlight === settled) inFlight = null })
     },
     isPaused: () => paused,
+    isDisposed: () => disposed,
+    activate() { disposed = false },
+    dispose() { disposed = true },
     async runExclusive<T>(
       operation: () => Promise<T>,
       onSuccess?: (result: T) => void,
-      onSettled?: () => void,
+      onSettled?: () => void | Promise<void>,
+      onDisposedSettled?: (outcome: PersistenceOutcome<T>) => void | Promise<void>,
     ): Promise<T | null> {
       if (paused) return null
       paused = true
+      let outcome!: PersistenceOutcome<T>
       try {
         await inFlight
         const result = await operation()
-        onSuccess?.(result)
+        outcome = { status: 'success', result }
+        if (!disposed) onSuccess?.(result)
         return result
+      } catch (error: unknown) {
+        outcome = { status: 'failure', error }
+        throw error
       } finally {
         paused = false
-        onSettled?.()
+        if (disposed) await onDisposedSettled?.(outcome)
+        else await onSettled?.()
       }
     },
   }
@@ -129,37 +152,45 @@ export function useAutosave(projectId: string, baseVersion: number): AutosaveRes
   // ไม่งั้นตัวจับเวลาจะถูกตั้งใหม่ทุกครั้งที่สถานะเปลี่ยน แล้วไม่มีวันครบเวลา
   const attempts = useRef(createAutosaveAttemptState(store.getState().revision, baseVersion))
   attempts.current.transitionBaseVersion(baseVersion)
+  const baseVersionRef = useRef(baseVersion)
+  baseVersionRef.current = baseVersion
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const persistenceGate = useRef(createAutosavePersistenceGate())
+  const pendingUnmount = useRef<PendingUnmountSnapshot | null>(null)
   const save = useRef<(trigger: AutosaveTrigger) => void>(() => undefined)
 
   save.current = (trigger) => {
     const { revision, document } = store.getState()
     if (persistenceGate.current.isPaused()) return
     if (!attempts.current.start(revision, baseVersion, trigger)) return
-    setStatus('saving')
+    if (!persistenceGate.current.isDisposed()) setStatus('saving')
     persistenceGate.current.track((async () => {
       try {
         await saveDraft.mutateAsync({ projectId, document, baseVersion })
         const hasNewerRevision = attempts.current.succeed(revision, store.getState().revision)
-        setStatus(hasNewerRevision ? 'pending' : 'saved')
-        setMessage(null)
-        setConflict(null)
-        if (hasNewerRevision) {
+        if (!persistenceGate.current.isDisposed()) {
+          setStatus(hasNewerRevision ? 'pending' : 'saved')
+          setMessage(null)
+          setConflict(null)
+        }
+        if (hasNewerRevision && !persistenceGate.current.isDisposed()) {
           if (timer.current) clearTimeout(timer.current)
           timer.current = setTimeout(() => save.current('debounce'), AUTOSAVE_DELAY_MS)
         }
       } catch (error: unknown) {
         const failure = autosaveFailureFromError(error)
         attempts.current.fail(baseVersion, failure.conflict !== null)
-        setStatus('error')
-        setMessage(failure.message)
-        setConflict(failure.conflict)
+        if (!persistenceGate.current.isDisposed()) {
+          setStatus('error')
+          setMessage(failure.message)
+          setConflict(failure.conflict)
+        }
       }
     })())
   }
 
   useEffect(() => {
+    persistenceGate.current.activate()
     const unsubscribe = store.subscribe((state) => {
       if (!attempts.current.needsSave(state.revision)) return
       setStatus('pending')
@@ -177,6 +208,11 @@ export function useAutosave(projectId: string, baseVersion: number): AutosaveRes
       unsubscribe()
       window.document.removeEventListener('visibilitychange', onHide)
       if (timer.current) clearTimeout(timer.current)
+      const { revision, document } = store.getState()
+      if (attempts.current.needsSave(revision)) {
+        pendingUnmount.current = { revision, document, baseVersion: baseVersionRef.current }
+      }
+      persistenceGate.current.dispose()
       // ออกจากหน้าแก้ไขก็เป็นการ "หยุดวาด" อย่างหนึ่ง — บันทึกก่อนไป
       save.current('cleanup')
     }
@@ -191,7 +227,7 @@ export function useAutosave(projectId: string, baseVersion: number): AutosaveRes
       if (timer.current) clearTimeout(timer.current)
       save.current('flush')
     },
-    runVersionSave: async <T>(operation: (snapshot: VersionSaveSnapshot) => Promise<T>) => {
+    runVersionSave: async <T extends VersionSaveResult>(operation: (snapshot: VersionSaveSnapshot) => Promise<T>) => {
       if (timer.current) clearTimeout(timer.current)
       if (persistenceGate.current.isPaused()) return null
       setVersionSavePending(true)
@@ -219,10 +255,29 @@ export function useAutosave(projectId: string, baseVersion: number): AutosaveRes
           if (!attempts.current.needsSave(store.getState().revision)) return
           if (timer.current) clearTimeout(timer.current)
           timer.current = setTimeout(() => save.current('debounce'), AUTOSAVE_DELAY_MS)
+        }, async (outcome) => {
+          const snapshot = pendingUnmount.current
+          pendingUnmount.current = null
+          if (!snapshot) return
+          if (outcome.status === 'failure' && conflictStateFromError(outcome.error, 'explicit-save')) {
+            return
+          }
+          const handoffBaseVersion = outcome.status === 'success'
+            ? outcome.result.result.versionNumber
+            : snapshot.baseVersion
+          try {
+            await saveDraftRequest({
+              projectId,
+              document: snapshot.document,
+              baseVersion: handoffBaseVersion,
+            })
+          } catch {
+            // The offline-draft cleanup flush is the recovery path when detached server persistence fails.
+          }
         })
         return persisted?.result ?? null
       } finally {
-        setVersionSavePending(false)
+        if (!persistenceGate.current.isDisposed()) setVersionSavePending(false)
       }
     },
   }
