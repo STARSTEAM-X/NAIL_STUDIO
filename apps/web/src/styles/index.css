@@ -1,0 +1,312 @@
+@import "tailwindcss";
+
+/*
+  โทนสีและตัวอักษรยกมาจาก CEPP-KMITL-68-NailStudio (docs/source-audit.md §2.3)
+  เก็บเป็น custom property เพื่อให้ Slice ถัดไปทำธีมมืดได้โดยไม่ต้องไล่แก้ทุกไฟล์
+*/
+:root {
+  --ground: #f8f4ec;
+  --surface: #fffdf9;
+  --ink: #3a3a3a;
+  --muted: #7d6f66;
+  --rule: #e3d6c6;
+  --accent: #b5314c;
+  --deep: #6b1e2b;
+  --mauve: #b18d88;
+  --chip: #e8ddd0;
+  --ok: #2f7d4f;
+  --danger: #b3122e;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; margin: 0; }
+
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: "Leelawadee UI", "Noto Sans Thai", "Segoe UI", system-ui, sans-serif;
+  line-height: 1.6;
+}
+
+.center { display: grid; place-items: center; min-height: 40vh; text-align: center; }
+.stack { display: flex; flex-direction: column; gap: 0.75rem; align-items: center; }
+.muted { color: var(--muted); font-size: 0.9rem; margin: 0; }
+.hint { color: var(--muted); font-size: 0.8rem; margin: -0.25rem 0 0; }
+.error { color: var(--danger); font-size: 0.9rem; margin: 0; }
+.ok { color: var(--ok); font-size: 0.9rem; }
+
+/* ---------- โครงหน้า ---------- */
+
+.shell { display: flex; flex-direction: column; height: 100%; }
+
+.navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 1.5rem;
+  background: var(--ground);
+  border-bottom: 1.5px solid var(--mauve);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.brand { font-weight: 700; color: var(--deep); text-decoration: none; font-size: 1.05rem; }
+.brand span { color: var(--accent); }
+.navbar-right { display: flex; align-items: center; gap: 0.75rem; }
+.user-name { font-size: 0.9rem; color: var(--muted); }
+
+.shell-main { flex: 1; min-height: 0; overflow-y: auto; }
+
+/* ---------- ส่วนประกอบ ---------- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 1.25rem;
+}
+
+.btn {
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.45rem 1rem;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color 120ms, color 120ms;
+}
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--deep); }
+
+.btn-ghost { background: transparent; border-color: var(--rule); color: var(--ink); }
+.btn-ghost:hover:not(:disabled) { background: var(--chip); }
+.btn-danger { color: var(--danger); }
+
+input {
+  font: inherit;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+}
+input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* ---------- หน้าเข้าสู่ระบบ ---------- */
+
+.auth-page { display: grid; place-items: center; min-height: 100%; padding: 2rem 1rem; }
+.auth-card { display: flex; flex-direction: column; gap: 0.5rem; width: min(380px, 100%); }
+.auth-card h1 { margin: 0 0 0.5rem; font-size: 1.3rem; color: var(--deep); }
+.auth-card label { font-size: 0.85rem; color: var(--muted); margin-top: 0.4rem; }
+.auth-card .btn { margin-top: 1rem; }
+
+/* ---------- รายการงาน ---------- */
+
+.page { padding: 1.5rem; max-width: 1100px; margin: 0 auto; }
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+.page-head h1 { margin: 0; font-size: 1.35rem; color: var(--deep); }
+.inline-form { display: flex; gap: 0.5rem; }
+
+.project-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+}
+.project-card { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.project-link { display: flex; flex-direction: column; text-decoration: none; color: inherit; min-width: 0; }
+.project-name { font-weight: 600; color: var(--deep); overflow-wrap: anywhere; }
+
+/* ---------- editor ---------- */
+
+.editor { display: flex; flex-direction: column; height: 100%; }
+.editor-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+.editor-head h1 { margin: 0; font-size: 1.15rem; color: var(--deep); }
+.editor-actions { display: flex; align-items: center; gap: 0.75rem; }
+
+.editor-body { flex: 1; min-height: 0; display: flex; }
+
+/*
+  min-width: 0 จำเป็น ไม่ใช่การตกแต่ง
+
+  ค่าเริ่มต้นของ flex item คือ min-width: auto ซึ่งแปลว่า "ห้ามเล็กกว่าเนื้อหาข้างใน"
+  เนื้อหาข้างในคือแคนวาส WebGL ที่มีความกว้างจริงเป็นพันพิกเซล กล่องนี้จึงไม่ยอมหด
+  แล้วดันแผงวาดแบนหลุดออกนอกจอไปทั้งใบ
+*/
+.viewport { flex: 1; min-width: 0; min-height: 420px; background: #17120f; }
+
+/* แคนวาสรับ pointer เอง การให้เบราว์เซอร์เลื่อนหน้าจอตามนิ้วจะขัดกับการลากเส้น */
+.viewport canvas { touch-action: none; }
+
+.editor-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0;
+  padding: 0.5rem 1.5rem;
+  background: #fbeef0;
+  color: var(--deep);
+  font-size: 0.9rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+/* ---------- แถบเครื่องมือวาด ---------- */
+
+.toolbar {
+  width: 236px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  background: var(--surface);
+  border-right: 1px solid var(--rule);
+}
+
+.tool-group, .nail-buttons, .strip-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+.field { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.85rem; color: var(--muted); }
+.field select {
+  font: inherit;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+}
+.field input[type="range"] { accent-color: var(--accent); width: 100%; }
+
+.tool-actions { display: flex; flex-direction: column; gap: 0.4rem; margin-top: auto; }
+
+.chip {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+.chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chip-on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.swatches { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
+.swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--rule);
+  cursor: pointer;
+  padding: 0;
+}
+.swatch-on { border-color: var(--ink); }
+.swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.swatch-picker { width: 30px; height: 26px; padding: 0; border-radius: 6px; }
+
+/* ---------- แผงวาดแบบแบน ---------- */
+
+.canvas2d-panel {
+  width: 264px;
+  flex-shrink: 0;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: var(--surface);
+  border-left: 1px solid var(--rule);
+  overflow-y: auto;
+}
+.canvas2d-title { margin: 0; font-size: 0.9rem; font-weight: 600; color: var(--deep); }
+.canvas2d-panel .hint { margin: 0; }
+
+.canvas2d {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background:
+    repeating-conic-gradient(var(--chip) 0% 25%, var(--surface) 0% 50%) 0 0 / 16px 16px;
+  cursor: crosshair;
+  /* แผงรับ pointer เอง การให้เบราว์เซอร์เลื่อนหน้าจอตามนิ้วจะขัดกับการลากเส้น */
+  touch-action: none;
+}
+
+/* ---------- แถบเลือกเล็บ ---------- */
+
+.nail-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  padding: 0.7rem 1.5rem;
+  border-top: 1px solid var(--rule);
+  background: var(--surface);
+}
+.nail-strip .hint { margin: 0; }
+
+/*
+  จอแคบ: วางแถบเครื่องมือไว้ด้านบน แต่ต้องจำกัดความสูงไว้
+
+  ถ้าปล่อยให้แถบเครื่องมือสูงตามเนื้อหา มันจะดันภาพ 3 มิติตกไปใต้ขอบจอทั้งหมด
+  แล้วผู้ใช้ต้องเลื่อนหน้าจอลงเพื่อดูสิ่งที่ตัวเองกำลังวาด ซึ่งใช้งานจริงไม่ได้
+*/
+@media (max-width: 1080px) {
+  /* จอกลาง: ย้ายแผงวาดแบนไปอยู่ใต้ภาพ 3 มิติ แทนที่จะบีบทั้งสามคอลัมน์ */
+  .editor-body { flex-wrap: wrap; }
+  .canvas2d-panel {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+    border-left: none;
+    border-top: 1px solid var(--rule);
+  }
+  .canvas2d { width: 180px; }
+}
+
+@media (max-width: 720px) {
+  /*
+    ต้องปิด wrap ที่สืบมาจาก breakpoint ก่อนหน้าให้ชัดเจน
+    flex-direction: column คู่กับ flex-wrap: wrap ทำให้กล่องล้นไปเป็น "คอลัมน์ใหม่"
+    ทางแนวนอน ผลคือหน้าจอเลื่อนซ้ายขวาได้และภาพ 3 มิติหลุดออกนอกจอ
+  */
+  .editor-body { flex-direction: column; flex-wrap: nowrap; }
+  .toolbar {
+    width: 100%;
+    max-height: 32vh;
+    border-right: none;
+    border-bottom: 1px solid var(--rule);
+  }
+  .viewport { min-height: 38vh; }
+  .canvas2d { width: 132px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

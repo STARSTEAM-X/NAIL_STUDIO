@@ -1,0 +1,110 @@
+// Slice 1 — walking skeleton สร้างเฉพาะ 4 ตารางที่เส้นทางบางที่สุดต้องใช้
+// ตารางที่เหลืออีก 24 ตาราง (docs/database.md) จะถูกเพิ่มเมื่อถึง slice ที่ใช้จริง
+// ตามหลัก "สร้างตารางเมื่อถึงเวลาใช้ ไม่สร้างล่วงหน้าทั้งหมด" (implementation-plan.md §7)
+
+generator client {
+  provider = "prisma-client"
+  output   = "../apps/api/src/generated/prisma"
+}
+
+// Prisma 7 ถอด url/directUrl/shadowDatabaseUrl ออกจาก schema แล้ว
+// connection string ย้ายไปอยู่ใน prisma.config.ts และฝั่ง client ต้องใช้ driver adapter
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  user
+  shop
+  admin
+
+  @@map("user_role")
+}
+
+enum ProjectStatus {
+  draft
+  published
+  archived
+
+  @@map("project_status")
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         UserRole @default(user)
+  displayName  String   @map("display_name")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  sessions Session[]
+  projects Project[]
+
+  @@map("users")
+}
+
+model Session {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  // เก็บ SHA-256 ของ token ไม่ใช่ token ดิบ — ฐานข้อมูลรั่วก็ปลอม cookie ไม่ได้
+  tokenHash  Bytes    @unique @map("token_hash")
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz
+  lastSeenAt DateTime @default(now()) @map("last_seen_at") @db.Timestamptz
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  userAgent  String?  @map("user_agent")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model Project {
+  id           String        @id @default(uuid()) @db.Uuid
+  userId       String        @map("user_id") @db.Uuid
+  name         String
+  status       ProjectStatus @default(draft)
+  versionCount Int           @default(0) @map("version_count")
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt    DateTime?     @map("deleted_at") @db.Timestamptz
+
+  // งานที่ยังไม่ได้กดบันทึกเป็นเวอร์ชัน — ปลายทางของ autosave (Slice 2)
+  //
+  // ทำไมไม่ให้ autosave สร้างเวอร์ชันใหม่ทุก 3 วินาที: เวอร์ชันคือสิ่งที่ผู้ใช้ตั้งใจ
+  // บันทึกและย้อนกลับมาดูได้ ถ้าปล่อยให้ autosave สร้าง รายการเวอร์ชันจะมีหลายร้อยแถว
+  // ต่อการนั่งวาดหนึ่งชั่วโมงจนหาเวอร์ชันที่ต้องการไม่เจอ และตารางโตเร็วโดยไม่จำเป็น
+  //
+  // ทำไมไม่เขียนทับเวอร์ชันล่าสุดแทน: เวอร์ชันต้องเปลี่ยนแปลงไม่ได้ ไม่งั้นการย้อนกลับ
+  // ไปเวอร์ชันเก่าจะได้ของที่ไม่ตรงกับตอนที่บันทึกไว้
+  draftDocument    Json?     @map("draft_document") @db.JsonB
+  draftUpdatedAt   DateTime? @map("draft_updated_at") @db.Timestamptz
+  // เวอร์ชันที่ draft นี้ถูกแก้ต่อยอดมา — ใช้ตรวจว่า draft ล้าสมัยไปแล้วหรือยัง
+  draftBaseVersion Int?      @map("draft_base_version")
+
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  versions DesignVersion[]
+
+  // ดัชนีหลักของหน้ารายการงาน — รองรับทั้งการกรองเจ้าของ เรียงล่าสุด และ keyset pagination (A-14)
+  // เป็น partial index จึงไม่เก็บแถวที่ถูกลบ ทำให้ดัชนีเล็กลงและไม่ต้องกรองซ้ำ
+  @@index([userId, updatedAt(sort: Desc), id(sort: Desc)])
+  @@map("projects")
+}
+
+model DesignVersion {
+  id            String   @id @default(uuid()) @db.Uuid
+  projectId     String   @map("project_id") @db.Uuid
+  versionNumber Int      @map("version_number")
+  schemaVersion Int      @default(2) @map("schema_version")
+  document      Json     @db.JsonB
+  label         String?
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // บังคับไม่ให้เลขเวอร์ชันซ้ำ — เป็นรากฐานของ optimistic concurrency
+  @@unique([projectId, versionNumber])
+  @@map("design_versions")
+}

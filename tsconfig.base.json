@@ -1,0 +1,30 @@
+{
+  // ค่ากลางของทุก workspace — แต่ละแพ็กเกจ extends ไฟล์นี้แล้วเติมเฉพาะส่วนของตัวเอง
+  //
+  // หมายเหตุ: TypeScript 7 ปฏิเสธ key ที่ไม่รู้จักใน compilerOptions (TS 5 ปล่อยผ่าน)
+  // จึงห้ามใส่คีย์ปลอมอย่าง "//" เพื่อเขียนคอมเมนต์ — ใช้คอมเมนต์ // ของ JSONC แทน
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "verbatimModuleSyntax": true,
+
+    // บังคับให้เขียนเฉพาะไวยากรณ์ที่ลบทิ้งได้ (ห้าม enum, namespace, parameter property)
+    // จำเป็นเพราะ Node 24 รันไฟล์ .ts ตรง ๆ ด้วยการลบ type ออกเท่านั้น ไม่ได้คอมไพล์
+    "erasableSyntaxOnly": true
+  }
+}

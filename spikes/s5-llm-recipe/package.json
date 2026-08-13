@@ -1,0 +1,8 @@
+{
+  "name": "spike-s5-llm-recipe",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": { "bench": "node run.ts" },
+  "dependencies": { "zod": "^4.1.13" }
+}

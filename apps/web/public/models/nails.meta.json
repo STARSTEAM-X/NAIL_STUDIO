@@ -1,0 +1,9 @@
+{
+  "nails": {
+    "thumb": "Nail_thumb",
+    "index": "Nail_index",
+    "middle": "Nail_middle",
+    "ring": "Nail_ring",
+    "little": "Nail_little"
+  }
+}

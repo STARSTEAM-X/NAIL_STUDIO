@@ -1,0 +1,69 @@
+import { FINGERS, nailKey, type Finger } from '@nail-studio/contracts'
+import { EDITABLE_HAND } from './designStore.ts'
+import { useDesign } from './DesignStoreProvider.tsx'
+
+const FINGER_LABELS: Record<Finger, string> = {
+  thumb: 'โป้ง',
+  index: 'ชี้',
+  middle: 'กลาง',
+  ring: 'นาง',
+  little: 'ก้อย',
+}
+
+const HAND_LABEL = EDITABLE_HAND === 'right' ? 'มือขวา' : 'มือซ้าย'
+
+/**
+ * เลือกเล็บที่จะวาด
+ *
+ * ตอนนี้มีมือเดียว (EDITABLE_HAND) จึงไม่มีตัวสลับมือ — ถ้าเปิดมือที่สองกลับมา
+ * ให้เพิ่มแถวเลือกมือไว้เหนือแถวนิ้ว แล้วให้ selectAll ครอบคลุมทั้งสองมือ
+ */
+export function NailStrip() {
+  const selection = useDesign((state) => state.selection)
+  const selectNail = useDesign((state) => state.selectNail)
+  const selectAll = useDesign((state) => state.selectAll)
+  const focusNail = useDesign((state) => state.focusNail)
+  const focusHome = useDesign((state) => state.focusHome)
+
+  return (
+    <section className="nail-strip" aria-label="เลือกเล็บ">
+      <div className="nail-buttons" role="group" aria-label={`เล็บ${HAND_LABEL}`}>
+        {FINGERS.map((finger) => {
+          const key = nailKey(EDITABLE_HAND, finger)
+          const on = selection.has(key)
+          return (
+            <button
+              key={key}
+              type="button"
+              className={`chip ${on ? 'chip-on' : ''}`}
+              aria-pressed={on}
+              // คลิกธรรมดา = เลือกนิ้วเดียว, กด Shift หรือ Ctrl ค้าง = เลือกเพิ่ม
+              // เป็นข้อตกลงเดียวกับการเลือกไฟล์ในระบบปฏิบัติการ จึงไม่ต้องสอน
+              //
+              // เลือกจากแถบนี้ = จ่อกล้องไปที่นิ้วนั้นด้วย เพราะผู้ใช้เพิ่งบอกว่าจะทำงานกับนิ้วนี้
+              // (ส่วนการคลิกบนโมเดล 3 มิติไม่จ่อ — ผู้ใช้เห็นนิ้วนั้นอยู่แล้วจึงคลิกโดนได้)
+              onClick={(event) => {
+                const additive = event.shiftKey || event.ctrlKey
+                selectNail(key, additive ? 'toggle' : 'replace')
+                if (!additive) focusNail(key)
+              }}
+            >
+              {FINGER_LABELS[finger]}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="strip-actions">
+        <button type="button" className="btn btn-ghost" onClick={selectAll}>
+          ทุกนิ้ว
+        </button>
+        <button type="button" className="btn btn-ghost" onClick={focusHome}>
+          ดูทั้งมือ
+        </button>
+      </div>
+
+      <p className="hint">เลือกอยู่ {selection.size} นิ้ว · กด Shift ค้างเพื่อเลือกเพิ่ม</p>
+    </section>
+  )
+}

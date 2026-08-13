@@ -1,0 +1,51 @@
+* { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  height: 100%;
+  background: #0e0d10;
+  color: #f0e7dd;
+  font-family: "Leelawadee UI", "Segoe UI", system-ui, sans-serif;
+}
+
+.stage { position: absolute; inset: 0; }
+
+.hud {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  background: rgba(20, 16, 14, 0.86);
+  border: 1px solid #3a2e26;
+  border-radius: 6px;
+  padding: 12px 16px;
+  font-size: 13px;
+  line-height: 1.7;
+  min-width: 280px;
+  pointer-events: none;
+}
+
+.hud h1 {
+  font-size: 13px;
+  margin: 0 0 8px;
+  color: #e0a3ac;
+  letter-spacing: 0.04em;
+}
+
+.hud dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 0 12px; }
+.hud dt { color: #a99a90; }
+.hud dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+
+.ok   { color: #7fd18e; }
+.fail { color: #ff8a8a; }
+
+.error {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  text-align: center;
+  color: #ff8a8a;
+  white-space: pre-wrap;
+}

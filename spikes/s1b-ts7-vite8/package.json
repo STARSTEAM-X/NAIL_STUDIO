@@ -1,0 +1,25 @@
+{
+    "name": "spike-s1b",
+    "private": true,
+    "version": "0.0.0",
+    "type": "module",
+    "scripts": {
+        "build": "vite build",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "@react-three/drei": "^10.7.8",
+        "@react-three/fiber": "^9.7.0",
+        "react": "^19.2.8",
+        "react-dom": "^19.2.8",
+        "three": "^0.185.1"
+    },
+    "devDependencies": {
+        "@types/react": "^19.2.7",
+        "@types/react-dom": "^19.2.3",
+        "@types/three": "^0.185.1",
+        "@vitejs/plugin-react": "^6.0.5",
+        "typescript": "^5.9.3",
+        "vite": "^8.2.1"
+    }
+}

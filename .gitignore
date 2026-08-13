@@ -1,0 +1,37 @@
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+*.tsbuildinfo
+*.log
+
+# ความลับ — ห้าม commit เด็ดขาด (ซอร์สเดิม NailDesine-TEST commit .env เข้ามา TD-12)
+.env
+.env.*
+!.env.example
+
+# ไฟล์ที่ระบบสร้าง
+apps/api/src/generated/
+storage/
+playwright-report/
+test-results/
+__pycache__/
+*.pyc
+
+# spike เป็นโค้ดทิ้ง — เก็บเฉพาะสคริปต์ ไม่เก็บผลลัพธ์และโมเดล
+spikes/**/node_modules/
+spikes/**/dist/
+spikes/**/public/models/
+spikes/**/*.glb
+spikes/**/result.json
+spikes/**/run.log
+
+# ซอร์สต้นทางที่ใช้อ้างอิงเท่านั้น ไม่ใช่ส่วนหนึ่งของระบบใหม่
+Source/
+backup/
+
+# ระบบปฏิบัติการ / เครื่องมือ
+.DS_Store
+Thumbs.db
+.claude/

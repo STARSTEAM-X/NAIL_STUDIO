@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    // โค้ดฝั่ง server ไม่ควรเห็น DOM แต่ Prisma/Express บาง type อ้าง lib ES ที่ใหม่กว่า
+    "lib": ["ES2023"]
+  },
+  "include": ["src"],
+  "exclude": ["src/generated"]
+}
