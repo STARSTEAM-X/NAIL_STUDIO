@@ -74,14 +74,14 @@ The existing texture compositor remains the rendering authority. Layer visibilit
 
 ### Material pool
 
-`apps/web/src/3d/materials/MaterialPool.ts` caches materials by a stable key derived from finish and all shader-relevant options.
+`apps/web/src/3d/materials/MaterialPool.ts` caches materials by a stable key derived from finish, texture identity, and all shader-relevant options. Texture identity is mandatory because one Three.js material cannot expose different `map` values to multiple meshes in the same render.
 
 - `acquire(key, factory)` returns an existing material or creates one and increments its reference count.
 - `release(key)` decrements the count and disposes the material at zero.
 - `disposeAll()` releases remaining GPU resources during scene teardown.
 - Nail meshes never dispose pooled materials directly.
 
-The existing finish definitions remain the single source of visual parameters.
+The existing finish definitions remain the single source of visual parameters. Pooling reuses a material only when both its finish configuration and texture are identical, such as the same nail texture rendered in multiple views; it never shares one material across different nail textures.
 
 ### Version API and UI
 
@@ -202,4 +202,3 @@ Development follows red-green-refactor for each behavior.
 5. Version contracts, API endpoints, and history UI.
 6. IndexedDB persistence, recovery dialog, and 409 conflict dialog.
 7. Heap measurement, full verification, and documentation updates.
-
