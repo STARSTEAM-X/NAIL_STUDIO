@@ -8,6 +8,7 @@ import {
   type Stroke,
 } from '@nail-studio/contracts'
 import { EDITABLE_NAILS } from '@/features/design/designStore.ts'
+import type { Command } from '../Command.ts'
 import { CompositeCommand } from './CompositeCommand.ts'
 import {
   AddStrokeCommand,
@@ -56,6 +57,47 @@ function expectRoundTrip(document: DesignDocument, command: {
   const original = structuredClone(document)
   const changed = command.do(original).document
   expect(command.undo(changed).document).toEqual(original)
+}
+
+function markerCommand(marker: string): Command {
+  return {
+    label: `Add ${marker}`,
+    do(document) {
+      const baseColor = document.nails[RIGHT_INDEX].baseColor
+      return {
+        document: {
+          ...document,
+          nails: {
+            ...document.nails,
+            [RIGHT_INDEX]: {
+              ...document.nails[RIGHT_INDEX],
+              baseColor: `${baseColor}${marker}`,
+            },
+          },
+        },
+        affects: new Set([RIGHT_INDEX]),
+      }
+    },
+    undo(document) {
+      const baseColor = document.nails[RIGHT_INDEX].baseColor
+      if (!baseColor.endsWith(marker)) {
+        throw new Error(`Expected ${marker} to be the final marker`)
+      }
+      return {
+        document: {
+          ...document,
+          nails: {
+            ...document.nails,
+            [RIGHT_INDEX]: {
+              ...document.nails[RIGHT_INDEX],
+              baseColor: baseColor.slice(0, -marker.length),
+            },
+          },
+        },
+        affects: new Set([RIGHT_INDEX]),
+      }
+    },
+  }
 }
 
 describe('document commands', () => {
@@ -111,10 +153,14 @@ describe('document commands', () => {
 
   it('undoes composite children in reverse order', () => {
     const document = createEmptyDocument()
-    expectRoundTrip(document, new CompositeCommand('Set appearance', [
-      new SetBaseColorCommand(RIGHT_INDEX, '#ffffff', '#112233'),
-      new SetFinishCommand(RIGHT_INDEX, 'glossy', 'chrome'),
-    ]))
+    const command = new CompositeCommand('Add markers', [
+      markerCommand('A'),
+      markerCommand('B'),
+    ])
+
+    const applied = command.do(document).document
+    expect(applied.nails[RIGHT_INDEX].baseColor).toBe('#ffffffAB')
+    expect(command.undo(applied).document).toEqual(document)
   })
 
   it('keeps every left-hand nail unchanged when a bulk command targets editable nails', () => {

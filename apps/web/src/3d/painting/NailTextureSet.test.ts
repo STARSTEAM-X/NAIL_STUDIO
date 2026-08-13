@@ -135,8 +135,8 @@ describe('เส้นสดระหว่างลากนิ้ว', () => {
   it('เริ่มเส้นซ้อนกันไม่ได้', () => {
     const { textures } = harness()
     textures.setVisibleNails(['right.index'])
-    expect(textures.beginStroke(['right.index'], 0, false)).toBe(true)
-    expect(textures.beginStroke(['right.index'], 0, false)).toBe(false)
+    expect(textures.beginStroke(['right.index'], new Map([['right.index', 0]]), false)).toBe(true)
+    expect(textures.beginStroke(['right.index'], new Map([['right.index', 0]]), false)).toBe(false)
   })
 
   it('เส้นสดปรากฏบนทุกนิ้วที่เลือกไว้พร้อมกัน', () => {
@@ -146,7 +146,9 @@ describe('เส้นสดระหว่างลากนิ้ว', () => {
     const composites = new Map(visible.map((key, index) => [key, surfaces[2 + index]!]))
     const before = new Map([...composites].map(([key, entry]) => [key, entry.calls.length]))
 
-    textures.beginStroke(['right.index', 'right.ring'], 0, false)
+    textures.beginStroke(['right.index', 'right.ring'], new Map([
+      ['right.index', 0], ['right.ring', 0],
+    ]), false)
     textures.paintDabs([{ x: 10, y: 10, r: 5, alpha: 1 }], '#ff0000', 0)
 
     expect(composites.get('right.index')!.calls.length).toBeGreaterThan(before.get('right.index')!)
@@ -154,11 +156,49 @@ describe('เส้นสดระหว่างลากนิ้ว', () => {
     expect(composites.get('right.middle')!.calls.length).toBe(before.get('right.middle')!)
   })
 
+  it('composites the live preview at each target nail\'s mapped layer index', () => {
+    const { textures, document, surfaces } = harness()
+    const index = document.nails['right.index']
+    const ring = document.nails['right.ring']
+    document.nails['right.index'] = {
+      ...index,
+      layers: [
+        { ...index.layers[0]!, opacity: 0.2 },
+        { ...index.layers[0]!, id: 'index-top', name: 'Index top', opacity: 0.4 },
+      ],
+    }
+    document.nails['right.ring'] = {
+      ...ring,
+      layers: [
+        { ...ring.layers[0]!, opacity: 0.6 },
+        { ...ring.layers[0]!, id: 'ring-top', name: 'Ring top', opacity: 0.8 },
+      ],
+    }
+    textures.setVisibleNails(['right.index', 'right.ring'])
+    const indexComposite = surfaces[2]!
+    const ringComposite = surfaces[3]!
+    const indexBefore = indexComposite.calls.length
+    const ringBefore = ringComposite.calls.length
+
+    textures.beginStroke(
+      ['right.index', 'right.ring'],
+      new Map([['right.index', 0], ['right.ring', 1]]),
+      false,
+    )
+    textures.paintDabs([{ x: 10, y: 10, r: 5, alpha: 1 }], '#ff0000', 0)
+
+    const previewAlpha = (calls: DrawCall[]) => calls
+      .filter((call) => call.op === 'drawImage')
+      .map((call) => call.alpha)
+    expect(previewAlpha(indexComposite.calls.slice(indexBefore))).toEqual([0.2])
+    expect(previewAlpha(ringComposite.calls.slice(ringBefore))).toEqual([0.8])
+  })
+
   it('จบเส้นแล้วแคนวาสเส้นสดถูกล้าง ไม่ค้างไปปนกับเส้นถัดไป (TD-5)', () => {
     const { textures, surfaces } = harness()
     textures.setVisibleNails(['right.index'])
     const wet = surfaces[0]!
-    textures.beginStroke(['right.index'], 0, false)
+    textures.beginStroke(['right.index'], new Map([['right.index', 0]]), false)
     textures.paintDabs([{ x: 10, y: 10, r: 5, alpha: 1 }], '#ff0000', 0)
     const before = wet.calls.filter((call) => call.op === 'clearRect').length
     textures.endStroke()
@@ -169,7 +209,7 @@ describe('เส้นสดระหว่างลากนิ้ว', () => {
   it('จบเส้นซ้ำไม่ทำให้พัง — การยกเลิกกับการปล่อยนิ้วอาจมาพร้อมกัน', () => {
     const { textures } = harness()
     textures.setVisibleNails(['right.index'])
-    textures.beginStroke(['right.index'], 0, false)
+    textures.beginStroke(['right.index'], new Map([['right.index', 0]]), false)
     textures.endStroke()
     expect(() => textures.endStroke()).not.toThrow()
   })
@@ -179,7 +219,7 @@ describe('เส้นสดระหว่างลากนิ้ว', () => {
     // ถ้าปิดข้ามเจ้าของได้ การปล่อยนิ้วในโหมดหนึ่งจะไปตัดเส้นที่อีกโหมดกำลังลากอยู่ทิ้ง
     const { textures } = harness()
     textures.setVisibleNails(['right.index'])
-    textures.beginStroke(['right.index'], 0, false, '2d')
+    textures.beginStroke(['right.index'], new Map([['right.index', 0]]), false, '2d')
     expect(textures.strokeOwner()).toBe('2d')
 
     textures.endStroke('3d')
@@ -195,12 +235,12 @@ describe('เส้นสดระหว่างลากนิ้ว', () => {
     // ถ้าไม่มีทางกู้ ผู้ใช้จะวาดไม่ได้อีกเลยจนกว่าจะรีโหลด โดยไม่มีข้อความบอกสาเหตุ
     const { textures } = harness()
     textures.setVisibleNails(['right.index'])
-    textures.beginStroke(['right.index'], 0, false)
-    expect(textures.beginStroke(['right.index'], 0, false)).toBe(false)
+    textures.beginStroke(['right.index'], new Map([['right.index', 0]]), false)
+    expect(textures.beginStroke(['right.index'], new Map([['right.index', 0]]), false)).toBe(false)
 
     textures.endStroke()
     expect(textures.isPainting()).toBe(false)
-    expect(textures.beginStroke(['right.index'], 0, false)).toBe(true)
+    expect(textures.beginStroke(['right.index'], new Map([['right.index', 0]]), false)).toBe(true)
   })
 
   it('รวบการวาดหลายครั้งในเฟรมเดียวให้เหลือการประกอบภาพรอบเดียว', () => {
@@ -222,7 +262,7 @@ describe('เส้นสดระหว่างลากนิ้ว', () => {
     const composite = surfaces[2]!
     const before = composite.calls.length
 
-    textures.beginStroke(['right.index'], 0, false)
+    textures.beginStroke(['right.index'], new Map([['right.index', 0]]), false)
     for (let index = 0; index < 20; index += 1) {
       textures.paintDabs([{ x: index, y: index, r: 4, alpha: 1 }], '#ff0000', 0)
     }

@@ -89,7 +89,7 @@ export class NailTextureSet {
   private owner: string | null = null
   private wetErase = false
   /** ดัชนีเลเยอร์ที่เส้นสดกำลังถูกวาดลงไป */
-  private wetLayer = 0
+  private wetLayers = new Map<NailKey, number>()
   private wetDirty = false
   private rebuildScheduled = false
   private painting = false
@@ -143,7 +143,7 @@ export class NailTextureSet {
    */
   beginStroke(
     targets: Iterable<NailKey>,
-    layerIndex: number,
+    layerIndexes: ReadonlyMap<NailKey, number>,
     erase: boolean,
     owner = 'default',
   ): boolean {
@@ -151,8 +151,12 @@ export class NailTextureSet {
     this.painting = true
     this.owner = owner
     this.wetErase = erase
-    this.wetLayer = layerIndex
     this.wetTargets = new Set(targets)
+    this.wetLayers = new Map(
+      [...this.wetTargets]
+        .map((key) => [key, layerIndexes.get(key)] as const)
+        .filter((entry): entry is readonly [NailKey, number] => entry[1] !== undefined),
+    )
     this.clearWet()
     return true
   }
@@ -191,6 +195,7 @@ export class NailTextureSet {
     this.rebuildScheduled = false
     const targets = [...this.wetTargets]
     this.wetTargets.clear()
+    this.wetLayers.clear()
     this.clearWet()
     for (const key of targets) this.rebuild(key)
   }
@@ -206,7 +211,7 @@ export class NailTextureSet {
       // การ renderLayer ให้มันคือการ replay เส้นทิ้งเปล่า ๆ
       if (!layer.visible || layer.opacity <= 0) continue
       const surface = this.layerSurface(key, layer)
-      const isWetLayer = this.wetDirty && index === this.wetLayer && this.wetTargets.has(key)
+      const isWetLayer = this.wetDirty && index === this.wetLayers.get(key) && this.wetTargets.has(key)
       if (isWetLayer) {
         this.scratch.ctx.clearRect(0, 0, this.size, this.size)
         if (surface) this.scratch.ctx.drawImage(surface.canvas, 0, 0, this.size, this.size)

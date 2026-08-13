@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   MAX_STROKES_PER_LAYER,
   NAIL_KEYS,
@@ -168,6 +168,48 @@ describe('การล้างและวัสดุ', () => {
     expect(store.getState().document.nails['right.little'].finish).toBe('chrome')
     expect(store.getState().document.nails['right.little'].baseColor).toBe('#123456')
     expect(store.getState().document.nails['right.ring'].finish).toBe('glossy')
+  })
+
+  it('coalesces matching base-color edits across selected editable nails', () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date(1_000))
+      const store = createDesignStore()
+      store.getState().selectAll()
+
+      store.getState().setBaseColor('#112233', 'bulk-color')
+      vi.advanceTimersByTime(499)
+      store.getState().setBaseColor('#445566', 'bulk-color')
+      store.getState().undo()
+
+      for (const key of EDITABLE_NAILS) {
+        expect(store.getState().document.nails[key].baseColor).toBe('#ffffff')
+      }
+      expect(store.getState().history.state()).toMatchObject({ canUndo: false, canRedo: true })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('coalesces matching finish edits across selected editable nails', () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date(1_000))
+      const store = createDesignStore()
+      store.getState().selectAll()
+
+      store.getState().setFinish('matte', 'bulk-finish')
+      vi.advanceTimersByTime(499)
+      store.getState().setFinish('chrome', 'bulk-finish')
+      store.getState().undo()
+
+      for (const key of EDITABLE_NAILS) {
+        expect(store.getState().document.nails[key].finish).toBe('glossy')
+      }
+      expect(store.getState().history.state()).toMatchObject({ canUndo: false, canRedo: true })
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

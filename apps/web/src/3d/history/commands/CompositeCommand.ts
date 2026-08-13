@@ -24,6 +24,21 @@ export class CompositeCommand implements Command {
     return this.apply(document, [...this.children].reverse(), true)
   }
 
+  merge(next: Command): Command | null {
+    if (!(next instanceof CompositeCommand) || this.mergeKey === undefined) return null
+    if (next.mergeKey !== this.mergeKey || next.children.length !== this.children.length) return null
+    const children: Command[] = []
+    for (let index = 0; index < this.children.length; index += 1) {
+      const previous = this.children[index]
+      const following = next.children[index]
+      if (!previous || !following) return null
+      const merged = previous.merge?.(following) ?? null
+      if (!merged) return null
+      children.push(merged)
+    }
+    return new CompositeCommand(this.label, children, this.mergeKey)
+  }
+
   private apply(document: DesignDocument, commands: ReadonlyArray<Command>, undo = false): CommandResult {
     let current = document
     const affects = new Set<NailKey>()

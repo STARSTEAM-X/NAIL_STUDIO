@@ -120,8 +120,8 @@ function repairActiveLayerIds(
   return repaired
 }
 
-function commandFor(label: string, commands: Command[]): Command {
-  return commands.length === 1 ? commands[0]! : new CompositeCommand(label, commands)
+function commandFor(label: string, commands: Command[], mergeKey?: string): Command {
+  return commands.length === 1 ? commands[0]! : new CompositeCommand(label, commands, mergeKey)
 }
 
 function nailsMatch(first: Nail, second: Nail): boolean {
@@ -250,7 +250,7 @@ export function createDesignStore(options: CreateDesignStoreOptions = {}): Desig
         const commands = editableSelection(state.selection)
           .filter((key) => state.document.nails[key].finish !== finish)
           .map((key) => new SetFinishCommand(key, state.document.nails[key].finish, finish, mergeKey))
-        if (commands.length > 0) execute(commandFor('เปลี่ยนผิวเล็บ', commands))
+        if (commands.length > 0) execute(commandFor('เปลี่ยนผิวเล็บ', commands, mergeKey))
       },
 
       setBaseColor: (color, mergeKey) => {
@@ -258,7 +258,7 @@ export function createDesignStore(options: CreateDesignStoreOptions = {}): Desig
         const commands = editableSelection(state.selection)
           .filter((key) => state.document.nails[key].baseColor !== color)
           .map((key) => new SetBaseColorCommand(key, state.document.nails[key].baseColor, color, mergeKey))
-        if (commands.length > 0) execute(commandFor('เปลี่ยนสีเล็บ', commands))
+        if (commands.length > 0) execute(commandFor('เปลี่ยนสีเล็บ', commands, mergeKey))
       },
 
       copyActiveNailToAll: () => {
