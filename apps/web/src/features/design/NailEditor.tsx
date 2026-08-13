@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { useCurrentUserId } from '@/features/auth/useAuth.ts'
@@ -17,8 +17,8 @@ import {
 } from '@/features/projects/useProjects.ts'
 import {
   buildDuplicateCurrentInput,
-  conflictStateFromError,
   localizedTaskError,
+  createExplicitSaveUiController,
   type ServerVersionConflict,
 } from '@/features/projects/versionActions.ts'
 import { useDesign, useDesignStoreApi } from './DesignStoreProvider.tsx'
@@ -71,7 +71,7 @@ export function NailEditor({ projectId, detail }: Props) {
     serverDocument: openingDocument(detail),
     serverUpdatedAt: detail.draft?.updatedAt ?? detail.version.createdAt,
   })
-  const autosave = useAutosave(projectId, saveBaseVersion)
+  const autosave = useAutosave(projectId, saveBaseVersion, offlineDraft)
   const saveVersion = useSaveVersion()
   const duplicateProject = useDuplicateProject()
   const [draftSourceVersion, setDraftSourceVersion] = useState<number | null>(null)
@@ -79,6 +79,17 @@ export function NailEditor({ projectId, detail }: Props) {
   const [isReloading, setIsReloading] = useState(false)
   const [conflictActionError, setConflictActionError] = useState<string | null>(null)
   const latestVersion = saveBaseVersion
+  const explicitSaveUi = useRef(createExplicitSaveUiController({
+    setBaseVersion: setSaveBaseVersion,
+    clearDraftSource: () => setDraftSourceVersion(null),
+    showConflict: setConflict,
+    clearConflictError: () => setConflictActionError(null),
+  }))
+
+  useEffect(() => {
+    explicitSaveUi.current.activate()
+    return () => explicitSaveUi.current.dispose()
+  }, [])
 
   useEffect(() => {
     if (!autosave.conflict) return
@@ -160,21 +171,16 @@ export function NailEditor({ projectId, detail }: Props) {
             className="btn btn-primary"
             disabled={saveVersion.isPending || autosave.isVersionSavePending}
             onClick={() => {
-              void autosave.runVersionSave(async ({ document }) => {
+              void autosave.runVersionSave(async ({ document }, lifecycle) => {
                 const result = await saveVersion.mutateAsync({
                   projectId,
                   document,
                   expectedVersion: latestVersion,
                 })
-                setSaveBaseVersion(result.versionNumber)
-                setDraftSourceVersion(null)
+                if (lifecycle.isActive()) explicitSaveUi.current.success(result.versionNumber)
                 return result
               }).catch((error: unknown) => {
-                const nextConflict = conflictStateFromError(error, 'explicit-save')
-                if (nextConflict) {
-                  setConflictActionError(null)
-                  setConflict(nextConflict)
-                }
+                explicitSaveUi.current.failure(error)
               })
             }}
           >

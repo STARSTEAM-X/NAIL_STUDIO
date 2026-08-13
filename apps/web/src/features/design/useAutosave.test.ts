@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createEmptyDocument } from '@nail-studio/contracts'
 import { ApiRequestError } from '@/api/client.ts'
-import { AUTOSAVE_DELAY_MS, autosaveFailureFromError, createAutosaveAttemptState, createAutosavePersistenceGate } from './useAutosave.ts'
+import { AUTOSAVE_DELAY_MS, autosaveFailureFromError, createAutosaveAttemptState, createAutosavePersistenceGate, persistDetachedDraft, settleDisposedVersionFallback } from './useAutosave.ts'
 
 function apiError(status: number): ApiRequestError {
   return new ApiRequestError(status, {
@@ -305,5 +305,50 @@ describe('autosave persistence ordering', () => {
 
     expect(activeSuccesses).toBe(1)
     expect(disposedSettles).toBe(0)
+  })
+
+  it('removes the offline fallback only after detached server persistence succeeds', async () => {
+    const cleared: number[] = []
+    const retained: Array<{ revision: number; baseVersion: number }> = []
+    const snapshot = { revision: 2, document: createEmptyDocument() }
+
+    await persistDetachedDraft(
+      snapshot,
+      5,
+      async () => undefined,
+      async (revision) => { cleared.push(revision) },
+      async (revision, baseVersion) => { retained.push({ revision, baseVersion }) },
+    )
+    expect(cleared).toEqual([2])
+    expect(retained).toEqual([])
+
+    await persistDetachedDraft(
+      snapshot,
+      5,
+      async () => { throw new Error('offline') },
+      async (revision) => { cleared.push(revision) },
+      async (revision, baseVersion) => { retained.push({ revision, baseVersion }) },
+    )
+    expect(cleared).toEqual([2])
+    expect(retained).toEqual([{ revision: 2, baseVersion: 5 }])
+  })
+
+  it('retains a 409 fallback without attempting detached server persistence', async () => {
+    const snapshot = { revision: 2, document: createEmptyDocument(), baseVersion: 4 }
+    const persist = vi.fn(async () => undefined)
+    const clear = vi.fn(async () => undefined)
+    const retain = vi.fn(async () => undefined)
+
+    await settleDisposedVersionFallback(
+      snapshot,
+      { status: 'failure', error: apiError(409) },
+      persist,
+      clear,
+      retain,
+    )
+
+    expect(persist).not.toHaveBeenCalled()
+    expect(clear).not.toHaveBeenCalled()
+    expect(retain).toHaveBeenCalledWith(2, 4)
   })
 })

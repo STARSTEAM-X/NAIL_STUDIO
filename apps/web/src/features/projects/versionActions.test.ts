@@ -6,6 +6,7 @@ import {
   conflictStateFromError,
   loadHistoricalVersion,
   localizedTaskError,
+  createExplicitSaveUiController,
 } from './versionActions.ts'
 
 function conflictError(status: number) {
@@ -78,5 +79,29 @@ describe('version action error localization', () => {
 
     expect(message).toBe(fallback)
     expect(message).not.toContain('Version not found')
+  })
+})
+
+describe('explicit-save UI lifecycle', () => {
+  it.each([
+    ['success', null],
+    ['409 conflict', conflictError(409)],
+  ])('runs zero UI callbacks when %s settles after disposal', (_label, error) => {
+    const callbacks = {
+      setBaseVersion: vi.fn(),
+      clearDraftSource: vi.fn(),
+      showConflict: vi.fn(),
+      clearConflictError: vi.fn(),
+    }
+    const controller = createExplicitSaveUiController(callbacks)
+    controller.dispose()
+
+    if (error) controller.failure(error)
+    else controller.success(5)
+
+    expect(callbacks.setBaseVersion).not.toHaveBeenCalled()
+    expect(callbacks.clearDraftSource).not.toHaveBeenCalled()
+    expect(callbacks.showConflict).not.toHaveBeenCalled()
+    expect(callbacks.clearConflictError).not.toHaveBeenCalled()
   })
 })

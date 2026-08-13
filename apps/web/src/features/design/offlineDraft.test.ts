@@ -12,6 +12,8 @@ import {
   createOfflineDraftPersistence,
   inspectOfflineDraft,
   isOfflineDraftNewer,
+  clearPendingVersionFallback,
+  retainPendingVersionFallback,
 } from './useOfflineDraft.ts'
 
 function documentWithColor(color: string): DesignDocument {
@@ -126,6 +128,7 @@ describe('offline draft persistence', () => {
     expect(drafts).toEqual([record('project-a', 2, {
       document: documentWithColor('#222222'),
       updatedAt: '2026-08-13T05:00:00.000Z',
+      createdAt: '2026-08-13T05:00:00.000Z',
     })])
   })
 
@@ -237,6 +240,38 @@ describe('offline draft persistence', () => {
     expect(writes).toHaveLength(1)
     expect(writes[0]).toMatchObject({ baseVersion: 4, revision: 2 })
   })
+
+  it('marks only edits scheduled after a version save starts as cross-base recovery records', async () => {
+    vi.useFakeTimers()
+    const writes: OfflineDraftRecord[] = []
+    const persistence = createOfflineDraftPersistence({
+      store: {
+        get: async () => null,
+        put: async (draft) => { writes.push(draft) },
+        delete: async () => undefined,
+      },
+      userId: 'user-1',
+      projectId: 'project-a',
+      delayMs: 500,
+      now: () => new Date('2026-08-13T05:00:00.000Z'),
+    })
+    persistence.schedule(documentWithColor('#111111'), 4, 1)
+    persistence.beginVersionSave()
+    persistence.schedule(documentWithColor('#222222'), 4, 2)
+
+    await persistence.flush()
+
+    expect(writes).toHaveLength(1)
+    expect(writes[0]).toMatchObject({
+      revision: 2,
+      provenance: 'pending-version-save',
+      createdAt: '2026-08-13T05:00:00.000Z',
+    })
+    persistence.endVersionSave()
+    persistence.schedule(documentWithColor('#333333'), 5, 3)
+    await persistence.flush()
+    expect(writes[1]?.provenance).toBeUndefined()
+  })
 })
 
 describe('offline draft recovery', () => {
@@ -246,6 +281,91 @@ describe('offline draft recovery', () => {
     ['stale base despite later timestamp', 5, '2026-08-13T03:30:00.000Z', false],
   ])('%s determines whether the local draft is newer', (_label, baseVersion, updatedAt, expected) => {
     expect(isOfflineDraftNewer(record('project-a', 2), { baseVersion, updatedAt })).toBe(expected)
+  })
+
+  it('offers a newer pending-version snapshot after version N+1 exists but detached PUT failed', () => {
+    const local = record('project-a', 2, {
+      baseVersion: 4,
+      provenance: 'pending-version-save',
+      createdAt: '2026-08-13T05:00:00.000Z',
+    })
+    expect(isOfflineDraftNewer(local, {
+      baseVersion: 5,
+      updatedAt: '2026-08-13T04:59:00.000Z',
+    })).toBe(true)
+  })
+
+  it('offers a newer pending-version snapshot after a 409 advances the server base', () => {
+    const local = record('project-a', 2, {
+      baseVersion: 4,
+      provenance: 'pending-version-save',
+      createdAt: '2026-08-13T05:00:00.000Z',
+    })
+    expect(isOfflineDraftNewer(local, {
+      baseVersion: 7,
+      updatedAt: '2026-08-13T04:59:00.000Z',
+    })).toBe(true)
+  })
+
+  it('still rejects an ordinary draft from a stale base even when its timestamp is newer', () => {
+    expect(isOfflineDraftNewer(record('project-a', 2, {
+      baseVersion: 4,
+      createdAt: '2026-08-13T05:00:00.000Z',
+    }), {
+      baseVersion: 5,
+      updatedAt: '2026-08-13T04:59:00.000Z',
+    })).toBe(false)
+  })
+
+  it('rejects a pending-version fallback when its createdAt is not newer than the server', () => {
+    expect(isOfflineDraftNewer(record('project-a', 2, {
+      baseVersion: 4,
+      provenance: 'pending-version-save',
+      createdAt: '2026-08-13T04:58:00.000Z',
+    }), {
+      baseVersion: 5,
+      updatedAt: '2026-08-13T04:59:00.000Z',
+    })).toBe(false)
+  })
+
+  it('removes only the matching pending-version fallback after detached persistence succeeds', async () => {
+    const store = createOfflineDraftStore(memoryBackend())
+    const pending = record('project-a', 2, {
+      provenance: 'pending-version-save',
+      createdAt: '2026-08-13T05:00:00.000Z',
+    })
+    await store.put(pending)
+
+    await clearPendingVersionFallback(store, pending)
+
+    expect(await store.get('user-1', 'project-a')).toBeNull()
+  })
+
+  it('reconciles a retained fallback to N+1 with a post-outcome createdAt', async () => {
+    const store = createOfflineDraftStore(memoryBackend())
+    const pending = record('project-a', 2, {
+      provenance: 'pending-version-save',
+      createdAt: '2026-08-13T04:58:00.000Z',
+    })
+    await store.put(pending)
+
+    await retainPendingVersionFallback(
+      store,
+      pending,
+      5,
+      () => new Date('2026-08-13T05:01:00.000Z'),
+    )
+
+    const retained = await store.get('user-1', 'project-a')
+    expect(retained).toMatchObject({
+      baseVersion: 5,
+      createdAt: '2026-08-13T05:01:00.000Z',
+      provenance: 'pending-version-save',
+    })
+    expect(isOfflineDraftNewer(retained!, {
+      baseVersion: 5,
+      updatedAt: '2026-08-13T05:00:00.000Z',
+    })).toBe(true)
   })
 
   it('recovers the local document only after the recover choice', async () => {

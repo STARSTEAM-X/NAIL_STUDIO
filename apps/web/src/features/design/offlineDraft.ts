@@ -12,6 +12,8 @@ export interface OfflineDraftRecord {
   baseVersion: number
   revision: number
   updatedAt: string
+  createdAt?: string
+  provenance?: 'pending-version-save'
 }
 
 export interface OfflineDraftStore {

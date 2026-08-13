@@ -26,6 +26,34 @@ export function localizedTaskError(_error: unknown, thaiContext: string): string
   return thaiContext
 }
 
+interface ExplicitSaveUiCallbacks {
+  setBaseVersion: (version: number) => void
+  clearDraftSource: () => void
+  showConflict: (conflict: ServerVersionConflict) => void
+  clearConflictError: () => void
+}
+
+export function createExplicitSaveUiController(callbacks: ExplicitSaveUiCallbacks) {
+  let active = true
+  return {
+    isActive: () => active,
+    activate() { active = true },
+    dispose() { active = false },
+    success(version: number) {
+      if (!active) return
+      callbacks.setBaseVersion(version)
+      callbacks.clearDraftSource()
+    },
+    failure(error: unknown) {
+      if (!active) return
+      const conflict = conflictStateFromError(error, 'explicit-save')
+      if (!conflict) return
+      callbacks.clearConflictError()
+      callbacks.showConflict(conflict)
+    },
+  }
+}
+
 interface HistoricalVersionDocument {
   number: number
   document: DesignDocument

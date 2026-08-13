@@ -26,6 +26,7 @@ export function createOfflineDraftPersistence({
 }: CreateOfflineDraftPersistenceInput) {
   let timer: ReturnType<typeof setTimeout> | null = null
   let pending: OfflineDraftRecord | null = null
+  let versionSavePending = false
 
   const flush = async () => {
     if (timer) clearTimeout(timer)
@@ -43,6 +44,7 @@ export function createOfflineDraftPersistence({
   return {
     schedule(document: DesignDocument, baseVersion: number, revision: number) {
       if (timer) clearTimeout(timer)
+      const createdAt = now().toISOString()
       pending = {
         key: `${userId}:${projectId}`,
         userId,
@@ -50,10 +52,14 @@ export function createOfflineDraftPersistence({
         document,
         baseVersion,
         revision,
-        updatedAt: now().toISOString(),
+        updatedAt: createdAt,
+        createdAt,
+        ...(versionSavePending ? { provenance: 'pending-version-save' as const } : {}),
       }
       timer = setTimeout(() => { void flush() }, delayMs)
     },
+    beginVersionSave() { versionSavePending = true },
+    endVersionSave() { versionSavePending = false },
     flush,
     cancel() {
       if (timer) clearTimeout(timer)
@@ -68,6 +74,8 @@ interface CreateOfflineDraftRecoveryControllerInput {
   deleteLocal: (record: OfflineDraftRecord) => Promise<void>
   loadDocument: (document: DesignDocument) => void
   onWarning?: (warning: string) => void
+  clearPendingFallback?: (revision: number) => Promise<void>
+  retainPendingFallback?: (revision: number, baseVersion: number) => Promise<void>
 }
 
 export function createOfflineDraftRecoveryController({
@@ -75,6 +83,8 @@ export function createOfflineDraftRecoveryController({
   deleteLocal,
   loadDocument,
   onWarning = () => undefined,
+  clearPendingFallback = async () => undefined,
+  retainPendingFallback = async () => undefined,
 }: CreateOfflineDraftRecoveryControllerInput) {
   let suspended = false
   let disposed = false
@@ -85,6 +95,16 @@ export function createOfflineDraftRecoveryController({
     schedule(document: DesignDocument, baseVersion: number, revision: number) {
       if (suspended || disposed) return
       persistence.schedule(document, baseVersion, revision)
+    },
+    beginVersionSave() { persistence.beginVersionSave() },
+    endVersionSave() { persistence.endVersionSave() },
+    async clearPendingVersionFallback(revision: number) {
+      await (cleanup ?? persistence.flush())
+      await clearPendingFallback(revision)
+    },
+    async retainPendingVersionFallback(revision: number, baseVersion: number) {
+      await (cleanup ?? persistence.flush())
+      await retainPendingFallback(revision, baseVersion)
     },
     useServer(
       record: OfflineDraftRecord,
@@ -128,7 +148,30 @@ export function isOfflineDraftNewer(
   record: OfflineDraftRecord,
   server: ServerDraftMarker,
 ): boolean {
-  return record.baseVersion === server.baseVersion && record.updatedAt > server.updatedAt
+  const createdAt = record.createdAt ?? record.updatedAt
+  if (createdAt <= server.updatedAt) return false
+  return record.baseVersion === server.baseVersion || record.provenance === 'pending-version-save'
+}
+
+export async function clearPendingVersionFallback(
+  store: OfflineDraftStore,
+  expected: Pick<OfflineDraftRecord, 'userId' | 'projectId' | 'revision'>,
+): Promise<void> {
+  const current = await store.get(expected.userId, expected.projectId)
+  if (current?.provenance !== 'pending-version-save' || current.revision !== expected.revision) return
+  await store.delete(expected.userId, expected.projectId)
+}
+
+export async function retainPendingVersionFallback(
+  store: OfflineDraftStore,
+  expected: Pick<OfflineDraftRecord, 'userId' | 'projectId' | 'revision'>,
+  baseVersion: number,
+  now: () => Date = () => new Date(),
+): Promise<void> {
+  const current = await store.get(expected.userId, expected.projectId)
+  if (current?.provenance !== 'pending-version-save' || current.revision !== expected.revision) return
+  const createdAt = now().toISOString()
+  await store.put({ ...current, baseVersion, createdAt, updatedAt: createdAt })
 }
 
 interface InspectOfflineDraftInput {
@@ -203,6 +246,10 @@ export interface OfflineDraftResult {
   recoverLocal: () => void
   useServerDocument: (document?: DesignDocument) => Promise<void>
   dismissWarning: () => void
+  beginVersionSave: () => void
+  endVersionSave: () => void
+  clearPendingVersionFallback: (revision: number) => Promise<void>
+  retainPendingVersionFallback: (revision: number, baseVersion: number) => Promise<void>
 }
 
 export function useOfflineDraft({
@@ -249,6 +296,16 @@ export function useOfflineDraft({
       deleteLocal: (record) => draftStore.delete(record.userId, record.projectId),
       loadDocument: designStore.getState().loadDocument,
       onWarning: (nextWarning) => { if (active) setWarning(nextWarning) },
+      clearPendingFallback: (revision) => clearPendingVersionFallback(draftStore, {
+        userId,
+        projectId,
+        revision,
+      }),
+      retainPendingFallback: (revision, pendingBaseVersion) => retainPendingVersionFallback(
+        draftStore,
+        { userId, projectId, revision },
+        pendingBaseVersion,
+      ),
     })
     recoveryController.current = controller
     const unsubscribe = designStore.subscribe((state, previous) => {
@@ -258,8 +315,10 @@ export function useOfflineDraft({
     return () => {
       active = false
       unsubscribe()
-      void controller.cancel()
-      if (recoveryController.current === controller) recoveryController.current = null
+      const cleanup = controller.cancel()
+      void cleanup.finally(() => {
+        if (recoveryController.current === controller) recoveryController.current = null
+      })
     }
   }, [baseVersion, designStore, draftStore, projectId, userId])
 
@@ -319,5 +378,23 @@ export function useOfflineDraft({
     recoverLocal,
     useServerDocument,
     dismissWarning: () => setWarning(null),
+    beginVersionSave: () => recoveryController.current?.beginVersionSave(),
+    endVersionSave: () => recoveryController.current?.endVersionSave(),
+    clearPendingVersionFallback: async (revision) => {
+      if (!userId) return
+      const controller = recoveryController.current
+      if (controller) await controller.clearPendingVersionFallback(revision)
+      else await clearPendingVersionFallback(draftStore, { userId, projectId, revision })
+    },
+    retainPendingVersionFallback: async (revision, pendingBaseVersion) => {
+      if (!userId) return
+      const controller = recoveryController.current
+      if (controller) await controller.retainPendingVersionFallback(revision, pendingBaseVersion)
+      else await retainPendingVersionFallback(
+        draftStore,
+        { userId, projectId, revision },
+        pendingBaseVersion,
+      )
+    },
   }
 }

@@ -20,7 +20,9 @@ export interface AutosaveResult {
   /** ให้ผู้ใช้สั่งบันทึกทันทีโดยไม่ต้องรอครบเวลา */
   flush: () => void
   isVersionSavePending: boolean
-  runVersionSave: <T extends VersionSaveResult>(operation: (snapshot: VersionSaveSnapshot) => Promise<T>) => Promise<T | null>
+  runVersionSave: <T extends VersionSaveResult>(
+    operation: (snapshot: VersionSaveSnapshot, lifecycle: VersionSaveLifecycle) => Promise<T>,
+  ) => Promise<T | null>
 }
 
 export interface VersionSaveSnapshot {
@@ -32,7 +34,18 @@ export interface VersionSaveResult {
   versionNumber: number
 }
 
-interface PendingUnmountSnapshot extends VersionSaveSnapshot {
+export interface VersionSaveLifecycle {
+  isActive: () => boolean
+}
+
+export interface OfflineVersionFallback {
+  beginVersionSave: () => void
+  endVersionSave: () => void
+  clearPendingVersionFallback: (revision: number) => Promise<void>
+  retainPendingVersionFallback: (revision: number, baseVersion: number) => Promise<void>
+}
+
+export interface PendingUnmountSnapshot extends VersionSaveSnapshot {
   baseVersion: number
 }
 
@@ -41,6 +54,38 @@ export type AutosaveTrigger = 'debounce' | 'visibility' | 'cleanup' | 'flush'
 export type PersistenceOutcome<T> =
   | { status: 'success'; result: T }
   | { status: 'failure'; error: unknown }
+
+export async function persistDetachedDraft(
+  snapshot: VersionSaveSnapshot,
+  baseVersion: number,
+  persist: (snapshot: VersionSaveSnapshot, baseVersion: number) => Promise<void>,
+  clearFallback: (revision: number) => Promise<void>,
+  retainFallback: (revision: number, baseVersion: number) => Promise<void>,
+) {
+  try {
+    await persist(snapshot, baseVersion)
+    await clearFallback(snapshot.revision)
+  } catch {
+    await retainFallback(snapshot.revision, baseVersion)
+  }
+}
+
+export async function settleDisposedVersionFallback(
+  snapshot: PendingUnmountSnapshot,
+  outcome: PersistenceOutcome<{ result: VersionSaveResult; revision: number }>,
+  persist: (snapshot: VersionSaveSnapshot, baseVersion: number) => Promise<void>,
+  clearFallback: (revision: number) => Promise<void>,
+  retainFallback: (revision: number, baseVersion: number) => Promise<void>,
+) {
+  if (outcome.status === 'failure' && conflictStateFromError(outcome.error, 'explicit-save')) {
+    await retainFallback(snapshot.revision, snapshot.baseVersion)
+    return
+  }
+  const handoffBaseVersion = outcome.status === 'success'
+    ? outcome.result.result.versionNumber
+    : snapshot.baseVersion
+  await persistDetachedDraft(snapshot, handoffBaseVersion, persist, clearFallback, retainFallback)
+}
 
 export function createAutosavePersistenceGate() {
   let inFlight: Promise<void> | null = null
@@ -140,7 +185,11 @@ export function autosaveFailureFromError(error: unknown): {
  * ติดตามด้วย revision ไม่ใช่เนื้อเอกสาร — เทียบตัวเลขเป็นการทำงานคงที่
  * ส่วนการเทียบเอกสารทั้งชิ้นคือการเดินโครงสร้างขนาดใหญ่ทุกครั้งที่วาดเสร็จหนึ่งเส้น
  */
-export function useAutosave(projectId: string, baseVersion: number): AutosaveResult {
+export function useAutosave(
+  projectId: string,
+  baseVersion: number,
+  offlineFallback?: OfflineVersionFallback,
+): AutosaveResult {
   const store = useDesignStoreApi()
   const saveDraft = useSaveDraft()
   const [status, setStatus] = useState<AutosaveStatus>('idle')
@@ -227,15 +276,24 @@ export function useAutosave(projectId: string, baseVersion: number): AutosaveRes
       if (timer.current) clearTimeout(timer.current)
       save.current('flush')
     },
-    runVersionSave: async <T extends VersionSaveResult>(operation: (snapshot: VersionSaveSnapshot) => Promise<T>) => {
+    runVersionSave: async <T extends VersionSaveResult>(
+      operation: (snapshot: VersionSaveSnapshot, lifecycle: VersionSaveLifecycle) => Promise<T>,
+    ) => {
       if (timer.current) clearTimeout(timer.current)
       if (persistenceGate.current.isPaused()) return null
+      offlineFallback?.beginVersionSave()
       setVersionSavePending(true)
       try {
         const persisted = await persistenceGate.current.runExclusive(async () => {
           const { revision, document } = store.getState()
           try {
-            return { result: await operation({ revision, document }), revision }
+            return {
+              result: await operation(
+                { revision, document },
+                { isActive: () => !persistenceGate.current.isDisposed() },
+              ),
+              revision,
+            }
           } catch (error: unknown) {
             if (conflictStateFromError(error, 'explicit-save')) {
               attempts.current.fail(baseVersion, true)
@@ -259,24 +317,25 @@ export function useAutosave(projectId: string, baseVersion: number): AutosaveRes
           const snapshot = pendingUnmount.current
           pendingUnmount.current = null
           if (!snapshot) return
-          if (outcome.status === 'failure' && conflictStateFromError(outcome.error, 'explicit-save')) {
-            return
-          }
-          const handoffBaseVersion = outcome.status === 'success'
-            ? outcome.result.result.versionNumber
-            : snapshot.baseVersion
-          try {
-            await saveDraftRequest({
-              projectId,
-              document: snapshot.document,
-              baseVersion: handoffBaseVersion,
-            })
-          } catch {
-            // The offline-draft cleanup flush is the recovery path when detached server persistence fails.
-          }
+          await settleDisposedVersionFallback(
+            snapshot,
+            outcome,
+            async (pending, pendingBaseVersion) => {
+              await saveDraftRequest({
+                projectId,
+                document: pending.document,
+                baseVersion: pendingBaseVersion,
+              })
+            },
+            async (revision) => offlineFallback?.clearPendingVersionFallback(revision),
+            async (revision, pendingBaseVersion) => {
+              await offlineFallback?.retainPendingVersionFallback(revision, pendingBaseVersion)
+            },
+          )
         })
         return persisted?.result ?? null
       } finally {
+        offlineFallback?.endVersionSave()
         if (!persistenceGate.current.isDisposed()) setVersionSavePending(false)
       }
     },
