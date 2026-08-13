@@ -249,7 +249,6 @@ export function createDesignStore(options: CreateDesignStoreOptions = {}): Desig
       setFinish: (finish, mergeKey) => {
         const state = get()
         const commands = editableSelection(state.selection)
-          .filter((key) => state.document.nails[key].finish !== finish)
           .map((key) => new SetFinishCommand(key, state.document.nails[key].finish, finish, mergeKey))
         if (commands.length > 0) execute(commandFor('เปลี่ยนผิวเล็บ', commands, mergeKey))
       },
@@ -257,7 +256,6 @@ export function createDesignStore(options: CreateDesignStoreOptions = {}): Desig
       setBaseColor: (color, mergeKey) => {
         const state = get()
         const commands = editableSelection(state.selection)
-          .filter((key) => state.document.nails[key].baseColor !== color)
           .map((key) => new SetBaseColorCommand(key, state.document.nails[key].baseColor, color, mergeKey))
         if (commands.length > 0) execute(commandFor('เปลี่ยนสีเล็บ', commands, mergeKey))
       },
@@ -297,10 +295,19 @@ export function createDesignStore(options: CreateDesignStoreOptions = {}): Desig
       },
 
       renameLayer: (key, layerId, name, mergeKey) => {
-        if (!isEditable(key) || name.length === 0 || name.length > 60) return
+        if (!isEditable(key)) return
+        const normalized = name.trim()
+        if (normalized.length === 0) {
+          set({ notice: 'กรุณาตั้งชื่อเลเยอร์' })
+          return
+        }
+        if (normalized.length > 60) {
+          set({ notice: 'ชื่อเลเยอร์ยาวเกิน 60 ตัวอักษร' })
+          return
+        }
         const layer = get().document.nails[key].layers.find((item) => item.id === layerId)
         if (!layer) return
-        execute(new RenameLayerCommand(key, layerId, layer.name, name, mergeKey))
+        execute(new RenameLayerCommand(key, layerId, layer.name, normalized, mergeKey))
       },
 
       setLayerVisibility: (key, layerId, visible) => {

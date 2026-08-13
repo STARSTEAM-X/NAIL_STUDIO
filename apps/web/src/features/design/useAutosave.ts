@@ -18,9 +18,41 @@ export interface AutosaveResult {
   conflict: ServerVersionConflict | null
   /** ให้ผู้ใช้สั่งบันทึกทันทีโดยไม่ต้องรอครบเวลา */
   flush: () => void
+  runVersionSave: <T>(operation: () => Promise<T>) => Promise<T>
 }
 
 export type AutosaveTrigger = 'debounce' | 'visibility' | 'cleanup' | 'flush'
+
+export function createAutosavePersistenceGate() {
+  let inFlight: Promise<void> | null = null
+  let paused = false
+  let exclusiveTail = Promise.resolve()
+  return {
+    track(promise: Promise<unknown>) {
+      const settled = promise.then(() => undefined, () => undefined)
+      inFlight = settled
+      void settled.finally(() => { if (inFlight === settled) inFlight = null })
+    },
+    isPaused: () => paused,
+    async runExclusive<T>(operation: () => Promise<T>, onSuccess?: () => void): Promise<T> {
+      paused = true
+      const previous = exclusiveTail
+      let release!: () => void
+      const current = new Promise<void>((resolve) => { release = resolve })
+      exclusiveTail = current
+      try {
+        await previous
+        await inFlight
+        const result = await operation()
+        onSuccess?.()
+        return result
+      } finally {
+        release()
+        if (exclusiveTail === current) paused = false
+      }
+    },
+  }
+}
 
 export function createAutosaveAttemptState(initialSavedRevision: number, initialBaseVersion: number) {
   let savedRevision = initialSavedRevision
@@ -34,9 +66,10 @@ export function createAutosaveAttemptState(initialSavedRevision: number, initial
       inFlight = true
       return true
     },
-    succeed(revision: number) {
+    succeed(revision: number, currentRevision = revision): boolean {
       savedRevision = revision
       inFlight = false
+      return currentRevision !== savedRevision
     },
     fail(baseVersion: number, conflict: boolean) {
       inFlight = false
@@ -90,30 +123,33 @@ export function useAutosave(projectId: string, baseVersion: number): AutosaveRes
   const attempts = useRef(createAutosaveAttemptState(store.getState().revision, baseVersion))
   attempts.current.transitionBaseVersion(baseVersion)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const persistenceGate = useRef(createAutosavePersistenceGate())
   const save = useRef<(trigger: AutosaveTrigger) => void>(() => undefined)
 
   save.current = (trigger) => {
     const { revision, document } = store.getState()
+    if (persistenceGate.current.isPaused()) return
     if (!attempts.current.start(revision, baseVersion, trigger)) return
     setStatus('saving')
-    saveDraft.mutate(
-      { projectId, document, baseVersion },
-      {
-        onSuccess: () => {
-          attempts.current.succeed(revision)
-          setStatus('saved')
-          setMessage(null)
-          setConflict(null)
-        },
-        onError: (error: unknown) => {
-          const failure = autosaveFailureFromError(error)
-          attempts.current.fail(baseVersion, failure.conflict !== null)
-          setStatus('error')
-          setMessage(failure.message)
-          setConflict(failure.conflict)
-        },
-      },
-    )
+    persistenceGate.current.track((async () => {
+      try {
+        await saveDraft.mutateAsync({ projectId, document, baseVersion })
+        const hasNewerRevision = attempts.current.succeed(revision, store.getState().revision)
+        setStatus(hasNewerRevision ? 'pending' : 'saved')
+        setMessage(null)
+        setConflict(null)
+        if (hasNewerRevision) {
+          if (timer.current) clearTimeout(timer.current)
+          timer.current = setTimeout(() => save.current('debounce'), AUTOSAVE_DELAY_MS)
+        }
+      } catch (error: unknown) {
+        const failure = autosaveFailureFromError(error)
+        attempts.current.fail(baseVersion, failure.conflict !== null)
+        setStatus('error')
+        setMessage(failure.message)
+        setConflict(failure.conflict)
+      }
+    })())
   }
 
   useEffect(() => {
@@ -146,6 +182,16 @@ export function useAutosave(projectId: string, baseVersion: number): AutosaveRes
     flush: () => {
       if (timer.current) clearTimeout(timer.current)
       save.current('flush')
+    },
+    runVersionSave: async <T>(operation: () => Promise<T>) => {
+      if (timer.current) clearTimeout(timer.current)
+      return persistenceGate.current.runExclusive(operation, () => {
+        if (timer.current) clearTimeout(timer.current)
+        attempts.current.succeed(store.getState().revision)
+        setStatus('saved')
+        setMessage(null)
+        setConflict(null)
+      })
     },
   }
 }

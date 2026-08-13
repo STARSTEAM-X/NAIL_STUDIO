@@ -134,6 +134,17 @@ describe('HistoryStack', () => {
     expect(history.state().canUndo).toBe(false)
   })
 
+  it('removes a merged gesture that returns to its original value', () => {
+    const history = new HistoryStack()
+    const original = createEmptyDocument()
+    const first = history.execute(original, setRightIndexColor('#ffffff', '#808080', 'Half', 'opacity'), 1_000)
+    const second = history.execute(first.document, setRightIndexColor('#808080', '#ffffff', 'Full', 'opacity'), 1_400)
+
+    expect(second.document.nails[RIGHT_INDEX].baseColor).toBe('#ffffff')
+    expect(second.recorded).toBe(true)
+    expect(history.state()).toEqual({ canUndo: false, canRedo: false, undoLabel: null, redoLabel: null })
+  })
+
   it('coalesces an empty merge key inside 500 milliseconds', () => {
     const history = new HistoryStack()
     const original = createEmptyDocument()

@@ -152,4 +152,22 @@ describe('Slice 3 version history API', () => {
     expect(detail.body.data.version.number).toBe(1)
     expect(detail.body.data.version.document).toEqual(duplicateDocument)
   })
+
+  it('accepts exactly one of two concurrent saves with the same expected version', async () => {
+    const created = await owner.send('post', '/projects', { name: 'Concurrent version race' })
+    const raceProjectId = created.body.data.id as string
+
+    const results = await Promise.all(Array.from({ length: 12 }, (_, index) =>
+      owner.send('post', `/projects/${raceProjectId}/versions`, {
+        document: index % 2 === 0 ? savedDocument : duplicateDocument,
+        expectedVersion: 1,
+      })))
+
+    expect(results.filter((result) => result.status === 201)).toHaveLength(1)
+    expect(results.filter((result) => result.status === 409)).toHaveLength(11)
+    const detail = await owner.send('get', `/projects/${raceProjectId}`)
+    const versions = await owner.send('get', `/projects/${raceProjectId}/versions`)
+    expect(detail.body.data.project.versionCount).toBe(2)
+    expect(versions.body.data).toHaveLength(2)
+  })
 })

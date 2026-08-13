@@ -28,7 +28,13 @@ export class HistoryStack {
     const previous = this.entryAt(this.cursor - 1)
     const merged = this.merge(previous, command, now)
     if (merged) {
-      this.entries[this.indexOf(this.cursor - 1)] = { command: merged, timestamp: now }
+      if (merged.undo(result.document).document === result.document) {
+        this.entries[this.indexOf(this.cursor - 1)] = undefined
+        this.length -= 1
+        this.cursor -= 1
+      } else {
+        this.entries[this.indexOf(this.cursor - 1)] = { command: merged, timestamp: now }
+      }
     } else {
       this.append({ command, timestamp: now })
     }

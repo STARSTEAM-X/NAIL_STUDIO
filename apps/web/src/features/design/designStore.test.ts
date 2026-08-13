@@ -212,6 +212,30 @@ describe('การล้างและวัสดุ', () => {
       vi.useRealTimers()
     }
   })
+
+  it('keeps multi-nail coalescing stable when a target starts at the first gesture value', () => {
+    vi.useFakeTimers()
+    try {
+      const store = createDesignStore()
+      store.getState().selectNail('right.index')
+      store.getState().setBaseColor('#808080')
+      store.getState().selectAll()
+      vi.setSystemTime(new Date(1_000))
+
+      store.getState().setBaseColor('#808080', 'bulk-variable-targets')
+      vi.advanceTimersByTime(400)
+      store.getState().setBaseColor('#ffffff', 'bulk-variable-targets')
+      store.getState().undo()
+
+      expect(store.getState().document.nails['right.index'].baseColor).toBe('#808080')
+      for (const key of EDITABLE_NAILS.filter((key) => key !== 'right.index')) {
+        expect(store.getState().document.nails[key].baseColor).toBe('#ffffff')
+      }
+      expect(store.getState().history.state().undoLabel).toBe('เปลี่ยนสีเล็บ')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 describe('ประวัติการแก้ไขเอกสาร', () => {
@@ -291,6 +315,14 @@ describe('ประวัติการแก้ไขเอกสาร', () =
 
     expect(store.getState().document).toBe(beforeAdd)
     expect(store.getState().notice).toContain(String(MAX_LAYERS_PER_NAIL))
+  })
+
+  it('rejects an empty layer rename with a Thai notice and keeps the saved name', () => {
+    const store = createDesignStore()
+    store.getState().renameLayer('right.index', 'layer-1', '   ')
+
+    expect(store.getState().document.nails['right.index'].layers[0]?.name).toBe('เลเยอร์ 1')
+    expect(store.getState().notice).toBe('กรุณาตั้งชื่อเลเยอร์')
   })
 
   it('records copying the active nail to editable nails as one reversible command', () => {

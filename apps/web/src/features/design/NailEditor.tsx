@@ -160,28 +160,22 @@ export function NailEditor({ projectId, detail }: Props) {
             className="btn btn-primary"
             disabled={saveVersion.isPending}
             onClick={() => {
-              // งานค้างที่ยังไม่ถูกส่งต้องไม่หายไปกับการกดบันทึกเวอร์ชัน
-              autosave.flush()
-              saveVersion.mutate(
-                {
+              void autosave.runVersionSave(async () => {
+                const result = await saveVersion.mutateAsync({
                   projectId,
                   document: store.getState().document,
                   expectedVersion: latestVersion,
-                },
-                {
-                  onSuccess: (result) => {
-                    setSaveBaseVersion(result.versionNumber)
-                    setDraftSourceVersion(null)
-                  },
-                  onError: (error) => {
-                    const nextConflict = conflictStateFromError(error, 'explicit-save')
-                    if (nextConflict) {
-                      setConflictActionError(null)
-                      setConflict(nextConflict)
-                    }
-                  },
-                },
-              )
+                })
+                setSaveBaseVersion(result.versionNumber)
+                setDraftSourceVersion(null)
+                return result
+              }).catch((error: unknown) => {
+                const nextConflict = conflictStateFromError(error, 'explicit-save')
+                if (nextConflict) {
+                  setConflictActionError(null)
+                  setConflict(nextConflict)
+                }
+              })
             }}
           >
             {saveVersion.isPending ? 'กำลังบันทึก…' : 'บันทึกเป็นเวอร์ชัน'}

@@ -124,29 +124,36 @@ export function updateVersionLabel(
  * ความไม่ซ้ำของ versionNumber ถูกบังคับด้วย UNIQUE (project_id, version_number)
  * ที่ระดับฐานข้อมูล — ถ้าสองคำขอมาพร้อมกัน คนที่สองจะชน constraint ไม่ใช่เขียนทับ
  */
-export function createVersion(
+export async function createVersion(
   projectId: string,
   versionNumber: number,
   document: Prisma.InputJsonValue,
   label: string | null,
 ) {
-  return prisma.$transaction(async (tx) => {
-    const version = await tx.designVersion.create({
-      data: { projectId, versionNumber, document, label },
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const version = await tx.designVersion.create({
+        data: { projectId, versionNumber, document, label },
+      })
+      await tx.project.update({
+        where: { id: projectId },
+        data: {
+          versionCount: { increment: 1 },
+          // งานที่ค้างอยู่ถูกรวมเข้าเวอร์ชันนี้แล้ว ถ้าไม่ล้างทิ้ง การเปิดงานครั้งหน้า
+          // จะได้ draft เก่ากลับมาแทนเวอร์ชันที่เพิ่งบันทึก
+          draftDocument: Prisma.DbNull,
+          draftUpdatedAt: null,
+          draftBaseVersion: null,
+        },
+      })
+      return version
     })
-    await tx.project.update({
-      where: { id: projectId },
-      data: {
-        versionCount: { increment: 1 },
-        // งานที่ค้างอยู่ถูกรวมเข้าเวอร์ชันนี้แล้ว ถ้าไม่ล้างทิ้ง การเปิดงานครั้งหน้า
-        // จะได้ draft เก่ากลับมาแทนเวอร์ชันที่เพิ่งบันทึก
-        draftDocument: Prisma.DbNull,
-        draftUpdatedAt: null,
-        draftBaseVersion: null,
-      },
-    })
-    return version
-  })
+  } catch (error: unknown) {
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002') {
+      return null
+    }
+    throw error
+  }
 }
 
 /** เขียนทับ draft ของงาน — ไม่แตะเวอร์ชันที่บันทึกไว้แล้ว */

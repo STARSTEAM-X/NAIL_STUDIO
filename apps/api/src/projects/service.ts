@@ -265,5 +265,8 @@ export async function saveVersion(
     input.document,
     input.label ?? null,
   )
+  if (!version) {
+    throw AppError.conflict('งานนี้ถูกบันทึกจากที่อื่นไปแล้ว กรุณาโหลดเวอร์ชันล่าสุด')
+  }
   return { versionNumber: version.versionNumber }
 }

@@ -69,12 +69,11 @@ export function LayerPanel() {
                   key={`${layer.id}:${layer.name}`}
                   defaultValue={layer.name}
                   maxLength={60}
-                  onBlur={(event) => renameLayer(
-                    nailKey,
-                    layer.id,
-                    event.currentTarget.value.trim(),
-                    `layer-name:${nailKey}:${layer.id}`,
-                  )}
+                  onBlur={(event) => {
+                    const value = event.currentTarget.value.trim()
+                    renameLayer(nailKey, layer.id, value, `layer-name:${nailKey}:${layer.id}`)
+                    if (value.length === 0 || value.length > 60) event.currentTarget.value = layer.name
+                  }}
                 />
               </label>
               <div className="layer-row">
