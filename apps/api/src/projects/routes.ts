@@ -2,9 +2,12 @@ import { Router } from 'express'
 import {
   createProjectSchema,
   createVersionSchema,
+  duplicateProjectSchema,
   listProjectsQuerySchema,
   saveDraftSchema,
   updateProjectSchema,
+  updateVersionLabelSchema,
+  versionNumberParamSchema,
 } from '@nail-studio/contracts'
 import { z } from 'zod'
 import { currentUser, requireUser } from '../middleware/requireUser.ts'
@@ -27,6 +30,32 @@ projectsRouter.post('/', async (request, response) => {
   const input = createProjectSchema.parse(request.body)
   const project = await service.create(currentUser(request).id, input.name)
   response.status(201).json({ success: true, data: project })
+})
+
+projectsRouter.get('/:id/versions', async (request, response) => {
+  const { id } = idParamSchema.parse(request.params)
+  const versions = await service.listVersions(currentUser(request).id, id)
+  response.json({ success: true, data: versions })
+})
+
+projectsRouter.get('/:id/versions/:version', async (request, response) => {
+  const { id, version } = versionNumberParamSchema.parse(request.params)
+  const result = await service.loadVersion(currentUser(request).id, id, version)
+  response.json({ success: true, data: result })
+})
+
+projectsRouter.patch('/:id/versions/:version', async (request, response) => {
+  const { id, version } = versionNumberParamSchema.parse(request.params)
+  const input = updateVersionLabelSchema.parse(request.body)
+  const result = await service.renameVersion(currentUser(request).id, id, version, input)
+  response.json({ success: true, data: result })
+})
+
+projectsRouter.post('/:id/duplicate', async (request, response) => {
+  const { id } = idParamSchema.parse(request.params)
+  const input = duplicateProjectSchema.parse(request.body)
+  const duplicate = await service.duplicateProject(currentUser(request).id, id, input)
+  response.status(201).json({ success: true, data: duplicate })
 })
 
 projectsRouter.get('/:id', async (request, response) => {

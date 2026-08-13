@@ -8,6 +8,13 @@ export interface Cursor {
   id: string
 }
 
+export interface VersionSummaryRow {
+  number: number
+  label: string | null
+  createdAt: Date
+  documentBytes: number
+}
+
 /**
  * รายการงานของผู้ใช้ด้วย keyset pagination (algorithms.md A-14)
  *
@@ -77,6 +84,34 @@ export function latestVersion(projectId: string) {
 export function findVersion(projectId: string, versionNumber: number) {
   return prisma.designVersion.findUnique({
     where: { projectId_versionNumber: { projectId, versionNumber } },
+  })
+}
+
+/**
+ * Select only history metadata. pg_column_size runs in PostgreSQL, so the JSON document is
+ * measured without being transferred to the API process.
+ */
+export function listVersions(projectId: string): Promise<VersionSummaryRow[]> {
+  return prisma.$queryRaw<VersionSummaryRow[]>`
+    SELECT
+      version_number AS "number",
+      label,
+      created_at AS "createdAt",
+      pg_column_size(document)::integer AS "documentBytes"
+    FROM design_versions
+    WHERE project_id = ${projectId}::uuid
+    ORDER BY version_number DESC
+  `
+}
+
+export function updateVersionLabel(
+  projectId: string,
+  versionNumber: number,
+  label: string | null,
+) {
+  return prisma.designVersion.updateMany({
+    where: { projectId, versionNumber },
+    data: { label },
   })
 }
 

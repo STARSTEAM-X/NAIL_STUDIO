@@ -30,6 +30,27 @@ export const createVersionSchema = z.object({
   label: z.string().trim().max(120).optional(),
 })
 
+export const versionNumberParamSchema = z.object({
+  id: z.string().uuid(),
+  version: z.coerce.number().int().min(1),
+})
+
+export const updateVersionLabelSchema = z.object({
+  label: z.string().trim().max(120).nullable(),
+})
+
+export const duplicateProjectSchema = z.object({
+  name: projectNameSchema,
+  document: designDocumentSchema,
+})
+
+export const versionSummarySchema = z.object({
+  number: z.number().int().min(1),
+  label: z.string().nullable(),
+  createdAt: z.string(),
+  documentBytes: z.number().int().nonnegative(),
+})
+
 /**
  * บันทึกงานที่ยังไม่ได้กดบันทึกเป็นเวอร์ชัน — ปลายทางของ autosave
  *
@@ -61,5 +82,9 @@ export const listProjectsQuerySchema = z.object({
 export type CreateProjectInput = z.infer<typeof createProjectSchema>
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>
 export type CreateVersionInput = z.infer<typeof createVersionSchema>
+export type VersionNumberParams = z.infer<typeof versionNumberParamSchema>
+export type UpdateVersionLabelInput = z.infer<typeof updateVersionLabelSchema>
+export type DuplicateProjectInput = z.infer<typeof duplicateProjectSchema>
+export type VersionSummary = z.infer<typeof versionSummarySchema>
 export type SaveDraftInput = z.infer<typeof saveDraftSchema>
 export type ProjectSummary = z.infer<typeof projectSummarySchema>

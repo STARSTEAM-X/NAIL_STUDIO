@@ -3,9 +3,12 @@ import {
   designDocumentSchema,
   type CreateVersionInput,
   type DesignDocument,
+  type DuplicateProjectInput,
   type ProjectSummary,
   type SaveDraftInput,
   type UpdateProjectInput,
+  type UpdateVersionLabelInput,
+  type VersionSummary,
 } from '@nail-studio/contracts'
 import { AppError } from '../errors/AppError.ts'
 import * as repository from './repository.ts'
@@ -104,6 +107,71 @@ export async function detail(userId: string, projectId: string): Promise<Project
     },
     draft: readDraft(project, version.versionNumber),
   }
+}
+
+export interface VersionDetail {
+  number: number
+  label: string | null
+  createdAt: string
+  document: DesignDocument
+}
+
+export async function listVersions(
+  userId: string,
+  projectId: string,
+): Promise<VersionSummary[]> {
+  await mustOwn(userId, projectId)
+  const versions = await repository.listVersions(projectId)
+  return versions.map((version) => ({
+    number: version.number,
+    label: version.label,
+    createdAt: version.createdAt.toISOString(),
+    documentBytes: version.documentBytes,
+  }))
+}
+
+export async function loadVersion(
+  userId: string,
+  projectId: string,
+  versionNumber: number,
+): Promise<VersionDetail> {
+  await mustOwn(userId, projectId)
+  const version = await repository.findVersion(projectId, versionNumber)
+  if (!version) throw AppError.notFound('Version not found')
+
+  const parsed = designDocumentSchema.safeParse(version.document)
+  if (!parsed.success) {
+    throw AppError.conflict('This version uses a document format the system cannot read')
+  }
+
+  return {
+    number: version.versionNumber,
+    label: version.label,
+    createdAt: version.createdAt.toISOString(),
+    document: parsed.data,
+  }
+}
+
+export async function renameVersion(
+  userId: string,
+  projectId: string,
+  versionNumber: number,
+  input: UpdateVersionLabelInput,
+): Promise<{ number: number; label: string | null }> {
+  await mustOwn(userId, projectId)
+  const result = await repository.updateVersionLabel(projectId, versionNumber, input.label)
+  if (result.count === 0) throw AppError.notFound('Version not found')
+  return { number: versionNumber, label: input.label }
+}
+
+export async function duplicateProject(
+  userId: string,
+  projectId: string,
+  input: DuplicateProjectInput,
+): Promise<ProjectSummary> {
+  await mustOwn(userId, projectId)
+  const duplicate = await repository.createProject(userId, input.name, input.document)
+  return toSummary(duplicate)
 }
 
 /**
