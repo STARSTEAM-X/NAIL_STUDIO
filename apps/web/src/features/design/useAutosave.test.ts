@@ -79,36 +79,52 @@ describe('autosave persistence ordering', () => {
     expect(gate.isPaused()).toBe(false)
   })
 
-  it('runs the post-save reconciliation only after the explicit save succeeds', async () => {
-    const events: string[] = []
+  it('reconciles the revision snapshot captured for the version request, not a later live revision', async () => {
+    let finishVersion!: () => void
+    const versionPending = new Promise<void>((resolve) => { finishVersion = resolve })
+    let liveRevision = 1
+    let liveDocument = { marker: 'version-request' }
+    let reconciledRevision: number | null = null
+    let persistedDocument: { marker: string } | null = null
+    const attempts = createAutosaveAttemptState(0, 1)
     const gate = createAutosavePersistenceGate()
 
-    await gate.runExclusive(async () => {
-      events.push('version persisted')
-      return 2
-    }, () => { events.push('autosave reconciled') })
+    const saving = gate.runExclusive(async () => {
+      const capturedRevision = liveRevision
+      const capturedDocument = liveDocument
+      await versionPending
+      return { capturedRevision, capturedDocument }
+    }, ({ capturedRevision, capturedDocument }) => {
+      reconciledRevision = capturedRevision
+      persistedDocument = capturedDocument
+      attempts.succeed(capturedRevision, liveRevision)
+    })
+    await Promise.resolve()
+    liveRevision = 2
+    liveDocument = { marker: 'newer-edit' }
+    finishVersion()
+    await saving
 
-    expect(events).toEqual(['version persisted', 'autosave reconciled'])
+    expect(reconciledRevision).toBe(1)
+    expect(persistedDocument).toEqual({ marker: 'version-request' })
+    expect(attempts.needsSave(2)).toBe(true)
   })
 
-  it('serializes two explicit save requests instead of running them concurrently', async () => {
-    let finishFirst!: () => void
-    const firstPending = new Promise<void>((resolve) => { finishFirst = resolve })
-    const events: string[] = []
+  it('deduplicates a second explicit save while the first waits for an in-flight draft', async () => {
+    let finishDraft!: () => void
+    const draftPending = new Promise<void>((resolve) => { finishDraft = resolve })
+    let versionCalls = 0
     const gate = createAutosavePersistenceGate()
+    gate.track(draftPending)
 
-    const first = gate.runExclusive(async () => {
-      events.push('first start')
-      await firstPending
-      events.push('first end')
-    })
-    const second = gate.runExclusive(async () => { events.push('second start') })
+    const first = gate.runExclusive(async () => { versionCalls += 1 })
+    const second = gate.runExclusive(async () => { versionCalls += 1 })
     await Promise.resolve()
-    await Promise.resolve()
-    expect(events).toEqual(['first start'])
+    expect(versionCalls).toBe(0)
 
-    finishFirst()
-    await Promise.all([first, second])
-    expect(events).toEqual(['first start', 'first end', 'second start'])
+    finishDraft()
+    await expect(second).resolves.toBeNull()
+    await first
+    expect(versionCalls).toBe(1)
   })
 })

@@ -158,12 +158,12 @@ export function NailEditor({ projectId, detail }: Props) {
           <button
             type="button"
             className="btn btn-primary"
-            disabled={saveVersion.isPending}
+            disabled={saveVersion.isPending || autosave.isVersionSavePending}
             onClick={() => {
-              void autosave.runVersionSave(async () => {
+              void autosave.runVersionSave(async ({ document }) => {
                 const result = await saveVersion.mutateAsync({
                   projectId,
-                  document: store.getState().document,
+                  document,
                   expectedVersion: latestVersion,
                 })
                 setSaveBaseVersion(result.versionNumber)
@@ -178,7 +178,7 @@ export function NailEditor({ projectId, detail }: Props) {
               })
             }}
           >
-            {saveVersion.isPending ? 'กำลังบันทึก…' : 'บันทึกเป็นเวอร์ชัน'}
+            {saveVersion.isPending || autosave.isVersionSavePending ? 'กำลังบันทึก…' : 'บันทึกเป็นเวอร์ชัน'}
           </button>
         </div>
       </header>

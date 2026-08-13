@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import type { DesignDocument } from '@nail-studio/contracts'
 import { useSaveDraft } from '@/features/projects/useProjects.ts'
 import {
   conflictStateFromError,
@@ -18,7 +19,13 @@ export interface AutosaveResult {
   conflict: ServerVersionConflict | null
   /** ให้ผู้ใช้สั่งบันทึกทันทีโดยไม่ต้องรอครบเวลา */
   flush: () => void
-  runVersionSave: <T>(operation: () => Promise<T>) => Promise<T>
+  isVersionSavePending: boolean
+  runVersionSave: <T>(operation: (snapshot: VersionSaveSnapshot) => Promise<T>) => Promise<T | null>
+}
+
+export interface VersionSaveSnapshot {
+  revision: number
+  document: DesignDocument
 }
 
 export type AutosaveTrigger = 'debounce' | 'visibility' | 'cleanup' | 'flush'
@@ -26,7 +33,6 @@ export type AutosaveTrigger = 'debounce' | 'visibility' | 'cleanup' | 'flush'
 export function createAutosavePersistenceGate() {
   let inFlight: Promise<void> | null = null
   let paused = false
-  let exclusiveTail = Promise.resolve()
   return {
     track(promise: Promise<unknown>) {
       const settled = promise.then(() => undefined, () => undefined)
@@ -34,21 +40,16 @@ export function createAutosavePersistenceGate() {
       void settled.finally(() => { if (inFlight === settled) inFlight = null })
     },
     isPaused: () => paused,
-    async runExclusive<T>(operation: () => Promise<T>, onSuccess?: () => void): Promise<T> {
+    async runExclusive<T>(operation: () => Promise<T>, onSuccess?: (result: T) => void): Promise<T | null> {
+      if (paused) return null
       paused = true
-      const previous = exclusiveTail
-      let release!: () => void
-      const current = new Promise<void>((resolve) => { release = resolve })
-      exclusiveTail = current
       try {
-        await previous
         await inFlight
         const result = await operation()
-        onSuccess?.()
+        onSuccess?.(result)
         return result
       } finally {
-        release()
-        if (exclusiveTail === current) paused = false
+        paused = false
       }
     },
   }
@@ -117,6 +118,7 @@ export function useAutosave(projectId: string, baseVersion: number): AutosaveRes
   const [status, setStatus] = useState<AutosaveStatus>('idle')
   const [message, setMessage] = useState<string | null>(null)
   const [conflict, setConflict] = useState<ServerVersionConflict | null>(null)
+  const [isVersionSavePending, setVersionSavePending] = useState(false)
 
   // เก็บใน ref เพราะ effect ด้านล่างต้องอ่านค่าล่าสุดโดยไม่ผูกเป็น dependency
   // ไม่งั้นตัวจับเวลาจะถูกตั้งใหม่ทุกครั้งที่สถานะเปลี่ยน แล้วไม่มีวันครบเวลา
@@ -179,19 +181,33 @@ export function useAutosave(projectId: string, baseVersion: number): AutosaveRes
     status,
     message,
     conflict,
+    isVersionSavePending,
     flush: () => {
       if (timer.current) clearTimeout(timer.current)
       save.current('flush')
     },
-    runVersionSave: async <T>(operation: () => Promise<T>) => {
+    runVersionSave: async <T>(operation: (snapshot: VersionSaveSnapshot) => Promise<T>) => {
       if (timer.current) clearTimeout(timer.current)
-      return persistenceGate.current.runExclusive(operation, () => {
-        if (timer.current) clearTimeout(timer.current)
-        attempts.current.succeed(store.getState().revision)
-        setStatus('saved')
-        setMessage(null)
-        setConflict(null)
-      })
+      if (persistenceGate.current.isPaused()) return null
+      setVersionSavePending(true)
+      try {
+        const persisted = await persistenceGate.current.runExclusive(async () => {
+          const { revision, document } = store.getState()
+          return { result: await operation({ revision, document }), revision }
+        }, ({ revision }) => {
+          if (timer.current) clearTimeout(timer.current)
+          const hasNewerRevision = attempts.current.succeed(revision, store.getState().revision)
+          setStatus(hasNewerRevision ? 'pending' : 'saved')
+          setMessage(null)
+          setConflict(null)
+          if (hasNewerRevision) {
+            timer.current = setTimeout(() => save.current('debounce'), AUTOSAVE_DELAY_MS)
+          }
+        })
+        return persisted?.result ?? null
+      } finally {
+        setVersionSavePending(false)
+      }
     },
   }
 }

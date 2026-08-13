@@ -15,6 +15,37 @@ export interface VersionSummaryRow {
   documentBytes: number
 }
 
+const VERSION_NUMBER_CONSTRAINT = 'design_versions_project_id_version_number_key'
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function isVersionNumberFields(target: unknown): boolean {
+  if (!Array.isArray(target)) return false
+  const fields = new Set(target.filter((field): field is string => typeof field === 'string'))
+  const databaseFields = fields.size === 2 && fields.has('project_id') && fields.has('version_number')
+  const prismaFields = fields.size === 2 && fields.has('projectId') && fields.has('versionNumber')
+  return databaseFields || prismaFields
+}
+
+export function isDesignVersionNumberConflict(error: unknown): boolean {
+  if (!isRecord(error) || error.code !== 'P2002' || !isRecord(error.meta)) return false
+  if (typeof error.meta.modelName === 'string' && error.meta.modelName !== 'DesignVersion') return false
+
+  const target = error.meta.target
+  if (isVersionNumberFields(target)) return true
+
+  const adapterError = error.meta.driverAdapterError
+  const cause = isRecord(adapterError) && isRecord(adapterError.cause) ? adapterError.cause : null
+  const constraint = cause && isRecord(cause.constraint) ? cause.constraint : null
+  if (cause?.kind === 'UniqueConstraintViolation' && isVersionNumberFields(constraint?.fields)) {
+    return true
+  }
+
+  return target === VERSION_NUMBER_CONSTRAINT || error.meta.constraint === VERSION_NUMBER_CONSTRAINT
+}
+
 /**
  * รายการงานของผู้ใช้ด้วย keyset pagination (algorithms.md A-14)
  *
@@ -149,7 +180,7 @@ export async function createVersion(
       return version
     })
   } catch (error: unknown) {
-    if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002') {
+    if (isDesignVersionNumberConflict(error)) {
       return null
     }
     throw error
