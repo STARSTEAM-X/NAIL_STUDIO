@@ -38,7 +38,7 @@ function setRightIndexColor(before: string, after: string, label: string, mergeK
       })
     },
     merge(next) {
-      if (!next.mergeKey || next.mergeKey !== mergeKey || !('targetColor' in next)) return null
+      if (next.mergeKey === undefined || next.mergeKey !== mergeKey || !('targetColor' in next)) return null
       return setRightIndexColor(before, next.targetColor as string, next.label, mergeKey)
     },
     targetColor: after,
@@ -130,6 +130,16 @@ describe('HistoryStack', () => {
     const second = history.execute(first.document, setRightIndexColor('#112233', '#445566', 'Set teal', 'color'), 1_499)
 
     expect(second.recorded).toBe(true)
+    expect(history.undo(second.document).document.nails[RIGHT_INDEX].baseColor).toBe('#ffffff')
+    expect(history.state().canUndo).toBe(false)
+  })
+
+  it('coalesces an empty merge key inside 500 milliseconds', () => {
+    const history = new HistoryStack()
+    const original = createEmptyDocument()
+    const first = history.execute(original, setRightIndexColor('#ffffff', '#112233', 'Set blue', ''), 1_000)
+    const second = history.execute(first.document, setRightIndexColor('#112233', '#445566', 'Set teal', ''), 1_499)
+
     expect(history.undo(second.document).document.nails[RIGHT_INDEX].baseColor).toBe('#ffffff')
     expect(history.state().canUndo).toBe(false)
   })

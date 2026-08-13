@@ -69,7 +69,7 @@ export class HistoryStack {
   }
 
   private merge(previous: HistoryEntry | undefined, next: Command, now: number): Command | null {
-    if (!previous || previous.command.mergeKey !== next.mergeKey || !next.mergeKey) return null
+    if (!previous || previous.command.mergeKey !== next.mergeKey || next.mergeKey === undefined) return null
     if (now - previous.timestamp > MERGE_WINDOW_MS) return null
     return previous.command.merge?.(next) ?? null
   }
