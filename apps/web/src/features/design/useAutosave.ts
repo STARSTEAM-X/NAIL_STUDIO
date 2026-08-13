@@ -40,7 +40,11 @@ export function createAutosavePersistenceGate() {
       void settled.finally(() => { if (inFlight === settled) inFlight = null })
     },
     isPaused: () => paused,
-    async runExclusive<T>(operation: () => Promise<T>, onSuccess?: (result: T) => void): Promise<T | null> {
+    async runExclusive<T>(
+      operation: () => Promise<T>,
+      onSuccess?: (result: T) => void,
+      onSettled?: () => void,
+    ): Promise<T | null> {
       if (paused) return null
       paused = true
       try {
@@ -50,6 +54,7 @@ export function createAutosavePersistenceGate() {
         return result
       } finally {
         paused = false
+        onSettled?.()
       }
     },
   }
@@ -193,7 +198,14 @@ export function useAutosave(projectId: string, baseVersion: number): AutosaveRes
       try {
         const persisted = await persistenceGate.current.runExclusive(async () => {
           const { revision, document } = store.getState()
-          return { result: await operation({ revision, document }), revision }
+          try {
+            return { result: await operation({ revision, document }), revision }
+          } catch (error: unknown) {
+            if (conflictStateFromError(error, 'explicit-save')) {
+              attempts.current.fail(baseVersion, true)
+            }
+            throw error
+          }
         }, ({ revision }) => {
           if (timer.current) clearTimeout(timer.current)
           const hasNewerRevision = attempts.current.succeed(revision, store.getState().revision)
@@ -203,6 +215,10 @@ export function useAutosave(projectId: string, baseVersion: number): AutosaveRes
           if (hasNewerRevision) {
             timer.current = setTimeout(() => save.current('debounce'), AUTOSAVE_DELAY_MS)
           }
+        }, () => {
+          if (!attempts.current.needsSave(store.getState().revision)) return
+          if (timer.current) clearTimeout(timer.current)
+          timer.current = setTimeout(() => save.current('debounce'), AUTOSAVE_DELAY_MS)
         })
         return persisted?.result ?? null
       } finally {

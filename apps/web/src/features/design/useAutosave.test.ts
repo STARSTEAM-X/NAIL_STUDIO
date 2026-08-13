@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiRequestError } from '@/api/client.ts'
-import { autosaveFailureFromError, createAutosaveAttemptState, createAutosavePersistenceGate } from './useAutosave.ts'
+import { AUTOSAVE_DELAY_MS, autosaveFailureFromError, createAutosaveAttemptState, createAutosavePersistenceGate } from './useAutosave.ts'
 
 function apiError(status: number): ApiRequestError {
   return new ApiRequestError(status, {
@@ -12,6 +12,10 @@ function apiError(status: number): ApiRequestError {
     },
   })
 }
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 describe('autosave failures', () => {
   it('preserves a 409 as an autosave conflict without a retry message', () => {
@@ -126,5 +130,78 @@ describe('autosave persistence ordering', () => {
     await expect(second).resolves.toBeNull()
     await first
     expect(versionCalls).toBe(1)
+  })
+
+  it('requeues a dirty revision after a slow explicit save fails after its timer fired while paused', async () => {
+    vi.useFakeTimers()
+    let rejectVersion!: (error: unknown) => void
+    const versionPending = new Promise<never>((_resolve, reject) => { rejectVersion = reject })
+    const attempts = createAutosaveAttemptState(0, 1)
+    const gate = createAutosavePersistenceGate()
+    let revision = 1
+    let draftCalls = 0
+    let status = 'pending'
+
+    const autosave = () => {
+      if (gate.isPaused() || !attempts.start(revision, 1, 'debounce')) return
+      status = 'saving'
+      draftCalls += 1
+      attempts.succeed(revision)
+      status = 'saved'
+    }
+    const scheduleIfDirty = () => {
+      if (attempts.needsSave(revision)) setTimeout(autosave, AUTOSAVE_DELAY_MS)
+    }
+
+    const explicit = gate.runExclusive(() => versionPending, undefined, scheduleIfDirty)
+    revision = 2
+    setTimeout(autosave, AUTOSAVE_DELAY_MS)
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS)
+    expect(draftCalls).toBe(0)
+
+    rejectVersion(new Error('version unavailable'))
+    await expect(explicit).rejects.toThrow('version unavailable')
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS)
+
+    expect(draftCalls).toBe(1)
+    expect(status).toBe('saved')
+  })
+
+  it('does not retry a dirty revision after an explicit 409 until the base transitions', async () => {
+    vi.useFakeTimers()
+    let rejectVersion!: (error: unknown) => void
+    const versionPending = new Promise<never>((_resolve, reject) => { rejectVersion = reject })
+    const attempts = createAutosaveAttemptState(0, 1)
+    const gate = createAutosavePersistenceGate()
+    const revision = 1
+    let draftCalls = 0
+
+    const autosave = () => {
+      if (gate.isPaused() || !attempts.start(revision, 1, 'debounce')) return
+      draftCalls += 1
+    }
+    const scheduleIfDirty = () => {
+      if (attempts.needsSave(revision)) setTimeout(autosave, AUTOSAVE_DELAY_MS)
+    }
+    const explicit = gate.runExclusive(async () => {
+      try {
+        return await versionPending
+      } catch (error) {
+        attempts.fail(1, autosaveFailureFromError(error).conflict !== null)
+        throw error
+      }
+    }, undefined, scheduleIfDirty)
+
+    setTimeout(autosave, AUTOSAVE_DELAY_MS)
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS)
+    expect(draftCalls).toBe(0)
+    rejectVersion(apiError(409))
+    await expect(explicit).rejects.toMatchObject({ status: 409 })
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS * 2)
+
+    expect(draftCalls).toBe(0)
+    expect(attempts.start(revision, 1, 'flush')).toBe(false)
+    attempts.transitionBaseVersion(2)
+    expect(attempts.start(revision, 2, 'flush')).toBe(true)
   })
 })
