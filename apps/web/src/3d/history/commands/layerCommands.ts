@@ -6,38 +6,7 @@ import {
   type NailKey,
 } from '@nail-studio/contracts'
 import type { Command, CommandResult } from '../Command.ts'
-
-const NO_AFFECTS: ReadonlySet<NailKey> = new Set<NailKey>()
-
-function result(document: DesignDocument, key: NailKey, changed: boolean): CommandResult {
-  return { document, affects: changed ? new Set([key]) : NO_AFFECTS }
-}
-
-function replaceNail(
-  document: DesignDocument,
-  key: NailKey,
-  update: (nail: Nail) => Nail,
-): CommandResult {
-  const current = document.nails[key]
-  const next = update(current)
-  if (next === current) return result(document, key, false)
-  return result({ ...document, nails: { ...document.nails, [key]: next } }, key, true)
-}
-
-function replaceLayer(
-  nail: Nail,
-  layerId: string,
-  update: (layer: Layer) => Layer,
-): Nail {
-  const index = nail.layers.findIndex((layer) => layer.id === layerId)
-  const current = nail.layers[index]
-  if (!current) return nail
-  const next = update(current)
-  if (next === current) return nail
-  const layers = [...nail.layers]
-  layers[index] = next
-  return { ...nail, layers }
-}
+import { replaceLayer, replaceNail } from './documentEdits.ts'
 
 function moveLayer(nail: Nail, layerId: string, from: number, to: number): Nail {
   if (from === to || from < 0 || to < 0 || from >= nail.layers.length || to >= nail.layers.length) return nail

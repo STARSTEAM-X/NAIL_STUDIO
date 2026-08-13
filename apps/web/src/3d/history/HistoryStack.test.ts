@@ -155,6 +155,46 @@ describe('HistoryStack', () => {
     expect(history.state().canUndo).toBe(false)
   })
 
+  it('keeps the cursor still when a command cannot undo itself', () => {
+    // ทุกคำสั่งใน commands/ มีทางลัดคืนเอกสารเดิมเมื่อสถานะไม่ตรงกับที่คาดไว้
+    // ถ้า cursor ขยับทั้งที่เอกสารไม่ขยับ การกดย้อนครั้งถัดไปจะข้ามไปหนึ่งรายการเงียบ ๆ
+    const history = new HistoryStack()
+    const original = createEmptyDocument()
+    const real = setRightIndexColor('#ffffff', '#112233', 'Set blue')
+    const stubborn: Command = {
+      label: 'Stubborn',
+      do: (current) => result({ ...current, hand: { ...current.hand, skinTone: '#abcdef' } }, []),
+      undo: (current) => result(current, []),
+    }
+
+    let document = history.execute(original, real).document
+    document = history.execute(document, stubborn).document
+
+    const stuck = history.undo(document)
+    expect(stuck.applied).toBe(false)
+    expect(stuck.document).toBe(document)
+    expect(history.state()).toMatchObject({ canUndo: true, undoLabel: 'Stubborn' })
+
+    // รายการของ real ยังอยู่ครบ ไม่ถูกกลืนไปกับการกดครั้งที่ล้มเหลว
+    expect(history.undo(document).applied).toBe(false)
+    expect(history.state().undoLabel).toBe('Stubborn')
+  })
+
+  it('keeps the cursor still when a command cannot redo itself', () => {
+    const history = new HistoryStack()
+    const original = createEmptyDocument()
+    const executed = history.execute(original, setRightIndexColor('#ffffff', '#112233', 'Set blue'))
+    const undone = history.undo(executed.document)
+    expect(undone.applied).toBe(true)
+
+    // เอกสารถูกเปลี่ยนจากทางอื่นจนคำสั่งเดิมทำซ้ำไม่ได้ (do คืนเอกสารเดิม)
+    const diverged = { ...undone.document, nails: { ...undone.document.nails,
+      [RIGHT_INDEX]: { ...undone.document.nails[RIGHT_INDEX], baseColor: '#112233' } } }
+    const stuck = history.redo(diverged)
+    expect(stuck.applied).toBe(false)
+    expect(history.state()).toMatchObject({ canRedo: true, redoLabel: 'Set blue' })
+  })
+
   it('does not coalesce matching merge keys after 500 milliseconds', () => {
     const history = new HistoryStack()
     const original = createEmptyDocument()

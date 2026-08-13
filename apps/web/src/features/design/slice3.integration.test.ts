@@ -3,8 +3,23 @@ import {
   createEmptyDocument,
   type DesignDocument,
   type Layer,
+  type NailKey,
+  type Stroke,
 } from '@nail-studio/contracts'
-import { EDITABLE_NAILS, createDesignStore } from './designStore.ts'
+import type { Command } from '@/3d/history/Command.ts'
+import { EDITABLE_NAILS, HISTORY_STUCK_NOTICE, createDesignStore } from './designStore.ts'
+
+function stroke(): Stroke {
+  return {
+    kind: 'brush',
+    brush: 'round',
+    color: '#ff0000',
+    size: 20,
+    opacity: 1,
+    softness: 0.5,
+    points: [{ x: 0.5, y: 0.5, p: 1 }, { x: 0.6, y: 0.6, p: 1 }],
+  }
+}
 
 function withNailColor(
   document: DesignDocument,
@@ -108,6 +123,76 @@ describe('Slice 3 store and history scenarios', () => {
     store.getState().undo()
     expect(store.getState().document).toEqual(original)
     expect(store.getState().history.state()).toMatchObject({ canUndo: false, canRedo: true })
+  })
+
+  it('makes a freshly added layer the active one, and undo puts it back', () => {
+    const store = createDesignStore()
+    const key = 'right.index' as const
+    const first = store.getState().activeLayerId(key)
+    const added: Layer = {
+      id: 'layer-new', name: 'ใหม่', visible: true, opacity: 1, blend: 'normal', strokes: [],
+    }
+
+    store.getState().addLayer(key, added)
+    // ถ้าไม่สลับให้ ผู้ใช้กด "เพิ่ม" แล้ววาดต่อ สีจะไปลงเลเยอร์เดิมโดยไม่มีอะไรบอก
+    expect(store.getState().activeLayerId(key)).toBe('layer-new')
+
+    store.getState().undo()
+    expect(store.getState().activeLayerId(key)).toBe(first)
+  })
+
+  it('refuses to paint into a hidden layer and says why', () => {
+    const store = createDesignStore()
+    const key = 'right.index' as const
+    store.getState().selectNail(key)
+    const layerId = store.getState().activeLayerId(key)
+    store.getState().setLayerVisibility(key, layerId, false)
+    const before = store.getState().document
+
+    expect(store.getState().beginPaint()).toBeNull()
+    expect(store.getState().notice).toContain('ถูกซ่อนอยู่')
+
+    // ถึงจะเรียก addStroke ตรง ๆ ก็ต้องไม่เขียนลงเอกสาร — จอไม่เปลี่ยนแต่ไฟล์เปลี่ยนไม่ได้
+    store.getState().addStroke(stroke())
+    expect(store.getState().document).toBe(before)
+
+    store.getState().setLayerVisibility(key, layerId, true)
+    expect(store.getState().beginPaint()).toEqual(new Map([[key, 0]]))
+    store.getState().addStroke(stroke())
+    expect(store.getState().document.nails[key].layers[0]?.strokes).toHaveLength(1)
+  })
+
+  it('refuses to paint into a layer at zero opacity and says why', () => {
+    const store = createDesignStore()
+    const key = 'right.index' as const
+    store.getState().selectNail(key)
+    store.getState().setLayerOpacity(key, store.getState().activeLayerId(key), 0)
+    const before = store.getState().document
+
+    expect(store.getState().beginPaint()).toBeNull()
+    expect(store.getState().notice).toContain('ความทึบ 0%')
+    store.getState().addStroke(stroke())
+    expect(store.getState().document).toBe(before)
+  })
+
+  it('warns instead of going silent when history no longer matches the document', () => {
+    const store = createDesignStore()
+    // คำสั่งที่ย้อนตัวเองไม่ได้ ถูกบันทึกลงประวัติโดยที่ store ไม่ได้รับเอกสารใหม่ไป
+    // — สภาพเดียวกับตอนที่ประวัติกับเอกสารหลุดจากกัน
+    const stubborn: Command = {
+      label: 'ดื้อ',
+      do: (current) => ({
+        document: { ...current, hand: { ...current.hand, skinTone: '#abcdef' } },
+        affects: new Set<NailKey>(),
+      }),
+      undo: (current) => ({ document: current, affects: new Set<NailKey>() }),
+    }
+    store.getState().history.execute(store.getState().document, stubborn)
+    expect(store.getState().history.state().canUndo).toBe(true)
+
+    store.getState().undo()
+    expect(store.getState().notice).toBe(HISTORY_STUCK_NOTICE)
+    expect(store.getState().history.state().canUndo).toBe(true)
   })
 
   it('cannot replay commands from the previous document after loading a server document', () => {

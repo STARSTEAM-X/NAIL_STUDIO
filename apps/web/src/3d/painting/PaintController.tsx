@@ -112,17 +112,12 @@ export function PaintController({ parts, textures }: Props) {
         state.selectNail(target.key, event.shiftKey ? 'toggle' : 'replace')
       }
       const paintState = store.getState()
-      const selection = paintState.selection
-      const layerIndexes = new Map<NailKey, number>()
-      for (const key of selection) {
-        const layerIndex = paintState.document.nails[key].layers.findIndex(
-          (layer) => layer.id === paintState.activeLayerId(key),
-        )
-        if (layerIndex < 0) return
-        layerIndexes.set(key, layerIndex)
-      }
+      // เลเยอร์ที่ซ่อนหรือเต็มแล้วต้องหยุดตั้งแต่ตรงนี้ พร้อมข้อความบอกเหตุผล
+      // ไม่ใช่ปล่อยให้ลากจนจบแล้วค่อยพบว่าไม่มีอะไรปรากฏบนเล็บ
+      const layerIndexes = paintState.beginPaint()
+      if (!layerIndexes) return
       if (!textures.beginStroke(
-        selection,
+        paintState.selection,
         layerIndexes,
         paintState.settings.tool === 'erase',
         OWNER,

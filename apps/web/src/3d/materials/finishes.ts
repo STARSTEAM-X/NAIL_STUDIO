@@ -28,9 +28,13 @@ export const FINISH_PRESETS: Record<FinishId, FinishSpec> = {
 }
 
 /**
- * The material map and normal-map presence affect shader state.  The map UUID
- * is deliberately part of this key: one Three.js material can render only one
- * colour map at a time, so separate nail textures must never share an entry.
+ * คีย์ที่ระบุ "วัสดุที่ตั้งค่าเหมือนกันทุกอย่าง" สำหรับ MaterialPool
+ *
+ * `map.uuid` อยู่ในคีย์โดยตั้งใจ: material หนึ่งตัวของ three.js ถือแผนที่สีได้ผืนเดียว
+ * เล็บแต่ละนิ้วมีผืนของตัวเอง จึงห้ามใช้ entry ร่วมกันเด็ดขาด ผลข้างเคียงที่ต้องรู้คือ
+ * **คีย์จะไม่มีวันซ้ำกันข้ามนิ้ว** pool จึงไม่ได้ลดจำนวน material ในสไลซ์นี้
+ * สิ่งที่ได้จริงคือการนับ ref และ dispose ให้ตรงเวลาตอนสลับผิวเล็บ
+ * (การ reuse จะเริ่มมีผลกับของตกแต่งใน Slice 4 ที่หลายชิ้นใช้ material ชุดเดียวกันได้)
  */
 export function nailMaterialKey(
   finish: FinishId,

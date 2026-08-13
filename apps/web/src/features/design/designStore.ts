@@ -14,6 +14,7 @@ import {
 import { HistoryStack } from '@/3d/history/HistoryStack.ts'
 import type { Command } from '@/3d/history/Command.ts'
 import { CompositeCommand } from '@/3d/history/commands/CompositeCommand.ts'
+import { nailsMatch } from '@/3d/history/commands/documentEdits.ts'
 import {
   AddStrokeCommand,
   ClearNailCommand,
@@ -58,6 +59,11 @@ export interface DesignActions {
   setSettings: (patch: Partial<PaintSettings>) => void
   activeLayerId: (key: NailKey) => string
   selectLayer: (key: NailKey, id: string) => void
+  /**
+   * ขออนุญาตเริ่มลากเส้น — คืนดัชนีเลเยอร์ของแต่ละนิ้ว หรือ null พร้อมตั้ง notice
+   * ให้ผู้ใช้รู้เหตุผล ตัวควบคุมทั้งสองโหมดเรียกตัวนี้ตัวเดียวกัน
+   */
+  beginPaint: () => ReadonlyMap<NailKey, number> | null
   addStroke: (stroke: Stroke) => void
   clearSelectedNails: () => void
   setFinish: (finish: Nail['finish'], mergeKey?: string) => void
@@ -125,21 +131,51 @@ function commandFor(label: string, commands: Command[], mergeKey?: string): Comm
   return commands.length === 1 ? commands[0]! : new CompositeCommand(label, commands, mergeKey)
 }
 
-function nailsMatch(first: Nail, second: Nail): boolean {
-  if (
-    first.shape !== second.shape
-    || first.length !== second.length
-    || first.finish !== second.finish
-    || first.baseColor !== second.baseColor
-    || first.layers.length !== second.layers.length
-    || first.decorations.length !== second.decorations.length
-  ) return false
-  return JSON.stringify(first.layers) === JSON.stringify(second.layers)
-    && JSON.stringify(first.decorations) === JSON.stringify(second.decorations)
-}
-
 function isEditable(key: NailKey): boolean {
   return EDITABLE_NAILS.includes(key)
+}
+
+export const HISTORY_STUCK_NOTICE = 'ย้อนกลับไม่ได้ — ประวัติไม่ตรงกับงานบนหน้าจอแล้ว'
+
+interface PaintTargets {
+  /** เล็บที่พร้อมรับเส้น พร้อมดัชนีเลเยอร์ที่จะเขียนลง — ว่างเมื่อวาดไม่ได้ */
+  layerIndexes: Map<NailKey, number>
+  /** เหตุผลที่วาดไม่ได้ — null เมื่อวาดได้ หรือเมื่อไม่ได้เลือกนิ้วไว้เลย */
+  notice: string | null
+}
+
+/**
+ * ตรวจว่าตอนนี้ลงสีได้จริงไหม ก่อนจะเริ่มลากเส้น
+ *
+ * ทำไมต้องกัน: `compositeLayers` ข้ามเลเยอร์ที่ซ่อนหรือความทึบ 0 ไปเลย ถ้าเลเยอร์
+ * ที่กำลังใช้งานเป็นแบบนั้น ผู้ใช้จะลากเส้นแล้วจอไม่เปลี่ยนอะไรสักนิด ทั้งที่เส้นถูก
+ * บันทึกลงเอกสารเรียบร้อย — ความล้มเหลวที่ไม่มีอาการให้เห็นและเดาสาเหตุเองไม่ได้
+ * เหมือนกรณี `beginStroke` ค้างใน Slice 2 จึงต้องบอกเหตุผลออกไปเสมอ ไม่ใช่เงียบ
+ */
+function paintTargetsOf(state: DesignState): PaintTargets {
+  const empty = new Map<NailKey, number>()
+  const layerIndexes = new Map<NailKey, number>()
+  for (const key of editableSelection(state.selection)) {
+    const layers = state.document.nails[key].layers
+    const activeId = activeLayerIdOf(state.document, state.activeLayerIds, key)
+    const index = layers.findIndex((layer) => layer.id === activeId)
+    const layer = layers[index]
+    if (!layer) return { layerIndexes: empty, notice: null }
+    if (!layer.visible) {
+      return { layerIndexes: empty, notice: `เลเยอร์ "${layer.name}" ถูกซ่อนอยู่ — เปิด "แสดง" ก่อนจึงจะวาดเห็น` }
+    }
+    if (layer.opacity <= 0) {
+      return { layerIndexes: empty, notice: `เลเยอร์ "${layer.name}" ความทึบ 0% — เพิ่มความทึบก่อนจึงจะวาดเห็น` }
+    }
+    if (layer.strokes.length >= MAX_STROKES_PER_LAYER) {
+      return {
+        layerIndexes: empty,
+        notice: `เลเยอร์นี้เก็บได้สูงสุด ${MAX_STROKES_PER_LAYER} เส้น — รวมเลเยอร์หรือเริ่มเลเยอร์ใหม่ก่อน`,
+      }
+    }
+    layerIndexes.set(key, index)
+  }
+  return { layerIndexes, notice: null }
 }
 
 export interface CreateDesignStoreOptions {
@@ -217,22 +253,23 @@ export function createDesignStore(options: CreateDesignStoreOptions = {}): Desig
         set((state) => ({ activeLayerIds: { ...state.activeLayerIds, [key]: id } }))
       },
 
+      beginPaint: () => {
+        const { layerIndexes, notice } = paintTargetsOf(get())
+        if (notice) set({ notice })
+        return layerIndexes.size > 0 ? layerIndexes : null
+      },
+
       addStroke: (stroke) => {
         const state = get()
-        const targets = editableSelection(state.selection).map((key) => ({
-          key,
-          layerId: activeLayerIdOf(state.document, state.activeLayerIds, key),
-        }))
-        const overflowing = targets.some(({ key, layerId }) => {
-          const layer = state.document.nails[key].layers.find((item) => item.id === layerId)
-          return layer === undefined || layer.strokes.length >= MAX_STROKES_PER_LAYER
-        })
-        if (overflowing) {
-          set({ notice: `เลเยอร์นี้เก็บได้สูงสุด ${MAX_STROKES_PER_LAYER} เส้น — รวมเลเยอร์หรือเริ่มเลเยอร์ใหม่ก่อน` })
+        // ตรวจซ้ำตอนปิดเส้น ไม่ใช่เชื่อผลตอน beginPaint — เลเยอร์ถูกซ่อนกลางคันได้
+        const { layerIndexes, notice } = paintTargetsOf(state)
+        if (notice) {
+          set({ notice })
           return
         }
-        if (targets.length > 0) execute(commandFor('วาดเส้น', targets.map(({ key, layerId }) =>
-          new AddStrokeCommand(key, layerId, stroke))))
+        if (layerIndexes.size === 0) return
+        execute(commandFor('วาดเส้น', [...layerIndexes].map(([key, index]) =>
+          new AddStrokeCommand(key, state.document.nails[key].layers[index]!.id, stroke))))
       },
 
       clearSelectedNails: () => {
@@ -278,7 +315,12 @@ export function createDesignStore(options: CreateDesignStoreOptions = {}): Desig
           set({ notice: `เล็บหนึ่งนิ้วมีได้สูงสุด ${MAX_LAYERS_PER_NAIL} เลเยอร์` })
           return
         }
-        execute(new AddLayerCommand(key, layer, index ?? current.layers.length))
+        // เลเยอร์ที่เพิ่งเพิ่มต้องกลายเป็นเลเยอร์ที่ใช้งานทันที ไม่งั้นผู้ใช้กดเพิ่ม
+        // แล้ววาดต่อ สีจะไปลงเลเยอร์เดิมโดยไม่มีอะไรบอก — การ undo จะพาชั้นที่เลือก
+        // กลับเองผ่าน repairActiveLayerIds เพราะเลเยอร์นั้นหายไปจากเอกสาร
+        if (execute(new AddLayerCommand(key, layer, index ?? current.layers.length))) {
+          set((state) => ({ activeLayerIds: { ...state.activeLayerIds, [key]: layer.id } }))
+        }
       },
 
       removeLayer: (key, layerId) => {
@@ -341,8 +383,14 @@ export function createDesignStore(options: CreateDesignStoreOptions = {}): Desig
 
       undo: () => {
         const state = get()
+        if (!state.history.state().canUndo) return
         const result = state.history.undo(state.document)
-        if (result.document === state.document) return
+        // มีรายการอยู่แต่เล่นย้อนไม่ได้ = ประวัติไม่ตรงกับเอกสารแล้ว ต้องบอก
+        // ไม่ใช่เงียบ ไม่งั้นผู้ใช้จะเห็นแค่ "กดแล้วไม่มีอะไรเกิดขึ้น"
+        if (!result.applied) {
+          set({ notice: HISTORY_STUCK_NOTICE })
+          return
+        }
         set({
           document: result.document,
           revision: state.revision + 1,
@@ -353,8 +401,12 @@ export function createDesignStore(options: CreateDesignStoreOptions = {}): Desig
 
       redo: () => {
         const state = get()
+        if (!state.history.state().canRedo) return
         const result = state.history.redo(state.document)
-        if (result.document === state.document) return
+        if (!result.applied) {
+          set({ notice: HISTORY_STUCK_NOTICE })
+          return
+        }
         set({
           document: result.document,
           revision: state.revision + 1,

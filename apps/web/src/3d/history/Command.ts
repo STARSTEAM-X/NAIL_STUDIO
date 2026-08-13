@@ -5,6 +5,16 @@ export interface CommandResult {
   affects: ReadonlySet<NailKey>
 }
 
+/**
+ * ผลของการย้อน/ทำซ้ำ พร้อมคำตอบว่า "คำสั่งนั้นทำงานได้จริงหรือไม่"
+ *
+ * ต้องแยกจาก CommandResult เพราะ HistoryStack ใช้ค่านี้ตัดสินว่าจะขยับ cursor ไหม
+ * ถ้าขยับทั้งที่เอกสารไม่เปลี่ยน ประวัติกับเอกสารจะหลุดจากกันโดยไม่มีอาการให้เห็น
+ */
+export interface ReplayResult extends CommandResult {
+  applied: boolean
+}
+
 export interface Command {
   readonly label: string
   readonly mergeKey?: string

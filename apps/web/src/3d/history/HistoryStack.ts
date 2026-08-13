@@ -1,5 +1,5 @@
 import type { DesignDocument, NailKey } from '@nail-studio/contracts'
-import type { Command, CommandResult, HistoryState } from './Command.ts'
+import type { Command, CommandResult, HistoryState, ReplayResult } from './Command.ts'
 
 const HISTORY_CAPACITY = 100
 const MERGE_WINDOW_MS = 500
@@ -42,18 +42,33 @@ export class HistoryStack {
     return { ...result, recorded: true }
   }
 
-  undo(document: DesignDocument): CommandResult {
-    const entry = this.entryAt(this.cursor - 1)
-    if (!entry) return { document, affects: NO_AFFECTS }
-    this.cursor -= 1
-    return entry.command.undo(document)
+  /**
+   * ย้อนหนึ่งขั้น — cursor ขยับต่อเมื่อคำสั่งเปลี่ยนเอกสารได้จริง
+   *
+   * คำสั่งทุกตัวมีทางลัดคืนเอกสารเดิมเมื่อสถานะไม่ตรงกับที่มันคาดไว้ ถ้าขยับ cursor
+   * ไปก่อนโดยไม่ดูผล ประวัติจะเลื่อนไปหนึ่งช่องทั้งที่เอกสารอยู่ที่เดิม การกดย้อน
+   * ครั้งถัดไปจะข้ามการกระทำหนึ่งรายการโดยผู้ใช้ไม่มีทางสังเกตเห็น (execute
+   * ระวังกรณีเดียวกันนี้อยู่แล้วผ่าน `recorded`)
+   */
+  undo(document: DesignDocument): ReplayResult {
+    return this.replay(document, this.entryAt(this.cursor - 1), -1, true)
   }
 
-  redo(document: DesignDocument): CommandResult {
-    const entry = this.entryAt(this.cursor)
-    if (!entry) return { document, affects: NO_AFFECTS }
-    this.cursor += 1
-    return entry.command.do(document)
+  redo(document: DesignDocument): ReplayResult {
+    return this.replay(document, this.entryAt(this.cursor), 1, false)
+  }
+
+  private replay(
+    document: DesignDocument,
+    entry: HistoryEntry | undefined,
+    step: number,
+    undo: boolean,
+  ): ReplayResult {
+    if (!entry) return { document, affects: NO_AFFECTS, applied: false }
+    const result = undo ? entry.command.undo(document) : entry.command.do(document)
+    if (result.document === document) return { document, affects: NO_AFFECTS, applied: false }
+    this.cursor += step
+    return { ...result, applied: true }
   }
 
   clear(): void {
