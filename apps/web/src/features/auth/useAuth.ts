@@ -30,6 +30,11 @@ export function useCurrentUser() {
   })
 }
 
+/** ID ที่ใช้แบ่งข้อมูลเฉพาะเครื่องตามบัญชี โดยยังให้ server session เป็นแหล่งความจริง */
+export function useCurrentUserId(): string | null {
+  return useCurrentUser().data?.id ?? null
+}
+
 export function useLogin() {
   const queryClient = useQueryClient()
   return useMutation({

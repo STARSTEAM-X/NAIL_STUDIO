@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSaveDraft } from '@/features/projects/useProjects.ts'
+import {
+  conflictStateFromError,
+  localizedTaskError,
+  type ServerVersionConflict,
+} from '@/features/projects/versionActions.ts'
 import { useDesignStoreApi } from './DesignStoreProvider.tsx'
 
 /** รอให้ผู้ใช้หยุดวาดเท่านี้ก่อนจึงบันทึก — นานพอให้ลากหลายเส้นติดกันได้โดยไม่ยิงซ้ำ */
@@ -10,8 +15,22 @@ export type AutosaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'error'
 export interface AutosaveResult {
   status: AutosaveStatus
   message: string | null
+  conflict: ServerVersionConflict | null
   /** ให้ผู้ใช้สั่งบันทึกทันทีโดยไม่ต้องรอครบเวลา */
   flush: () => void
+}
+
+export function autosaveFailureFromError(error: unknown): {
+  conflict: ServerVersionConflict | null
+  message: string | null
+} {
+  const conflict = conflictStateFromError(error, 'autosave')
+  return {
+    conflict,
+    message: conflict
+      ? null
+      : localizedTaskError(error, 'บันทึกอัตโนมัติไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'),
+  }
 }
 
 /**
@@ -31,6 +50,7 @@ export function useAutosave(projectId: string, baseVersion: number): AutosaveRes
   const saveDraft = useSaveDraft()
   const [status, setStatus] = useState<AutosaveStatus>('idle')
   const [message, setMessage] = useState<string | null>(null)
+  const [conflict, setConflict] = useState<ServerVersionConflict | null>(null)
 
   // เก็บใน ref เพราะ effect ด้านล่างต้องอ่านค่าล่าสุดโดยไม่ผูกเป็น dependency
   // ไม่งั้นตัวจับเวลาจะถูกตั้งใหม่ทุกครั้งที่สถานะเปลี่ยน แล้วไม่มีวันครบเวลา
@@ -52,11 +72,14 @@ export function useAutosave(projectId: string, baseVersion: number): AutosaveRes
           inFlight.current = false
           setStatus('saved')
           setMessage(null)
+          setConflict(null)
         },
         onError: (error: unknown) => {
+          const failure = autosaveFailureFromError(error)
           inFlight.current = false
           setStatus('error')
-          setMessage(error instanceof Error ? error.message : 'บันทึกอัตโนมัติไม่สำเร็จ')
+          setMessage(failure.message)
+          setConflict(failure.conflict)
         },
       },
     )
@@ -88,6 +111,7 @@ export function useAutosave(projectId: string, baseVersion: number): AutosaveRes
   return {
     status,
     message,
+    conflict,
     flush: () => {
       if (timer.current) clearTimeout(timer.current)
       save.current()

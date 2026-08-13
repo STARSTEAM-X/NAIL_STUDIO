@@ -1,6 +1,7 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
+import { useCurrentUserId } from '@/features/auth/useAuth.ts'
 import { NailScene } from '@/3d/scene/NailScene.tsx'
 import { DesignScene } from '@/3d/scene/DesignScene.tsx'
 import { WebGlGuard } from '@/3d/scene/WebGlGuard.tsx'
@@ -22,12 +23,14 @@ import {
 } from '@/features/projects/versionActions.ts'
 import { useDesign, useDesignStoreApi } from './DesignStoreProvider.tsx'
 import { ConflictDialog } from './ConflictDialog.tsx'
+import { RecoveryDialog } from './RecoveryDialog.tsx'
 import { NailCanvas2D } from './NailCanvas2D.tsx'
 import { NailStrip } from './NailStrip.tsx'
 import { PaintToolbar } from './PaintToolbar.tsx'
 import { HistoryControls } from './HistoryControls.tsx'
 import { VersionHistoryPanel } from './VersionHistoryPanel.tsx'
 import { useAutosave, type AutosaveStatus } from './useAutosave.ts'
+import { useOfflineDraft } from './useOfflineDraft.ts'
 
 interface Props {
   projectId: string
@@ -45,6 +48,7 @@ const AUTOSAVE_LABELS: Record<AutosaveStatus, string> = {
 export function NailEditor({ projectId, detail }: Props) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const userId = useCurrentUserId()
   const store = useDesignStoreApi()
   const handScale = useDesign((state) => state.document.hand.proportions.handScale)
   const notice = useDesign((state) => state.notice)
@@ -60,6 +64,13 @@ export function NailEditor({ projectId, detail }: Props) {
   // ฐานบันทึกเปลี่ยนเฉพาะเมื่อเราบันทึกสำเร็จหรือผู้ใช้เลือกโหลดล่าสุดอย่างชัดเจน
   // การ refetch เบื้องหลังต้องไม่ทำให้เอกสารเก่าผ่าน optimistic concurrency โดยไม่ตั้งใจ
   const [saveBaseVersion, setSaveBaseVersion] = useState(detail.version.number)
+  const offlineDraft = useOfflineDraft({
+    userId,
+    projectId,
+    baseVersion: saveBaseVersion,
+    serverDocument: openingDocument(detail),
+    serverUpdatedAt: detail.draft?.updatedAt ?? detail.version.createdAt,
+  })
   const autosave = useAutosave(projectId, saveBaseVersion)
   const saveVersion = useSaveVersion()
   const duplicateProject = useDuplicateProject()
@@ -68,6 +79,12 @@ export function NailEditor({ projectId, detail }: Props) {
   const [isReloading, setIsReloading] = useState(false)
   const [conflictActionError, setConflictActionError] = useState<string | null>(null)
   const latestVersion = saveBaseVersion
+
+  useEffect(() => {
+    if (!autosave.conflict) return
+    setConflictActionError(null)
+    setConflict(autosave.conflict)
+  }, [autosave.conflict])
 
   const handleReloadServer = async () => {
     setIsReloading(true)
@@ -83,7 +100,7 @@ export function NailEditor({ projectId, detail }: Props) {
         queryFn: () => fetchProjectDetail(projectId),
       })
       // loadDocument ล้าง undo/redo ด้วย จึงไม่มีทางย้อนกลับไปปนกับเอกสารที่ขัดแย้ง
-      store.getState().loadDocument(openingDocument(latest))
+      await offlineDraft.useServerDocument(openingDocument(latest))
       setSaveBaseVersion(latest.version.number)
       setDraftSourceVersion(null)
       saveVersion.reset()
@@ -179,6 +196,13 @@ export function NailEditor({ projectId, detail }: Props) {
         </p>
       )}
 
+      {offlineDraft.warning && (
+        <p className="editor-notice" role="alert">
+          {offlineDraft.warning}
+          <button type="button" className="btn btn-ghost" onClick={offlineDraft.dismissWarning}>ปิด</button>
+        </p>
+      )}
+
       <div className="editor-body">
         <PaintToolbar />
         <div className="viewport">
@@ -212,6 +236,12 @@ export function NailEditor({ projectId, detail }: Props) {
           errorMessage={conflictActionError}
           onReloadServer={() => { void handleReloadServer() }}
           onDuplicateCurrent={handleDuplicateCurrent}
+        />
+      )}
+      {offlineDraft.recoveryRecord && !conflict && (
+        <RecoveryDialog
+          onRecoverLocal={offlineDraft.recoverLocal}
+          onUseServer={() => { void offlineDraft.useServerDocument() }}
         />
       )}
     </section>
