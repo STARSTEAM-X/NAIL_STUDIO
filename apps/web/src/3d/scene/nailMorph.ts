@@ -1,4 +1,4 @@
-import type { BufferAttribute, Mesh, Vector3 } from 'three'
+import type { BufferAttribute, InterleavedBufferAttribute, Mesh, Vector3 } from 'three'
 
 /**
  * ตำแหน่ง/normal ของจุดยอดหนึ่งจุด **รวมผลของ morph target ที่เปิดอยู่แล้ว**
@@ -21,7 +21,7 @@ export function morphedNormal(mesh: Mesh, index: number, out: Vector3): Vector3 
 }
 
 function addMorphDelta(
-  targets: BufferAttribute[] | undefined,
+  targets: (BufferAttribute | InterleavedBufferAttribute)[] | undefined,
   influences: number[] | undefined,
   index: number,
   out: Vector3,
