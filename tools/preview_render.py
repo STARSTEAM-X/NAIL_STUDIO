@@ -12,8 +12,11 @@ import bpy
 import numpy as np
 from mathutils import Vector
 
+# ROOT คือรากของ repo — OUT_DIR ของฝั่งเว็บอยู่ที่ apps/web/public ไม่ใช่ ROOT/public
+# เพราะ repo นี้เป็น monorepo ต่างจากโปรเจกต์ต้นทางที่ tools/ กับ public/ อยู่
+# ระดับเดียวกัน จึงต้องต่อ 'apps', 'web' เข้าไปก่อนถึง public/models
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-GLB = os.path.join(ROOT, 'public', 'models', 'hand.glb')
+GLB = os.path.join(ROOT, 'apps', 'web', 'public', 'models', 'hand.glb')
 FINGERS = ('thumb', 'index', 'middle', 'ring', 'little')
 
 

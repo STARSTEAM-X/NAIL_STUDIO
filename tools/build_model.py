@@ -19,11 +19,11 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from nail_unwrap import FINGERS
 
-# ROOT ตั้งใจให้ชี้ apps/web สำหรับ OUT_DIR ไม่ใช่รากของ monorepo — โปรเจกต์
-# ต้นทางเป็นโครงสร้างแบนที่ tools/ กับ public/ อยู่ระดับเดียวกัน แต่ repo นี้เป็น
-# monorepo ที่ public/ ของเว็บจริง ๆ อยู่ที่ apps/web/public/ จึงต้องต่อ
-# 'apps', 'web' เพิ่มเข้าไปเฉพาะฝั่ง OUT_DIR ไม่งั้นจะไปสร้างไฟล์ที่
-# <repo root>/public/models ซึ่งเว็บไม่ได้ใช้เลย ส่วน SRC_GLB ยังอยู่ที่
+# ROOT ยังคงเป็นรากของ repo นี้เหมือนเดิม (ไม่ใช่ apps/web) แต่ OUT_DIR ต่อ
+# 'apps', 'web' เข้าไปก่อนถึง public/models เพราะโปรเจกต์ต้นทางเป็นโครงสร้างแบน
+# ที่ tools/ กับ public/ อยู่ระดับเดียวกัน ส่วน repo นี้เป็น monorepo ที่ public/
+# ของเว็บจริง ๆ อยู่ที่ apps/web/public/ ถ้าไม่ต่อ apps/web เข้าไป OUT_DIR จะไปสร้าง
+# ไฟล์ที่ <repo root>/public/models ซึ่งเว็บไม่ได้ใช้เลย ส่วน SRC_GLB ยังอยู่ที่
 # model/hand_source.glb ระดับรากของ repo นี้เหมือนเดิม ไม่ต้องแก้
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC_GLB = os.path.join(ROOT, 'model', 'hand_source.glb')
