@@ -17,7 +17,8 @@ from mathutils import Matrix, Quaternion, Vector
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from nail_unwrap import FINGERS
+from nail_geometry import ALL_TARGETS, FINGERS, max_uv_distortion, project_to_uv
+from build_shapes import add_shape_keys
 
 # ROOT ยังคงเป็นรากของ repo นี้เหมือนเดิม (ไม่ใช่ apps/web) แต่ OUT_DIR ต่อ
 # 'apps', 'web' เข้าไปก่อนถึง public/models เพราะโปรเจกต์ต้นทางเป็นโครงสร้างแบน
@@ -72,6 +73,9 @@ NAIL_SRC = {
 # จึงทาสีได้ยากกว่าอีกสี่นิ้วจากมุมกล้องเริ่มต้น ผู้ใช้ต้องหมุนกล้องไปหาเอง
 # ถ้าอยากได้กลับ ใส่ 60.0 คืน ค่าอื่นดูบันทึกการเรนเดอร์ด้านบน
 THUMB_ROLL = 0.0
+
+MIN_NAIL_VERTS = 300
+MAX_SUBDIVIDE_LEVELS = 2
 
 
 def reset_scene():
@@ -325,6 +329,68 @@ def fix_nail_normals(hand):
         print('NORMALS: %-7s กลับทิศหน้าแล้ว (%s)' % (finger, kind))
 
 
+def subdivide_nails():
+    """แบ่งย่อยเล็บทุกชิ้นให้มีอย่างน้อย MIN_NAIL_VERTS verts
+
+    Nail_index มีแค่ 81 verts จากต้นทาง (S2 §6) ซึ่งไม่พอสำหรับมุมคมของทรง square/stiletto
+    ใช้ subdivide_edges แบบไม่ปัดมน (use_smooth=0.0) เพื่อไม่ขยับตำแหน่งจุดเดิมแม้แต่จุดเดียว
+    — จุดใหม่ถูกแทรกกลางขอบเดิมเป๊ะ ทรงของเล็บจึงไม่เปลี่ยนก่อนเข้าขั้นดัดทรง
+    """
+    for finger, source in NAIL_SRC.items():
+        obj = bpy.data.objects[source]
+        mesh = bmesh.new()
+        mesh.from_mesh(obj.data)
+        before = len(mesh.verts)
+        levels = 0
+        while len(mesh.verts) < MIN_NAIL_VERTS and levels < MAX_SUBDIVIDE_LEVELS:
+            bmesh.ops.subdivide_edges(
+                mesh, edges=mesh.edges, cuts=1, use_grid_fill=True, smooth=0.0,
+            )
+            levels += 1
+        mesh.to_mesh(obj.data)
+        mesh.free()
+        obj.data.update()
+        print('SUBDIVIDE: %-7s %d -> %d verts (%d level%s)'
+              % (finger, before, len(obj.data.vertices), levels, '' if levels == 1 else 's'))
+
+
+def reunwrap_nails():
+    """กาง UV ใหม่ทุกเล็บด้วย nail_geometry.project_to_uv แทน UV เดิมของโมเดลต้นทาง
+
+    UV เดิมกางเต็ม 0-1 แต่ยืดรูปเล็บให้เป็นจัตุรัส (D-25) — เขียนทับด้วยการฉายที่คงสัดส่วน
+    ต้องทำ**หลัง**แบ่งย่อยเสมอ ไม่งั้นจุดที่เพิ่มมาจะไม่มี UV
+
+    เขียน (1 − v) ไม่ใช่ v ตรง ๆ: project_to_uv คืนค่าในพิกัด "แผง/พิกเซล" ที่ v ≈ 0
+    คือปลายเล็บ ส่วน nailFlatten.ts อ่าน mesh UV ดิบแล้วกลับด้วย (1 − v) เป็นพิกัดพิกเซล
+    เอง (ดูฟังก์ชัน flattenNail) การเขียนกลับด้านตั้งแต่ตรงนี้จึงทำให้สองฝั่งตรงกัน —
+    **ถ้าเรนเดอร์แล้วเล็บดูหัวกลับ (ปลายเล็บอยู่ล่าง) ให้ลองตัด `1.0 -` ออกแล้วรันใหม่**
+    """
+    for finger, source in NAIL_SRC.items():
+        obj = bpy.data.objects[source]
+        mesh = obj.data
+        count = len(mesh.vertices)
+        coords = np.empty(count * 3, dtype=np.float64)
+        mesh.vertices.foreach_get('co', coords)
+        coords = coords.reshape(count, 3)
+        uv = project_to_uv(coords)
+
+        uv_layer = mesh.uv_layers.active or mesh.uv_layers.new(name='UVMap')
+        for loop in mesh.loops:
+            u, v = uv[loop.vertex_index]
+            uv_layer.data[loop.index].uv = (float(u), 1.0 - float(v))
+        mesh.update()
+
+        indices = [loop.vertex_index for loop in mesh.loops]
+        distortion = max_uv_distortion(coords, uv, indices)
+        print('UNWRAP: %-7s UV บิดสูงสุด %.3f' % (finger, distortion))
+
+
+def build_shapes():
+    """สร้าง shape key 7 อันต่อเล็บ — เรียกหลังแบ่งย่อยและกาง UV เสร็จแล้วเสมอ"""
+    for finger, source in NAIL_SRC.items():
+        add_shape_keys(bpy.data.objects[source], print)
+
+
 def rename_meshes():
     """เปลี่ยนชื่อ object และ mesh data ให้ตรงกับที่เว็บมองหา"""
     hand = bpy.data.objects[HAND_SRC]
@@ -343,6 +409,9 @@ def main():
     report_facings(rig)
     roll_thumb(rig, THUMB_ROLL)
     fix_nail_normals(_hand)
+    subdivide_nails()
+    reunwrap_nails()
+    build_shapes()
     drop_actions(rig)
     keep_rig(rig)
     rename_meshes()
@@ -360,6 +429,8 @@ def main():
         # ต้องเป็น False ไม่งั้นจะได้ท่า rest แทนท่าจริงของโมเดลต้นทาง
         export_rest_position_armature=False,
         export_apply=False,
+        export_morph=True,
+        export_morph_normal=True,
     )
     # เว็บปัจจุบันไม่ได้อ่านไฟล์นี้เลย เก็บไว้เป็นสัญญา/เอกสารอ้างอิงว่าเล็บนิ้วไหน
     # ตรงกับ mesh ชื่ออะไร เผื่อมีระบบภายนอกอื่นมาต่อยอดในอนาคต
