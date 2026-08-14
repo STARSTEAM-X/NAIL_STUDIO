@@ -574,6 +574,45 @@ structured output, จำนวนรอบ repair เฉลี่ย, latency �
 
 ---
 
+### 3.10B `notifications`
+
+> **A-13** (`source-audit.md`): พบ draft schema (`notifications`, `notification_deliveries`,
+> `user_notification_settings`) ที่ตกหล่นจากรอบ audit ก่อนหน้าเช่นเดียวกับ A-12 — **เพิ่มกลับ
+> เข้าแผน** แต่ตัดเหลือ**ตารางเดียว** เพราะระบบยังไม่มี email/push จริง (in-app เท่านั้น)
+> และยังไม่มี query ใดต้องเปิด/ปิดแจ้งเตือนรายประเภทของผู้ใช้แต่ละคน
+
+| คอลัมน์ | ชนิด | หมายเหตุ |
+|---|---|---|
+| `id` | `uuid` PK | |
+| `user_id` | `uuid` FK → `users.id` `ON DELETE CASCADE` | ผู้รับ |
+| `kind` | `notification_kind` | enum: `post_like` \| `post_comment` \| `template_remix` \| `appointment_status` \| `appointment_message` |
+| `title` | `text NOT NULL CHECK (length <= 200)` | ข้อความสรุปสั้น สร้างตอน insert (ไม่ query join ตอนแสดงผล) |
+| `source_type` | `text` | `post` \| `appointment` — ใช้คู่กับ `source_id` ทำลิงก์กลับ |
+| `source_id` | `uuid` | ไม่มี FK บังคับ (ชี้ได้หลายตาราง) — แถวต้นทางถูกลบแล้วลิงก์ก็แค่ตายเฉย ๆ ไม่กระทบแถวแจ้งเตือน |
+| `is_read` | `boolean NOT NULL DEFAULT false` | |
+| `created_at` | `timestamptz NOT NULL DEFAULT now()` | |
+
+ดัชนี: `(user_id, created_at DESC) WHERE is_read = false` — **badge จำนวนที่ยังไม่อ่าน + รายการแจ้งเตือน** (query เดียวตอบทั้งสองอย่างเพราะ partial index ครอบ `is_read=false` อยู่แล้ว);
+`(user_id, created_at DESC)` — ประวัติทั้งหมดรวมที่อ่านแล้ว (หน้ารายการเต็ม)
+
+**DECISION DB-10 — `source_id` ไม่มี FK constraint**
+
+| หัวข้อ | รายละเอียด |
+|---|---|
+| **อะไร** | `source_id` เป็น `uuid` เปล่า ไม่ผูก FK ไปยัง `community_posts`/`appointments` |
+| **ทำไม** | แถวเดียวกันต้องชี้ได้ทั้งสองตารางแล้วแต่ `kind` — PostgreSQL ไม่มี FK แบบ polymorphic ในตัว |
+| **ทางเลือก** | (ก) แยกคอลัมน์ `post_id`/`appointment_id` เป็น nullable คนละคอลัมน์ + FK จริง (ข) ตาราง `notifications` แยกต่อ `kind` |
+| **ทำไมไม่เลือก** | (ก) เพิ่มคอลัมน์ NULL ทุกครั้งที่เพิ่ม `kind` ใหม่ในอนาคต (ข) เพิ่มความซับซ้อนเกินสัดส่วนของฟีเจอร์ที่เป็นแค่ "ป้ายแจ้งเตือน" — เนื้อหาจริงอยู่ที่ `title` ซึ่ง denormalize ไว้แล้วตอน insert ไม่ต้อง join กลับไปอ่าน source อยู่ดี |
+| **ผล** | เขียนง่ายกว่า · **ข้อจำกัดที่ยอมรับ**: ลบต้นทาง (เช่นลบโพสต์) แล้วลิงก์ในแจ้งเตือนเก่าใช้ไม่ได้ — service layer ต้องเช็คก่อน redirect ไม่ใช่หน้าที่ของ FK |
+
+**ทำไมไม่มี `notification_deliveries`/`user_notification_settings`**: ทั้งสองตารางออกแบบไว้
+สำหรับหลาย channel (realtime/email) และการเปิด-ปิดแจ้งเตือนรายประเภท — ระบบนี้มีแค่ในแอปเดียว
+ยังไม่มี email provider ต่ออยู่ การเพิ่มตารางไว้ก่อนคือ schema ที่รอโค้ดที่ยังไม่มีใครเขียน
+(หลักการเดียวกับที่ตัด `SINGLETON_LAYER_KINDS` ออกจาก Slice 3 — ดู `implementation-plan.md`)
+ถ้าต้องมีจริงค่อยเพิ่มทีหลังได้โดยไม่กระทบตารางนี้
+
+---
+
 ### 3.11 ตารางกลุ่มร้าน / นัดหมาย / รีวิว
 
 > ขอบเขตยืนยันโดยผู้ใช้ 2026-08-12: ร้านมี **นัดหมาย** และ **รีวิว**
@@ -702,6 +741,35 @@ stateDiagram-v2
 - **ทางเลือก**: ให้ใครก็รีวิวได้ / รีวิวได้หลายครั้งต่อร้าน
 - **ทำไมไม่เลือก**: เปิดช่องให้บัญชีปลอมทำลายคะแนนร้าน และทำให้ `rating_avg` ไร้ความหมาย
 - **ผล**: `rating_avg`/`rating_count` ใน `shop_profiles` อัปเดตใน transaction เดียวกับการ insert/ลบรีวิว
+
+**`appointment_messages`** — แชทระหว่างลูกค้ากับร้าน ผูกกับนัดหมาย
+
+> **A-12** (`source-audit.md`): พบ draft schema แชทระหว่างผู้ใช้ทั่วไป (`conversations`,
+> `conversation_members`, `message_reads`) ที่ตกหล่นจากรอบ audit ก่อนหน้า — **ไม่นำเข้าตามที่ร่างไว้**
+> เพราะระบบนี้ไม่มี concept "แชทอิสระ" นอกบริบทนัดหมาย จึงตัดโครง group chat/DM ทั่วไปทิ้ง
+> และผูกคู่สนทนาเข้ากับ `appointments` โดยตรงแทนที่จะมีตาราง `conversations` แยก
+
+| คอลัมน์ | ชนิด | หมายเหตุ |
+|---|---|---|
+| `id` | `uuid` PK | |
+| `appointment_id` | `uuid` FK → `appointments.id` `ON DELETE CASCADE` | คู่สนทนา = ลูกค้า+ร้านของนัดนี้ — ไม่มีตาราง `conversations` แยก เพราะคู่สนทนากำหนดจาก `appointments.customer_id`/`shop_id` อยู่แล้ว |
+| `sender_id` | `uuid` FK → `users.id` `ON DELETE SET NULL` | ผู้ส่ง (ต้องเป็น customer หรือ shop ของนัดนั้นเท่านั้น — ตรวจที่ service layer) |
+| `content` | `text NOT NULL CHECK (length <= 2000)` | |
+| `read_at` | `timestamptz` | NULL = ยังไม่อ่าน — ฝั่งตรงข้ามกับ `sender_id` เท่านั้นที่ทำให้ค่านี้ถูกเติม |
+| `created_at` | `timestamptz NOT NULL DEFAULT now()` | |
+
+ดัชนี: `(appointment_id, created_at)` — โหลดประวัติแชทเรียงเวลาต่อนัด;
+`(appointment_id) WHERE read_at IS NULL` — นับ/แสดง badge ข้อความที่ยังไม่อ่าน
+
+**DECISION DB-09 — ไม่มีตาราง `conversations`/`conversation_members` แยก**
+
+| หัวข้อ | รายละเอียด |
+|---|---|
+| **อะไร** | `appointment_messages.appointment_id` ทำหน้าที่เป็น thread id ในตัว ไม่มีตาราง conversation กลาง ไม่มี many-to-many กับผู้เข้าร่วม |
+| **ทำไม** | ทุกคู่สนทนาในระบบนี้ผูกกับนัดหมาย 1 นัด = คู่สนทนา 1 คู่ (customer, shop) ตายตัวอยู่แล้วจาก `appointments` — การมีตาราง `conversation_members` แบบ many-to-many คือออกแบบสำหรับ group chat ที่ไม่มีใน scope |
+| **ทางเลือก** | (ก) ยกโครง `conversations`+`conversation_members`+`message_reads` ตามร่างเดิมทั้งชุด (ข) ผูกกับ `appointments` ตรง ๆ |
+| **ทำไมไม่เลือก (ก)** | เพิ่ม 3 ตารางสำหรับความสามารถ (group chat, คู่สนทนานอกบริบทนัดหมาย) ที่ไม่มีข้อกำหนดใดต้องการ — ผิดหลักการ "อย่าสร้างตารางที่ไม่จำเป็น" ในเอกสารนี้ §1 |
+| **ผล** | เขียนง่ายกว่า, ผูก authorization กับ `appointments` ที่ตรวจสิทธิ์อยู่แล้ว (ผู้ใช้ A อ่านแชทของนัด B ไม่ได้ ใช้กฎเดียวกับที่ป้องกัน `appointments` เอง) · **ข้อจำกัดที่ยอมรับ**: ถ้าอนาคตต้องมีแชททั่วไปนอกบริบทนัดหมาย ต้องเพิ่มตาราง `conversations` แยกจริง — จะไม่ retrofit ตารางนี้ |
 
 ---
 
