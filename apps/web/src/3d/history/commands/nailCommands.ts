@@ -111,6 +111,68 @@ export class SetFinishCommand implements Command {
   }
 }
 
+export class SetShapeCommand implements Command {
+  readonly label = 'เปลี่ยนทรงเล็บ'
+  readonly key: NailKey
+  readonly before: Nail['shape']
+  readonly after: Nail['shape']
+  readonly mergeKey?: string
+
+  constructor(key: NailKey, before: Nail['shape'], after: Nail['shape'], mergeKey?: string) {
+    this.key = key
+    this.before = before
+    this.after = after
+    if (mergeKey !== undefined) this.mergeKey = mergeKey
+  }
+
+  do(document: DesignDocument): CommandResult {
+    return replaceNail(document, this.key, (nail) =>
+      nail.shape === this.after ? nail : { ...nail, shape: this.after })
+  }
+
+  undo(document: DesignDocument): CommandResult {
+    return replaceNail(document, this.key, (nail) =>
+      nail.shape === this.before ? nail : { ...nail, shape: this.before })
+  }
+
+  merge(next: Command): Command | null {
+    if (!(next instanceof SetShapeCommand) || next.key !== this.key) return null
+    if (this.mergeKey === undefined || next.mergeKey !== this.mergeKey) return null
+    return new SetShapeCommand(this.key, this.before, next.after, this.mergeKey)
+  }
+}
+
+export class SetLengthCommand implements Command {
+  readonly label = 'เปลี่ยนความยาวเล็บ'
+  readonly key: NailKey
+  readonly before: Nail['length']
+  readonly after: Nail['length']
+  readonly mergeKey?: string
+
+  constructor(key: NailKey, before: Nail['length'], after: Nail['length'], mergeKey?: string) {
+    this.key = key
+    this.before = before
+    this.after = after
+    if (mergeKey !== undefined) this.mergeKey = mergeKey
+  }
+
+  do(document: DesignDocument): CommandResult {
+    return replaceNail(document, this.key, (nail) =>
+      nail.length === this.after ? nail : { ...nail, length: this.after })
+  }
+
+  undo(document: DesignDocument): CommandResult {
+    return replaceNail(document, this.key, (nail) =>
+      nail.length === this.before ? nail : { ...nail, length: this.before })
+  }
+
+  merge(next: Command): Command | null {
+    if (!(next instanceof SetLengthCommand) || next.key !== this.key) return null
+    if (this.mergeKey === undefined || next.mergeKey !== this.mergeKey) return null
+    return new SetLengthCommand(this.key, this.before, next.after, this.mergeKey)
+  }
+}
+
 export class ClearNailCommand implements Command {
   readonly label = 'ล้างลายเล็บ'
   readonly key: NailKey

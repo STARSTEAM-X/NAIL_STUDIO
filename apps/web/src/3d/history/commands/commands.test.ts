@@ -16,6 +16,8 @@ import {
   CopyNailCommand,
   SetBaseColorCommand,
   SetFinishCommand,
+  SetLengthCommand,
+  SetShapeCommand,
 } from './nailCommands.ts'
 import {
   AddLayerCommand,
@@ -115,6 +117,14 @@ describe('document commands', () => {
 
   it('restores a nail finish', () => {
     expectRoundTrip(createEmptyDocument(), new SetFinishCommand(RIGHT_INDEX, 'glossy', 'chrome'))
+  })
+
+  it('restores a nail shape', () => {
+    expectRoundTrip(createEmptyDocument(), new SetShapeCommand(RIGHT_INDEX, 'round', 'stiletto'))
+  })
+
+  it('restores a nail length', () => {
+    expectRoundTrip(createEmptyDocument(), new SetLengthCommand(RIGHT_INDEX, 'medium', 'long'))
   })
 
   it('restores all cleared strokes from one nail', () => {
