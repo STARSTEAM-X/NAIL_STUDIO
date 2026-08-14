@@ -5,6 +5,11 @@ import os
 import struct
 import sys
 
+import numpy as np
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from nail_geometry import local_frame, max_uv_distortion
+
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
@@ -25,10 +30,16 @@ NAILS = ['Nail_thumb', 'Nail_index', 'Nail_middle', 'Nail_ring', 'Nail_little']
 # รวมแล้วราว 12 MB ซึ่งชนเพดาน 12.0 เดิมพอดี ขยับเป็น 14.0 ให้มีที่หายใจ
 SIZE_BUDGET_MB = 14.0
 
-# โมเดลใหม่มี UV กางเต็ม 0-1 ทุกเล็บ วัดได้ 1.000 ถ้วนทั้งห้านิ้ว
-# (โมเดลเก่าได้ 0.55-0.65 เกณฑ์ตอนนั้นจึงตั้งไว้ที่ 0.55)
-# เกตหลวมกว่านี้จับอะไรไม่ได้เลย
-MIN_COVERAGE = 0.95
+# เดิมมีด่าน MIN_COVERAGE = 0.95 ตรงนี้ ตรวจว่า UV footprint กินพื้นที่สี่เหลี่ยม
+# หน่วย 0-1 กี่เปอร์เซ็นต์ ใช้ได้กับ mapping แบบยืดเต็มสี่เหลี่ยมของเดิม (วัดได้
+# 1.000 ทุกนิ้ว) แต่ task 3 เปลี่ยนมาใช้ projection ที่รักษาสัดส่วนจริงของเล็บ
+# (aspect-preserving) พร้อม padding 6% ซึ่งตั้งใจเหลือช่องว่างรอบเล็บที่ไม่เป็น
+# สี่เหลี่ยมจัตุรัส — วัดได้แค่ 0.445-0.525 ทั้งที่ mapping ถูกต้องสมบูรณ์ "พื้นที่
+# ที่กิน" จึงไม่มีความหมายเป็นสัญญาณคุณภาพอีกต่อไปภายใต้การออกแบบใหม่นี้ ตัด
+# ด่านนี้ออก (ค่าที่วัดได้จริงตอนตัด: thumb/index/middle/ring/little = 0.445-0.525
+# ดู task-4-report.md) ด่านที่วัดคุณภาพ mapping แทนคือ MAX_UV_DISTORTION ด้านล่าง
+# ส่วน union_coverage() ยังใช้อยู่ ห้ามลบ — MAX_OVERLAP ด้านล่างพึ่งมันตรวจ UV
+# พับทับตัวเอง ซึ่งเป็นข้อบกพร่องจริงไม่ว่าจะใช้ mapping แบบไหน
 
 # เล็บสามชิ้น (โป้ง กลาง ก้อย) เป็นก้อนปิด ผิวบนกับผิวล่างใช้ UV ชุดเดียวกัน
 # โดยตั้งใจ เพื่อให้สีที่วาดต่อเนื่องไปถึงขอบเล็บ อัตราส่วนจึงอยู่ที่ 2.00 พอดี
@@ -61,13 +72,42 @@ def accessor(buffer, gltf, binary_offset, index):
     value = gltf['accessors'][index]
     fmt, size = CTYPE[value['componentType']]
     component_count = NCOMP[value['type']]
-    view = gltf['bufferViews'][value['bufferView']]
-    base = binary_offset + view.get('byteOffset', 0) + value.get('byteOffset', 0)
-    stride = view.get('byteStride') or size * component_count
-    return [
-        struct.unpack_from('<' + fmt * component_count, buffer, base + row * stride)
-        for row in range(value['count'])
-    ]
+    # morph target deltas ที่ build_shapes.py อบออกมามีสัดส่วนจุดที่ไม่ขยับเยอะ (โคน
+    # เล็บ) exporter จึงเลือกเก็บเป็น sparse accessor แทนอาร์เรย์เต็ม — ไม่มี
+    # 'bufferView' บนตัว accessor เอง ค่าที่เหลือทั้งหมดถือเป็นศูนย์โดยปริยายตามสเปก
+    # glTF 2.0 แล้วเอา sparse.indices/values มาทับเฉพาะแถวที่ระบุ
+    if 'bufferView' in value:
+        view = gltf['bufferViews'][value['bufferView']]
+        base = binary_offset + view.get('byteOffset', 0) + value.get('byteOffset', 0)
+        stride = view.get('byteStride') or size * component_count
+        rows = [
+            list(struct.unpack_from('<' + fmt * component_count, buffer, base + row * stride))
+            for row in range(value['count'])
+        ]
+    else:
+        rows = [[0] * component_count for _ in range(value['count'])]
+
+    sparse = value.get('sparse')
+    if sparse:
+        index_info = sparse['indices']
+        index_fmt, index_size = CTYPE[index_info['componentType']]
+        index_view = gltf['bufferViews'][index_info['bufferView']]
+        index_base = binary_offset + index_view.get('byteOffset', 0) + index_info.get('byteOffset', 0)
+        indices = [
+            struct.unpack_from('<' + index_fmt, buffer, index_base + i * index_size)[0]
+            for i in range(sparse['count'])
+        ]
+
+        value_info = sparse['values']
+        value_view = gltf['bufferViews'][value_info['bufferView']]
+        value_base = binary_offset + value_view.get('byteOffset', 0) + value_info.get('byteOffset', 0)
+        value_stride = value_view.get('byteStride') or size * component_count
+        for position, row_index in enumerate(indices):
+            rows[row_index] = list(struct.unpack_from(
+                '<' + fmt * component_count, buffer, value_base + position * value_stride,
+            ))
+
+    return [tuple(row) for row in rows]
 
 
 def union_coverage(uv, indices, grid=256):
@@ -162,6 +202,8 @@ NAIL_BONES = {
     'Nail_ring': 'Ring4',
     'Nail_little': 'Pinky4',
 }
+TARGET_NAMES = ('almond', 'square', 'squoval', 'stiletto', 'short', 'long', 'extra')
+MAX_UV_DISTORTION = 1.15
 
 
 def check_skin(buffer, gltf, binary_offset, check):
@@ -220,6 +262,91 @@ def check_skin(buffer, gltf, binary_offset, check):
           + (' (ไม่พบ: %s)' % ', '.join(absent) if absent else ''))
 
 
+def check_morphs(gltf, names, check):
+    """ด่าน 4.1 — morph ครบ 7 ต่อเล็บ ชื่อตรงเรียงลำดับเป๊ะ"""
+    for wanted in NAILS:
+        hits = [index for index, name in enumerate(names) if name == wanted + '_Mesh']
+        if not hits:
+            continue
+        mesh = gltf['meshes'][hits[0]]
+        primitive = mesh['primitives'][0]
+        # targetNames อยู่ที่ mesh.extras ตามธรรมเนียม glTF 2.0 (ไม่ใช่ primitive.extras)
+        # — Blender exporter เขียนไว้ตรงนี้ และ nail_geometry.py คอมเมนต์ไว้เช่นกัน
+        target_names = mesh.get('extras', {}).get('targetNames', [])
+        check(
+            tuple(target_names) == TARGET_NAMES,
+            '%s มี morph target ครบ 7 อัน เรียงลำดับถูก (พบ: %s)' % (wanted, target_names),
+        )
+
+
+def check_base_still(buffer, gltf, binary_offset, names, check):
+    """ด่าน 4.2 — โคนเล็บ (10% แรกตามแกน PCA) ต้องไม่ขยับในทุก target
+
+    ใช้ nail_geometry ตัวเดียวกับที่ build_shapes.py ใช้สร้าง shape key — ด่านนี้จึง
+    ตรวจว่าไฟล์ที่ export ออกมาตรงกับสิ่งที่ควรจะเป็น ไม่ใช่แค่เชื่อว่า build ทำถูก
+    """
+    for wanted in NAILS:
+        hits = [index for index, name in enumerate(names) if name == wanted + '_Mesh']
+        if not hits:
+            continue
+        mesh = gltf['meshes'][hits[0]]
+        primitive = mesh['primitives'][0]
+        attributes = primitive['attributes']
+        base_position = accessor(buffer, gltf, binary_offset, attributes['POSITION'])
+        targets = primitive.get('targets', [])
+        # targetNames อยู่ที่ mesh.extras (ดูเหตุผลใน check_morphs ด้านบน)
+        target_names = mesh.get('extras', {}).get('targetNames', [])
+        base = np.array(base_position)
+        for target_name, target in zip(target_names, targets):
+            if 'POSITION' not in target:
+                continue
+            morphed = base + np.array(accessor(buffer, gltf, binary_offset, target['POSITION']))
+            _, _, t01, _, _, _ = local_frame(base)
+            mask = t01 <= 0.1
+            if not np.any(mask):
+                continue
+            displacement = float(np.linalg.norm((morphed - base)[mask], axis=1).max())
+            check(
+                displacement < 1e-6,
+                '%s target %s: โคนเล็บขยับ %.9f ม. (< 1e-6)' % (wanted, target_name, displacement),
+            )
+
+
+def check_uv_distortion(buffer, gltf, binary_offset, names, check):
+    """ด่าน 4.3 — ความบิด UV สูงสุดต้อง ≤ MAX_UV_DISTORTION (เกณฑ์ตั้งไว้ล่วงหน้า ห้ามขยับให้พอดีผล)"""
+    for wanted in NAILS:
+        hits = [index for index, name in enumerate(names) if name == wanted + '_Mesh']
+        if not hits:
+            continue
+        mesh = gltf['meshes'][hits[0]]
+        primitive = mesh['primitives'][0]
+        attributes = primitive['attributes']
+        position = np.array(accessor(buffer, gltf, binary_offset, attributes['POSITION']))
+        uv = np.array(accessor(buffer, gltf, binary_offset, attributes['TEXCOORD_0']))
+        indices = [item[0] for item in accessor(buffer, gltf, binary_offset, primitive['indices'])]
+        distortion = max_uv_distortion(position, uv, indices)
+        check(
+            distortion <= MAX_UV_DISTORTION,
+            '%s ความบิด UV %.3f ≤ %.2f' % (wanted, distortion, MAX_UV_DISTORTION),
+        )
+
+
+def check_skin_weights_sum(buffer, gltf, binary_offset, names, check):
+    """ด่าน 4.4 — น้ำหนัก skin ของทุก vertex ยังรวมเป็น 1 หลังแบ่งย่อย"""
+    for wanted in NAILS:
+        hits = [index for index, name in enumerate(names) if name == wanted + '_Mesh']
+        if not hits:
+            continue
+        mesh = gltf['meshes'][hits[0]]
+        primitive = mesh['primitives'][0]
+        attributes = primitive['attributes']
+        if 'WEIGHTS_0' not in attributes:
+            continue
+        weights = accessor(buffer, gltf, binary_offset, attributes['WEIGHTS_0'])
+        worst = max(abs(sum(row) - 1.0) for row in weights)
+        check(worst < 1e-4, '%s น้ำหนัก skin รวมเป็น 1 ทุกจุด (คลาดสูงสุด %.6f)' % (wanted, worst))
+
+
 def main():
     failures = []
 
@@ -245,6 +372,10 @@ def main():
     # เดิมด่านนี้ห้ามมี rig เพราะท่าถูกอบลง vertex แล้ว ตอนนี้กลับด้าน: สไลเดอร์
     # ปรับสัดส่วนมือฝั่งเว็บตั้ง scale ที่บอร์น ถ้าไม่มี rig ก็ไม่เหลืออะไรให้ปรับ
     check_skin(buffer, gltf, binary_offset, check)
+    check_morphs(gltf, names, check)
+    check_base_still(buffer, gltf, binary_offset, names, check)
+    check_uv_distortion(buffer, gltf, binary_offset, names, check)
+    check_skin_weights_sum(buffer, gltf, binary_offset, names, check)
     # โมเดลนี้ตั้งใจส่งเป็นท่านิ่ง ไม่มี animation: action Hand_Flex_Demo ที่ติดมากับ
     # rig ทำให้ exporter เขียน bind pose ตาม action แทนท่าที่จัดไว้ และเว็บก็ไม่ได้
     # เล่น animation อยู่แล้ว ด่านจึงตรวจว่า "ไม่มี" ไม่ใช่ "ต้องมี"
@@ -345,8 +476,6 @@ def main():
                 - (c[0] - a[0]) * (b[1] - a[1])
             ) / 2
         covered = union_coverage(uv, indices)
-        check(covered >= MIN_COVERAGE,
-              '%s กินพื้นที่ UV จริง %.3f ≥ %.2f' % (wanted, covered, MIN_COVERAGE))
         # ผลรวมพื้นที่สามเหลี่ยมมากกว่าพื้นที่ที่ถูกครอบจริงมาก = UV พับทับตัวเอง
         # ซึ่งทำให้ลายที่วาดไปโผล่ซ้ำสองที่บนเล็บ วัดจากผลรวมอย่างเดียวจับไม่ได้
         overlap = area / covered if covered > 0 else float('inf')
