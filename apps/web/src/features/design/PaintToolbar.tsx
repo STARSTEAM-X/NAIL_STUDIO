@@ -1,4 +1,4 @@
-import { BRUSHES, FINISHES, type Nail } from '@nail-studio/contracts'
+import { BRUSHES, FINISHES, NAIL_LENGTHS, NAIL_SHAPES, type Nail } from '@nail-studio/contracts'
 import type { BrushId } from '@/3d/painting/paintSettings.ts'
 import { useDesign } from './DesignStoreProvider.tsx'
 import { primaryOf } from './designStore.ts'
@@ -19,6 +19,21 @@ const FINISH_LABELS: Record<Nail['finish'], string> = {
   glitter: 'กลิตเตอร์',
 }
 
+const SHAPE_LABELS: Record<Nail['shape'], string> = {
+  round: 'มน',
+  almond: 'อัลมอนด์',
+  square: 'เหลี่ยม',
+  squoval: 'เหลี่ยมมน',
+  stiletto: 'แหลม',
+}
+
+const LENGTH_LABELS: Record<Nail['length'], string> = {
+  short: 'สั้น',
+  medium: 'กลาง',
+  long: 'ยาว',
+  extra: 'ยาวพิเศษ',
+}
+
 /** สีที่หยิบใช้บ่อย — ลดการเปิดตัวเลือกสีสำหรับงานทั่วไป */
 const SWATCHES = ['#b5314c', '#6b1e2b', '#e8bfa0', '#f2d5c4', '#2f3e46', '#ffffff', '#111111', '#d4af37']
 
@@ -30,6 +45,10 @@ export function PaintToolbar() {
   const clearSelectedNails = useDesign((state) => state.clearSelectedNails)
   const copyActiveNailToAll = useDesign((state) => state.copyActiveNailToAll)
   const finish = useDesign((state) => state.document.nails[primaryOf(state.selection)].finish)
+  const setShape = useDesign((state) => state.setShape)
+  const setLength = useDesign((state) => state.setLength)
+  const shape = useDesign((state) => state.document.nails[primaryOf(state.selection)].shape)
+  const length = useDesign((state) => state.document.nails[primaryOf(state.selection)].length)
 
   return (
     <aside className="toolbar" aria-label="เครื่องมือวาด">
@@ -123,6 +142,30 @@ export function PaintToolbar() {
         >
           {FINISHES.map((option) => (
             <option key={option} value={option}>{FINISH_LABELS[option]}</option>
+          ))}
+        </select>
+      </label>
+
+      <label className="field">
+        ทรงเล็บ
+        <select
+          value={shape}
+          onChange={(event) => setShape(event.target.value as Nail['shape'])}
+        >
+          {NAIL_SHAPES.map((option) => (
+            <option key={option} value={option}>{SHAPE_LABELS[option]}</option>
+          ))}
+        </select>
+      </label>
+
+      <label className="field">
+        ความยาว
+        <select
+          value={length}
+          onChange={(event) => setLength(event.target.value as Nail['length'])}
+        >
+          {NAIL_LENGTHS.map((option) => (
+            <option key={option} value={option}>{LENGTH_LABELS[option]}</option>
           ))}
         </select>
       </label>
