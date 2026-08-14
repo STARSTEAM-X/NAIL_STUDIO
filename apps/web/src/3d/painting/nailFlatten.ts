@@ -1,5 +1,6 @@
 import { Vector3, type Mesh } from 'three'
 import { nailMatrix, nailViewOf } from '@/3d/scene/nailViews.ts'
+import { morphedPosition } from '@/3d/scene/nailMorph.ts'
 import { TEX_SIZE } from './constants.ts'
 
 /**
@@ -61,7 +62,7 @@ export function flattenNail(mesh: Mesh, panelSize: number, texSize = TEX_SIZE): 
   let minY = Number.POSITIVE_INFINITY
   let maxY = Number.NEGATIVE_INFINITY
   for (let index = 0; index < position.count; index += 1) {
-    point.fromBufferAttribute(position, index).applyMatrix4(matrix).sub(view.center)
+    morphedPosition(mesh, index, point).applyMatrix4(matrix).sub(view.center)
     const x = point.dot(xAxis)
     // แกน y ของแคนวาสชี้ลง จึงกลับด้านให้ปลายเล็บอยู่ด้านบน
     const y = -point.dot(yAxis)

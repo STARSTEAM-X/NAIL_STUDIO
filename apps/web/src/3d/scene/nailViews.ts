@@ -1,5 +1,6 @@
 import { Matrix3, Matrix4, Vector3, type Mesh, type SkinnedMesh } from 'three'
 import { distanceForRadius, FRAME_FILL } from './cameraPresets.ts'
+import { morphedNormal, morphedPosition } from './nailMorph.ts'
 
 /**
  * กึ่งกลาง ทิศหน้า และรัศมีของเล็บหนึ่งชิ้นในพิกัดโลก — ข้อมูลที่กล้องต้องใช้เพื่อจ่อ
@@ -83,7 +84,7 @@ export function nailViewOf(mesh: Mesh): NailView {
   const centre = new Vector3()
   const point = new Vector3()
   for (let index = 0; index < position.count; index += 1) {
-    centre.add(point.fromBufferAttribute(position, index).applyMatrix4(matrix))
+    centre.add(morphedPosition(mesh, index, point).applyMatrix4(matrix))
   }
   centre.divideScalar(position.count)
 
@@ -94,7 +95,7 @@ export function nailViewOf(mesh: Mesh): NailView {
   const facing = new Vector3()
   for (let index = 0; index < normalAttribute.count; index += 1) {
     normal.add(
-      facing.fromBufferAttribute(normalAttribute, index).applyMatrix3(normalMatrix).normalize(),
+      morphedNormal(mesh, index, facing).applyMatrix3(normalMatrix).normalize(),
     )
   }
   if (normal.lengthSq() < 1e-12) {
@@ -104,7 +105,7 @@ export function nailViewOf(mesh: Mesh): NailView {
 
   let radius = 0
   for (let index = 0; index < position.count; index += 1) {
-    const distance = point.fromBufferAttribute(position, index)
+    const distance = morphedPosition(mesh, index, point)
       .applyMatrix4(matrix)
       .distanceTo(centre)
     if (distance > radius) radius = distance

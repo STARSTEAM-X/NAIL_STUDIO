@@ -7,7 +7,7 @@ import { flattenNail, panelToTexture, textureToPanelTransform } from './nailFlat
  * กว้าง 1 สูง 2 — สัดส่วนใกล้เคียงเล็บจริงที่ยาวกว่ากว้าง
  * UV กางเต็มผืน 0–1 เหมือนโมเดลจริง
  */
-function nailPlate(): Mesh {
+function nailPlate(influence = 0): Mesh {
   const geometry = new BufferGeometry()
   geometry.setAttribute('position', new BufferAttribute(new Float32Array([
     -0.5, -1, 0, 0.5, -1, 0, 0.5, 1, 0, -0.5, 1, 0,
@@ -19,8 +19,15 @@ function nailPlate(): Mesh {
     0, 0, 1, 0, 1, 1, 0, 1,
   ]), 2))
   geometry.setIndex([0, 1, 2, 0, 2, 3])
+  // morph สมมติ: ดันมุมปลายทั้งสอง (จุดที่ 2 และ 3, y=1) ออกด้านข้างจุดละ 0.5
+  geometry.morphAttributes.position = [
+    new BufferAttribute(new Float32Array([
+      0, 0, 0, 0, 0, 0, 0.5, 0, 0, -0.5, 0, 0,
+    ]), 3),
+  ]
   const mesh = new Mesh(geometry)
   mesh.name = 'Nail_index'
+  mesh.morphTargetInfluences = [influence]
   mesh.updateMatrixWorld(true)
   return mesh
 }
@@ -104,5 +111,21 @@ describe('textureToPanelTransform', () => {
       screen: [0, 0, 1, 1, 2, 2],
       tex: [0, 0, 1, 1, 2, 2],
     })).toBeNull()
+  })
+})
+
+describe('flattenNail กับ morph target', () => {
+  it('ใช้ตำแหน่งที่ผ่าน morph แล้ว ไม่ใช่ทรงฐานเฉย ๆ', () => {
+    const base = flattenNail(nailPlate(0), 512)
+    const morphed = flattenNail(nailPlate(1), 512)
+
+    // เปิด morph เต็มที่แล้วขอบบนกว้างขึ้น กรอบรูปเล็บบนแผงจึงต้องกว้างขึ้นตาม
+    expect(morphed.bounds.width).toBeGreaterThan(base.bounds.width)
+  })
+
+  it('influence 0 ให้ผลเหมือนไม่มี morph เลย', () => {
+    const withoutMorphField = flattenNail(nailPlate(), 512)
+    const withZeroInfluence = flattenNail(nailPlate(0), 512)
+    expect(withZeroInfluence.bounds).toEqual(withoutMorphField.bounds)
   })
 })
