@@ -21,7 +21,9 @@
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset --force",
     "db:studio": "prisma studio",
-    "db:verify": "node --env-file=.env tools/verify-migration.mjs"
+    "db:verify": "node --env-file=.env tools/verify-migration.mjs",
+    "build:model": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/build.ps1",
+    "verify:model": "python tools/verify_model.py"
   },
   "devDependencies": {
     "dotenv": "^17.4.2",
