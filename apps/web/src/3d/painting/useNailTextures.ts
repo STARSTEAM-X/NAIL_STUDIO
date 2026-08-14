@@ -10,6 +10,7 @@ import {
 } from '@/3d/materials/finishes.ts'
 import { MaterialPool } from '@/3d/materials/MaterialPool.ts'
 import type { HandParts } from '@/3d/models/HandModel.tsx'
+import { applyNailMorphs } from '@/3d/models/nailMorphs.ts'
 import { useDesignStoreApi } from '@/features/design/DesignStoreProvider.tsx'
 import { NailTextureSet } from './NailTextureSet.ts'
 
@@ -66,12 +67,20 @@ export function useNailTextures(parts: HandParts | null): NailTextureSet | null 
       if (previousKey) nailMaterialPool.release(previousKey)
     }
 
+    const syncShape = (key: NailKey): void => {
+      const mesh = parts.nails.get(key)
+      if (!mesh) return
+      const nail = store.getState().document.nails[key]
+      applyNailMorphs(mesh, nail.shape, nail.length)
+    }
+
     for (const [key] of parts.nails) {
       // composite ทึบมาตั้งแต่ต้นทางแล้ว (ดู NAIL_BASE_COLOR) จึงป้อนเข้า CanvasTexture
       // ได้ตรง ๆ ไม่ต้องมีแคนวาสอีกชุดคอยรองพื้นให้ทุกครั้งที่ลากนิ้ว
       const texture = new CanvasTexture(set.composite(key) as HTMLCanvasElement)
       maps.set(key, texture)
       syncFinish(key)
+      syncShape(key)
     }
 
     const offTexture = set.onUpdate((key) => {
@@ -89,6 +98,7 @@ export function useNailTextures(parts: HandParts | null): NailTextureSet | null 
         if (next.nails[key] === previous.nails[key]) continue
         set.rebuild(key)
         syncFinish(key)
+        syncShape(key)
       }
       previous = next
     })

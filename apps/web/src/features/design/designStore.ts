@@ -21,6 +21,8 @@ import {
   CopyNailCommand,
   SetBaseColorCommand,
   SetFinishCommand,
+  SetLengthCommand,
+  SetShapeCommand,
 } from '@/3d/history/commands/nailCommands.ts'
 import {
   AddLayerCommand,
@@ -67,6 +69,8 @@ export interface DesignActions {
   addStroke: (stroke: Stroke) => void
   clearSelectedNails: () => void
   setFinish: (finish: Nail['finish'], mergeKey?: string) => void
+  setShape: (shape: Nail['shape'], mergeKey?: string) => void
+  setLength: (length: Nail['length'], mergeKey?: string) => void
   setBaseColor: (color: string, mergeKey?: string) => void
   copyActiveNailToAll: () => void
   addLayer: (key: NailKey, layer: Layer, index?: number) => void
@@ -288,6 +292,20 @@ export function createDesignStore(options: CreateDesignStoreOptions = {}): Desig
         const commands = editableSelection(state.selection)
           .map((key) => new SetFinishCommand(key, state.document.nails[key].finish, finish, mergeKey))
         if (commands.length > 0) execute(commandFor('เปลี่ยนผิวเล็บ', commands, mergeKey))
+      },
+
+      setShape: (shape, mergeKey) => {
+        const state = get()
+        const commands = editableSelection(state.selection)
+          .map((key) => new SetShapeCommand(key, state.document.nails[key].shape, shape, mergeKey))
+        if (commands.length > 0) execute(commandFor('เปลี่ยนทรงเล็บ', commands, mergeKey))
+      },
+
+      setLength: (length, mergeKey) => {
+        const state = get()
+        const commands = editableSelection(state.selection)
+          .map((key) => new SetLengthCommand(key, state.document.nails[key].length, length, mergeKey))
+        if (commands.length > 0) execute(commandFor('เปลี่ยนความยาวเล็บ', commands, mergeKey))
       },
 
       setBaseColor: (color, mergeKey) => {
