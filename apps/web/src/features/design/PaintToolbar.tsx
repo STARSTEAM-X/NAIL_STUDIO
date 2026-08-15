@@ -40,6 +40,8 @@ const SWATCHES = ['#b5314c', '#6b1e2b', '#e8bfa0', '#f2d5c4', '#2f3e46', '#fffff
 export function PaintToolbar() {
   const settings = useDesign((state) => state.settings)
   const setSettings = useDesign((state) => state.setSettings)
+  const mode = useDesign((state) => state.mode)
+  const setMode = useDesign((state) => state.setMode)
   const selection = useDesign((state) => state.selection)
   const setFinish = useDesign((state) => state.setFinish)
   const clearSelectedNails = useDesign((state) => state.clearSelectedNails)
@@ -52,6 +54,25 @@ export function PaintToolbar() {
 
   return (
     <aside className="toolbar" aria-label="เครื่องมือวาด">
+      <div className="tool-group" role="group" aria-label="โหมด">
+        <button
+          type="button"
+          className={`chip ${mode === 'paint' ? 'chip-on' : ''}`}
+          aria-pressed={mode === 'paint'}
+          onClick={() => setMode('paint')}
+        >
+          วาด
+        </button>
+        <button
+          type="button"
+          className={`chip ${mode === 'decorate' ? 'chip-on' : ''}`}
+          aria-pressed={mode === 'decorate'}
+          onClick={() => setMode('decorate')}
+        >
+          ของตกแต่ง
+        </button>
+      </div>
+
       <div className="tool-group" role="group" aria-label="เครื่องมือ">
         <button
           type="button"

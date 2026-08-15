@@ -27,6 +27,7 @@ import { RecoveryDialog } from './RecoveryDialog.tsx'
 import { NailCanvas2D } from './NailCanvas2D.tsx'
 import { NailStrip } from './NailStrip.tsx'
 import { PaintToolbar } from './PaintToolbar.tsx'
+import { DecorationPanel } from './DecorationPanel.tsx'
 import { HistoryControls } from './HistoryControls.tsx'
 import { VersionHistoryPanel } from './VersionHistoryPanel.tsx'
 import { useAutosave, type AutosaveStatus } from './useAutosave.ts'
@@ -205,6 +206,7 @@ export function NailEditor({ projectId, detail }: Props) {
 
       <div className="editor-body">
         <PaintToolbar />
+        <DecorationPanel />
         <div className="viewport">
           <WebGlGuard>
             <NailScene fallback={null}>
