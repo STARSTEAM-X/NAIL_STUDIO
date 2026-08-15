@@ -69,11 +69,11 @@ export function DecorationInstances({ parts }: Props) {
           const surface = projectUvToSurface(mesh, decoration.u, decoration.v)
           if (!surface) continue
 
-          const bitangent = new Vector3().crossVectors(surface.normal, surface.tangent).normalize()
+          const bitangent = new Vector3().crossVectors(surface.tangent, surface.normal).normalize()
           const rotatedTangent = surface.tangent.clone()
             .multiplyScalar(Math.cos(decoration.rotation))
             .addScaledVector(bitangent, Math.sin(decoration.rotation))
-          const rotatedBitangent = new Vector3().crossVectors(surface.normal, rotatedTangent).normalize()
+          const rotatedBitangent = new Vector3().crossVectors(rotatedTangent, surface.normal).normalize()
 
           object.position.copy(surface.position)
           object.quaternion.setFromRotationMatrix(
