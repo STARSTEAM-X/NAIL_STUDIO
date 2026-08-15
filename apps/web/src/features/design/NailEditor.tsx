@@ -35,6 +35,7 @@ import { PaintToolbar } from './PaintToolbar.tsx'
 import { DecorationPanel } from './DecorationPanel.tsx'
 import { HandPanel } from './HandPanel.tsx'
 import { HistoryControls } from './HistoryControls.tsx'
+import { EditorProfileDropdown } from './EditorProfileDropdown.tsx'
 import { VersionHistoryPanel } from './VersionHistoryPanel.tsx'
 import { EditorToolRail, type EditorPanelId } from './EditorToolRail.tsx'
 import { useAutosave, type AutosaveStatus } from './useAutosave.ts'
@@ -261,16 +262,14 @@ export function NailEditor({ projectId, detail }: Props) {
             <button type="button" className="editor-topbar-link" onClick={() => navigate('/appointments')}>นัดหมาย</button>
             <NotificationBell />
           </div>
-          <button
-            type="button"
-            className="editor-topbar-user"
-            disabled={logout.isPending}
-            title={user ? `ออกจากระบบ (${user.displayName})` : 'ออกจากระบบ'}
-            aria-label={user ? `ออกจากระบบ (${user.displayName})` : 'ออกจากระบบ'}
-            onClick={handleLogout}
-          >
-            {user?.displayName?.trim().slice(0, 1).toUpperCase() ?? 'U'}
-          </button>
+          <EditorProfileDropdown
+            user={user}
+            isLoggingOut={logout.isPending}
+            onLogout={handleLogout}
+            onUnavailableAction={(label) => {
+              store.setState({ notice: `${label}ยังไม่เปิดใช้งานในรุ่นนี้` })
+            }}
+          />
           <div className="editor-topbar-feedback" aria-live="polite">
             {autosave.message && <span className="error" role="alert">{autosave.message}</span>}
             {saveVersion.error && !conflict && (
