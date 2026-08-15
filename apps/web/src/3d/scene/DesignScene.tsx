@@ -1,7 +1,9 @@
 import { HandModel, type HandParts } from '@/3d/models/HandModel.tsx'
 import { PaintController } from '@/3d/painting/PaintController.tsx'
+import { TransformController } from '@/3d/interactions/TransformController.tsx'
 import type { NailTextureSet } from '@/3d/painting/NailTextureSet.ts'
 import { DecorationInstances } from '@/3d/decorations/DecorationInstances.tsx'
+import { useDesign } from '@/features/design/DesignStoreProvider.tsx'
 import { NailFocus } from './NailFocus.tsx'
 
 interface Props {
@@ -11,19 +13,14 @@ interface Props {
   onReady: (parts: HandParts) => void
 }
 
-/**
- * เนื้อหาที่วางอยู่บนเวที 3 มิติ — มือ กล้องจ่อเล็บ และการวาดบนโมเดล
- *
- * ชุดเท็กซ์เจอร์ถูกสร้างไว้ข้างนอก <Canvas> แล้วส่งเข้ามา เพราะแผงวาดแบบแบนซึ่งเป็น
- * DOM ธรรมดาต้องใช้ชุดเดียวกันนี้ ถ้าสร้างไว้ข้างในจะเข้าถึงจากข้างนอกไม่ได้
- * และการมีสองชุดแปลว่าวาดในโหมดหนึ่งแล้วอีกโหมดไม่เห็น
- */
 export function DesignScene({ scale, parts, textures, onReady }: Props) {
+  const mode = useDesign((state) => state.mode)
   return (
     <>
       <HandModel scale={scale} onReady={onReady} />
       {parts && <NailFocus parts={parts} />}
-      {parts && textures && <PaintController parts={parts} textures={textures} />}
+      {parts && textures && mode === 'paint' && <PaintController parts={parts} textures={textures} />}
+      {parts && mode === 'decorate' && <TransformController parts={parts} />}
       {parts && <DecorationInstances parts={parts} />}
     </>
   )
