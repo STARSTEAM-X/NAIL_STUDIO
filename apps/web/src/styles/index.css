@@ -184,6 +184,20 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .template-like:hover, .template-like-on { color: var(--accent); }
 .template-like:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
 .template-like:disabled { cursor: wait; opacity: 0.65; }
+.template-remix {
+  margin-left: auto;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--deep);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.template-remix:hover { border-color: var(--accent); color: var(--accent); }
+.template-remix:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.template-remix:disabled { cursor: wait; opacity: 0.65; }
 .community-load-more { display: block; margin: 1.25rem auto 0; }
 
 /* ---------- editor ---------- */

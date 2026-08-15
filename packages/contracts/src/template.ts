@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { projectNameSchema, projectSummarySchema } from './project.ts'
 
 export const TEMPLATE_SORTS = ['latest', 'popular'] as const
 export const TEMPLATE_CATEGORIES = ['Minimalistic', 'Modern', 'Festive', 'Geometric', 'Luxury'] as const
@@ -39,6 +40,18 @@ export const templateLikeResultSchema = z.object({
   likeCount: z.number().int().nonnegative(),
 })
 
+export const templateRemixSchema = z.object({
+  name: projectNameSchema.optional(),
+})
+
+export const templateRemixResultSchema = z.object({
+  sourceTemplateId: z.string().uuid(),
+  remixCount: z.number().int().nonnegative(),
+  project: projectSummarySchema,
+})
+
 export type ListTemplatesQuery = z.infer<typeof listTemplatesQuerySchema>
 export type TemplateCard = z.infer<typeof templateCardSchema>
 export type TemplateLikeResult = z.infer<typeof templateLikeResultSchema>
+export type TemplateRemixInput = z.infer<typeof templateRemixSchema>
+export type TemplateRemixResult = z.infer<typeof templateRemixResultSchema>

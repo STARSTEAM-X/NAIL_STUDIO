@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { listTemplatesQuerySchema, templateCardSchema, templateLikeResultSchema } from './template.ts'
+import {
+  listTemplatesQuerySchema,
+  templateCardSchema,
+  templateLikeResultSchema,
+  templateRemixResultSchema,
+  templateRemixSchema,
+} from './template.ts'
 
 describe('template contracts', () => {
   it('applies safe feed defaults and rejects unsupported filters', () => {
@@ -38,5 +44,23 @@ describe('template contracts', () => {
       likeCount: 3,
     })
     expect(templateLikeResultSchema.safeParse({ liked: false, likeCount: -1 }).success).toBe(false)
+  })
+
+  it('validates remix input and the created project result', () => {
+    expect(templateRemixSchema.parse({ name: 'My remix' })).toEqual({ name: 'My remix' })
+    expect(templateRemixSchema.parse({})).toEqual({})
+    expect(templateRemixResultSchema.safeParse({
+      sourceTemplateId: '00000000-0000-4000-8000-000000000000',
+      remixCount: 1,
+      project: {
+        id: '00000000-0000-4000-8000-000000000001',
+        name: 'My remix',
+        status: 'draft',
+        versionCount: 1,
+        hasThumbnail: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    }).success).toBe(true)
   })
 })

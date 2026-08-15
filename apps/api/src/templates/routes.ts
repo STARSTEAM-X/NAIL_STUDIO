@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import { listTemplatesQuerySchema } from '@nail-studio/contracts'
+import { listTemplatesQuerySchema, templateRemixSchema } from '@nail-studio/contracts'
 import { currentUser, requireUser } from '../middleware/requireUser.ts'
 import * as service from './service.ts'
 
@@ -24,4 +24,11 @@ templatesRouter.delete('/:id/like', requireUser, async (request, response) => {
   const { id } = templateIdParamSchema.parse(request.params)
   const result = await service.unlike(currentUser(request).id, id)
   response.json({ success: true, data: result })
+})
+
+templatesRouter.post('/:id/remix', requireUser, async (request, response) => {
+  const { id } = templateIdParamSchema.parse(request.params)
+  const input = templateRemixSchema.parse(request.body ?? {})
+  const result = await service.remix(currentUser(request).id, id, input)
+  response.status(201).json({ success: true, data: result })
 })

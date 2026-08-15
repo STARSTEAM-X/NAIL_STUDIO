@@ -1,4 +1,10 @@
-import type { ListTemplatesQuery, TemplateCard, TemplateLikeResult } from '@nail-studio/contracts'
+import type {
+  ListTemplatesQuery,
+  TemplateCard,
+  TemplateLikeResult,
+  TemplateRemixInput,
+  TemplateRemixResult,
+} from '@nail-studio/contracts'
 import { AppError } from '../errors/AppError.ts'
 import * as repository from './repository.ts'
 import { decodeTemplateCursor, encodeTemplateCursor } from './cursor.ts'
@@ -68,4 +74,26 @@ export async function unlike(userId: string, templateId: string): Promise<Templa
   const result = await repository.removeTemplateLike(templateId, userId)
   if (!result) throw AppError.notFound('ไม่พบดีไซน์ที่ต้องการ')
   return result
+}
+
+export async function remix(
+  userId: string,
+  templateId: string,
+  input: TemplateRemixInput,
+): Promise<TemplateRemixResult> {
+  const result = await repository.remixTemplate(templateId, userId, input.name)
+  if (!result) throw AppError.notFound('ไม่พบดีไซน์ที่ต้องการ')
+  return {
+    sourceTemplateId: result.sourceTemplateId,
+    remixCount: result.remixCount,
+    project: {
+      id: result.project.id,
+      name: result.project.name,
+      status: result.project.status,
+      versionCount: result.project.versionCount,
+      hasThumbnail: result.project.thumbnailAssetId !== null,
+      createdAt: result.project.createdAt.toISOString(),
+      updatedAt: result.project.updatedAt.toISOString(),
+    },
+  }
 }

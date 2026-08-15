@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { TEMPLATE_CATEGORIES, TEMPLATE_PRIMARY_COLORS } from '@nail-studio/contracts'
 import { ApiRequestError } from '@/api/client.ts'
 import {
@@ -6,6 +7,7 @@ import {
   type TemplatePrimaryColor,
   type TemplateSort,
   useTemplateLike,
+  useTemplateRemix,
   useTemplates,
 } from '@/features/community/useTemplates.ts'
 
@@ -24,6 +26,7 @@ const PREVIEW_CLASSES: Record<string, string> = {
 }
 
 export function CommunityPage() {
+  const navigate = useNavigate()
   const [sort, setSort] = useState<TemplateSort>('latest')
   const [category, setCategory] = useState<TemplateCategory | ''>('')
   const [color, setColor] = useState<TemplatePrimaryColor | ''>('')
@@ -38,6 +41,7 @@ export function CommunityPage() {
   )
   const templates = useTemplates(filters)
   const likeMutation = useTemplateLike()
+  const remixMutation = useTemplateRemix()
   const items = templates.data?.pages.flatMap((page) => page.data) ?? []
 
   return (
@@ -146,6 +150,21 @@ export function CommunityPage() {
                 <span>↗ {template.shareCount}</span>
                 <span>↻ {template.remixCount}</span>
                 <span>💬 {template.commentCount}</span>
+                <button
+                  type="button"
+                  className="template-remix"
+                  disabled={remixMutation.isPending && remixMutation.variables?.templateId === template.id}
+                  onClick={() => {
+                    remixMutation.mutate(
+                      { templateId: template.id },
+                      { onSuccess: (result) => navigate(`/editor/${result.project.id}`) },
+                    )
+                  }}
+                >
+                  {remixMutation.isPending && remixMutation.variables?.templateId === template.id
+                    ? 'กำลังสร้าง…'
+                    : 'รีมิกซ์'}
+                </button>
               </div>
             </div>
           </article>

@@ -1,11 +1,12 @@
 import { useInfiniteQuery, useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query'
-import type { TemplateCard, TemplateLikeResult } from '@nail-studio/contracts'
+import type { TemplateCard, TemplateLikeResult, TemplateRemixResult } from '@nail-studio/contracts'
 import {
   TEMPLATE_CATEGORIES,
   TEMPLATE_PRIMARY_COLORS,
   TEMPLATE_SORTS,
 } from '@nail-studio/contracts'
 import { apiFetch, apiFetchPage, type ApiPage } from '@/api/client.ts'
+import { projectKeys } from '@/features/projects/useProjects.ts'
 
 export type TemplateSort = (typeof TEMPLATE_SORTS)[number]
 export type TemplateCategory = (typeof TEMPLATE_CATEGORIES)[number]
@@ -62,6 +63,38 @@ export function useTemplateLike() {
             ...page,
             data: page.data.map((template) =>
               template.id === templateId ? { ...template, likeCount: result.likeCount } : template,
+            ),
+          })),
+        }
+      })
+    },
+  })
+}
+
+export interface TemplateRemixInput {
+  templateId: string
+  name?: string
+}
+
+export function useTemplateRemix() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ templateId, name }: TemplateRemixInput) =>
+      apiFetch<TemplateRemixResult>(`/templates/${templateId}/remix`, {
+        method: 'POST',
+        body: name ? { name } : {},
+      }),
+    onSuccess: (result, { templateId }) => {
+      void queryClient.invalidateQueries({ queryKey: projectKeys.list(), exact: true })
+      queryClient.setQueriesData<InfiniteData<ApiPage<TemplateCard[]>>>({ queryKey: templateKeys.all }, (current) => {
+        if (!current) return current
+        return {
+          ...current,
+          pages: current.pages.map((page) => ({
+            ...page,
+            data: page.data.map((template) =>
+              template.id === templateId ? { ...template, remixCount: result.remixCount } : template,
             ),
           })),
         }
