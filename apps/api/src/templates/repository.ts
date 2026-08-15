@@ -29,6 +29,23 @@ export interface TemplateRemixMutationRow {
   }
 }
 
+export interface TemplateReportMutationRow {
+  reportId: string
+  reportCount: number
+  visibility: 'public' | 'unlisted' | 'hidden'
+}
+
+export interface TemplateModerationReportRow {
+  id: string
+  targetId: string
+  reason: 'spam' | 'inappropriate' | 'copyright' | 'harassment' | 'other'
+  detail: string | null
+  status: 'pending' | 'reviewed' | 'dismissed'
+  createdAt: Date
+  reporter: { id: string; displayName: string }
+  template: { name: string; visibility: 'public' | 'unlisted' | 'hidden'; reportCount: number } | null
+}
+
 const templateListSelect = {
   id: true,
   name: true,
@@ -201,6 +218,89 @@ export function remixTemplate(
       sourceTemplateId: template.id,
       remixCount: updated.remixCount,
       project,
+    }
+  })
+}
+
+/** รายงานหนึ่งครั้งต่อผู้ใช้ — unique constraint + skipDuplicates กันการยิงซ้ำ */
+export function reportTemplate(
+  templateId: string,
+  reporterId: string,
+  reason: 'spam' | 'inappropriate' | 'copyright' | 'harassment' | 'other',
+  detail: string | undefined,
+): Promise<TemplateReportMutationRow | null> {
+  return prisma.$transaction(async (tx) => {
+    const template = await tx.nailTemplate.findFirst({
+      where: { id: templateId, visibility: 'public', deletedAt: null },
+      select: { id: true },
+    })
+    if (!template) return null
+
+    const inserted = await tx.contentReport.createMany({
+      data: {
+        targetType: 'template',
+        targetId: template.id,
+        reporterId,
+        reason,
+        detail: detail ?? null,
+      },
+      skipDuplicates: true,
+    })
+
+    let current = await tx.nailTemplate.findUniqueOrThrow({
+      where: { id: template.id },
+      select: { reportCount: true, visibility: true },
+    })
+    if (inserted.count === 1) {
+      current = await tx.nailTemplate.update({
+        where: { id: template.id },
+        data: { reportCount: { increment: 1 } },
+        select: { reportCount: true, visibility: true },
+      })
+      if (current.reportCount >= 5 && current.visibility !== 'hidden') {
+        current = await tx.nailTemplate.update({
+          where: { id: template.id },
+          data: { visibility: 'hidden' },
+          select: { reportCount: true, visibility: true },
+        })
+      }
+    }
+
+    const report = await tx.contentReport.findFirstOrThrow({
+      where: { targetType: 'template', targetId: template.id, reporterId },
+      select: { id: true },
+    })
+    return { reportId: report.id, reportCount: current.reportCount, visibility: current.visibility }
+  })
+}
+
+export async function listPendingTemplateReports(limit = 50): Promise<TemplateModerationReportRow[]> {
+  const reports = await prisma.contentReport.findMany({
+    where: { targetType: 'template', status: 'pending' },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    take: limit,
+    select: {
+      id: true,
+      targetId: true,
+      reason: true,
+      detail: true,
+      status: true,
+      createdAt: true,
+      reporter: { select: { id: true, displayName: true } },
+    },
+  })
+  const templates = await prisma.nailTemplate.findMany({
+    where: { id: { in: reports.map((report) => report.targetId) } },
+    select: { id: true, name: true, visibility: true, reportCount: true },
+  })
+  const byId = new Map(templates.map((template) => [template.id, template]))
+  return reports.map((report) => {
+    const template = byId.get(report.targetId)
+    return {
+      ...report,
+      template: template
+        ? { name: template.name, visibility: template.visibility, reportCount: template.reportCount }
+        : null,
     }
   })
 }

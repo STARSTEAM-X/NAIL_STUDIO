@@ -372,7 +372,7 @@ Sprint 0, งานทำคลัง asset จริง, เวลา hardening
    `GET /templates` พร้อม cursor ที่แยก latest/popular และหน้า Community ที่โหลดเพิ่มได้
 5. [x] ไลก์ **idempotent** ด้วย composite PK; counter อัปเดตใน transaction เดียว — เพิ่ม `PUT/DELETE /templates/:id/like` พร้อมปุ่มไลก์บนการ์ด
 6. [x] Remix → สร้างโปรเจกต์ใหม่ + บันทึก lineage ต้นทางผ่าน `template_remixes.template_id` (ส่ง `sourceTemplateId` กลับในผลลัพธ์) — เพิ่ม `POST /templates/:id/remix`, event/counter และปุ่มรีมิกซ์ที่เปิด editor ของโปรเจกต์ใหม่
-7. Moderation: รายงาน → ซ่อนอัตโนมัติที่ 5 → คิว admin
+7. [x] Moderation: รายงาน → ซ่อนอัตโนมัติที่ 5 → คิว admin — เพิ่ม `POST /templates/:id/report`, dedupe ต่อผู้รายงาน และ `GET /templates/moderation/reports` สำหรับ admin
 8. พรีวิว 3D แบบ read-only (ไม่โหลดเครื่องมือแก้ไข → bundle เล็กกว่า)
 9. **`notifications`** (A-13, DB-10) — เพิ่มกลับเข้าแผนหลังพบว่าตกหล่นจากรอบ audit ก่อนหน้า
    - เริ่มที่สอง `kind` แรก: `post_like`, `post_comment` (ไลก์/คอมเมนต์เทมเพลตของตัวเอง)

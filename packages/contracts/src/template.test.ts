@@ -5,6 +5,9 @@ import {
   templateLikeResultSchema,
   templateRemixResultSchema,
   templateRemixSchema,
+  templateModerationReportSchema,
+  templateReportResultSchema,
+  templateReportSchema,
 } from './template.ts'
 
 describe('template contracts', () => {
@@ -61,6 +64,28 @@ describe('template contracts', () => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },
+    }).success).toBe(true)
+  })
+
+  it('validates reports and moderation queue rows', () => {
+    expect(templateReportSchema.parse({ reason: 'spam', detail: 'Looks automated' })).toEqual({
+      reason: 'spam',
+      detail: 'Looks automated',
+    })
+    expect(templateReportResultSchema.safeParse({
+      reportId: '00000000-0000-4000-8000-000000000000',
+      reportCount: 5,
+      visibility: 'hidden',
+    }).success).toBe(true)
+    expect(templateModerationReportSchema.safeParse({
+      id: '00000000-0000-4000-8000-000000000000',
+      targetId: '00000000-0000-4000-8000-000000000001',
+      reason: 'spam',
+      detail: null,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      reporter: { id: '00000000-0000-4000-8000-000000000002', displayName: 'Reporter' },
+      template: { name: 'Reported', visibility: 'hidden', reportCount: 5 },
     }).success).toBe(true)
   })
 })

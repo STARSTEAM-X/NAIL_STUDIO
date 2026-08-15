@@ -2,6 +2,9 @@ import type {
   ListTemplatesQuery,
   TemplateCard,
   TemplateLikeResult,
+  TemplateModerationReport,
+  TemplateReportInput,
+  TemplateReportResult,
   TemplateRemixInput,
   TemplateRemixResult,
 } from '@nail-studio/contracts'
@@ -96,4 +99,28 @@ export async function remix(
       updatedAt: result.project.updatedAt.toISOString(),
     },
   }
+}
+
+export async function report(
+  reporterId: string,
+  templateId: string,
+  input: TemplateReportInput,
+): Promise<TemplateReportResult> {
+  const result = await repository.reportTemplate(templateId, reporterId, input.reason, input.detail)
+  if (!result) throw AppError.notFound('ไม่พบดีไซน์ที่ต้องการ')
+  return result
+}
+
+export async function moderationQueue(): Promise<TemplateModerationReport[]> {
+  const rows = await repository.listPendingTemplateReports()
+  return rows.map((row) => ({
+    id: row.id,
+    targetId: row.targetId,
+    reason: row.reason,
+    detail: row.detail,
+    status: row.status,
+    createdAt: row.createdAt.toISOString(),
+    reporter: row.reporter,
+    template: row.template,
+  }))
 }

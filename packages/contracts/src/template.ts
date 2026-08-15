@@ -5,6 +5,8 @@ export const TEMPLATE_SORTS = ['latest', 'popular'] as const
 export const TEMPLATE_CATEGORIES = ['Minimalistic', 'Modern', 'Festive', 'Geometric', 'Luxury'] as const
 export const TEMPLATE_PRIMARY_COLORS = ['Red', 'Pink', 'Nude', 'Black', 'White'] as const
 export const TEMPLATE_ORIGINS = ['original', 'ai', 'remix'] as const
+export const TEMPLATE_VISIBILITIES = ['public', 'unlisted', 'hidden'] as const
+export const TEMPLATE_REPORT_REASONS = ['spam', 'inappropriate', 'copyright', 'harassment', 'other'] as const
 
 export const listTemplatesQuerySchema = z.object({
   sort: z.enum(TEMPLATE_SORTS).default('latest'),
@@ -50,8 +52,37 @@ export const templateRemixResultSchema = z.object({
   project: projectSummarySchema,
 })
 
+export const templateReportSchema = z.object({
+  reason: z.enum(TEMPLATE_REPORT_REASONS),
+  detail: z.string().trim().max(2000).optional(),
+})
+
+export const templateReportResultSchema = z.object({
+  reportId: z.string().uuid(),
+  reportCount: z.number().int().nonnegative(),
+  visibility: z.enum(TEMPLATE_VISIBILITIES),
+})
+
+export const templateModerationReportSchema = z.object({
+  id: z.string().uuid(),
+  targetId: z.string().uuid(),
+  reason: z.enum(TEMPLATE_REPORT_REASONS),
+  detail: z.string().nullable(),
+  status: z.enum(['pending', 'reviewed', 'dismissed']),
+  createdAt: z.string(),
+  reporter: templateAuthorSchema,
+  template: z.object({
+    name: z.string(),
+    visibility: z.enum(TEMPLATE_VISIBILITIES),
+    reportCount: z.number().int().nonnegative(),
+  }).nullable(),
+})
+
 export type ListTemplatesQuery = z.infer<typeof listTemplatesQuerySchema>
 export type TemplateCard = z.infer<typeof templateCardSchema>
 export type TemplateLikeResult = z.infer<typeof templateLikeResultSchema>
 export type TemplateRemixInput = z.infer<typeof templateRemixSchema>
 export type TemplateRemixResult = z.infer<typeof templateRemixResultSchema>
+export type TemplateReportInput = z.infer<typeof templateReportSchema>
+export type TemplateReportResult = z.infer<typeof templateReportResultSchema>
+export type TemplateModerationReport = z.infer<typeof templateModerationReportSchema>
