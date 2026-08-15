@@ -308,6 +308,15 @@ Sprint 0, งานทำคลัง asset จริง, เวลา hardening
      undo/redo, bone scaling และรีเฟรช skinned bounds ตาม
      `docs/superpowers/plans/2026-08-15-hand-proportions.md` และ
      `docs/superpowers/specs/2026-08-15-hand-proportions-design.md`
+   - **ยืนยันบนเบราว์เซอร์จริงแล้ว** (Codex ที่ implement ไม่มี browser backend ให้ตรวจเองได้
+     ระหว่างทำ — Claude เป็นผู้ตรวจแทนหลัง merge งานเข้า branch): เปิด `npm run dev:api` +
+     `npm run dev:web` จริง สร้างโปรเจกต์ทดสอบ 2 ชุด แล้วตรวจครบ 7 ข้อ — แผง "มือ" ปรากฏพร้อม
+     สไลเดอร์ 4 ตัว + color picker · ปรับสีผิวแล้วมือเปลี่ยนสี เล็บไม่เปลี่ยนตาม · ลาก `palmWidth`
+     แล้วฝ่ามือกว้างขึ้นเห็นชัดแบบเรียลไทม์ · วางของตกแต่งบนเล็บแล้วปรับ `palmWidth`/`fingerLength`
+     → ของตกแต่งยังติดผิวเล็บพอดี ไม่ลอยไม่จม (**พิสูจน์ D-10**) · วาดเส้นบนเล็บได้แม่นยำหลังปรับ
+     สัดส่วนมือ (พิสูจน์ `refreshSkinnedBounds` แก้ raycast ได้จริง ไม่ใช่แค่ไม่ throw) · Ctrl+Z
+     ย้อนการลากสไลเดอร์ 1 ครั้งกลับเป็น 1 ขั้นตอนพอดี (ทดสอบแบบ set ค่าตรงจุดเดียวเพื่อตัดปัจจัย
+     event ซ้อนจากเมาส์ในเครื่องมืออัตโนมัติออก) · Ctrl+Z ย้อนสีผิวได้ถูกต้อง
 6. Thumbnail: capture จาก canvas → WebP → `StorageProvider`
 7. Exporters: `.nail.json` · PNG · GLB (ถ้าประเมินแล้วเหมาะสม)
 
