@@ -8,6 +8,7 @@ import {
   type Decoration,
   type DesignDocument,
   type Hand,
+  type HandSettings,
   type Layer,
   type Nail,
   type NailKey,
@@ -41,6 +42,7 @@ import {
   RemoveDecorationCommand,
   ScaleDecorationCommand,
 } from '@/3d/history/commands/decorationCommands.ts'
+import { SetProportionsCommand, SetSkinToneCommand } from '@/3d/history/commands/handCommands.ts'
 import { DEFAULT_PAINT_SETTINGS, type PaintSettings } from '@/3d/painting/paintSettings.ts'
 
 export const EDITABLE_HAND: Hand = 'right'
@@ -82,6 +84,8 @@ export interface DesignActions {
   setShape: (shape: Nail['shape'], mergeKey?: string) => void
   setLength: (length: Nail['length'], mergeKey?: string) => void
   setBaseColor: (color: string, mergeKey?: string) => void
+  setSkinTone: (hex: string) => void
+  setProportions: (partial: Partial<HandSettings['proportions']>, mergeKey?: string) => void
   setMode: (mode: 'paint' | 'decorate') => void
   selectDecoration: (target: { key: NailKey; decorationId: string } | null) => void
   addDecoration: (key: NailKey, decoration: Decoration) => void
@@ -331,6 +335,18 @@ export function createDesignStore(options: CreateDesignStoreOptions = {}): Desig
         const commands = editableSelection(state.selection)
           .map((key) => new SetBaseColorCommand(key, state.document.nails[key].baseColor, color, mergeKey))
         if (commands.length > 0) execute(commandFor('เปลี่ยนสีเล็บ', commands, mergeKey))
+      },
+
+      setSkinTone: (hex) => {
+        const state = get()
+        execute(new SetSkinToneCommand(state.document.hand.skinTone, hex))
+      },
+
+      setProportions: (partial, mergeKey) => {
+        const state = get()
+        const before = state.document.hand.proportions
+        const after = { ...before, ...partial }
+        execute(new SetProportionsCommand(before, after, mergeKey))
       },
 
       setMode: (mode) => set({ mode, selectedDecoration: mode === 'paint' ? null : get().selectedDecoration }),

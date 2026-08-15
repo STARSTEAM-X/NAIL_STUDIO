@@ -340,3 +340,33 @@ describe('ประวัติการแก้ไขเอกสาร', () =
     expect(store.getState().history.state()).toMatchObject({ undoLabel: 'วาดเส้น', canRedo: true })
   })
 })
+
+describe('designStore hand actions', () => {
+  it('setSkinTone เปลี่ยนสีผิวและบันทึกลง history', () => {
+    const store = createDesignStore()
+    store.getState().setSkinTone('#4f382f')
+    expect(store.getState().document.hand.skinTone).toBe('#4f382f')
+    expect(store.getState().history.state().canUndo).toBe(true)
+
+    store.getState().undo()
+    expect(store.getState().document.hand.skinTone).toBe('#e8bfa0')
+  })
+
+  it('setProportions ปรับเฉพาะฟิลด์ที่ส่งมา คงฟิลด์อื่นไว้', () => {
+    const store = createDesignStore()
+    store.getState().setProportions({ palmWidth: 1.2 })
+    expect(store.getState().document.hand.proportions).toEqual({
+      handScale: 1, palmWidth: 1.2, fingerLength: 1, fingerWidth: 1,
+    })
+  })
+
+  it('setProportions สอง call ที่มี mergeKey เดียวกันรวมเป็น history รายการเดียว', () => {
+    const store = createDesignStore()
+    store.getState().setProportions({ palmWidth: 1.1 }, 'hand-proportions')
+    store.getState().setProportions({ palmWidth: 1.2 }, 'hand-proportions')
+    expect(store.getState().document.hand.proportions.palmWidth).toBe(1.2)
+
+    store.getState().undo()
+    expect(store.getState().document.hand.proportions.palmWidth).toBe(1)
+  })
+})
