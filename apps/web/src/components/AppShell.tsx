@@ -38,6 +38,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               user={user}
               isLoggingOut={logout.isPending}
               onLogout={handleLogout}
+              onEditProfile={() => navigate('/profile')}
             />
           </div>
         </nav>

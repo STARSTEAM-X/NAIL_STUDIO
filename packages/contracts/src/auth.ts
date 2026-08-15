@@ -33,6 +33,10 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'กรุณากรอกรหัสผ่าน').max(128),
 })
 
+export const updateProfileSchema = z.object({
+  displayName: z.string().trim().min(1, 'กรุณาระบุชื่อที่แสดง').max(60),
+})
+
 export const publicUserSchema = z.object({
   id: z.string().uuid(),
   email: z.string(),
@@ -43,4 +47,5 @@ export const publicUserSchema = z.object({
 
 export type RegisterInput = z.infer<typeof registerSchema>
 export type LoginInput = z.infer<typeof loginSchema>
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>
 export type PublicUser = z.infer<typeof publicUserSchema>

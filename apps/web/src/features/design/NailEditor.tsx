@@ -348,6 +348,7 @@ export function NailEditor({ projectId, detail }: Props) {
             user={user}
             isLoggingOut={logout.isPending}
             onLogout={handleLogout}
+            onEditProfile={() => navigate('/profile')}
             onUnavailableAction={(label) => {
               store.setState({ notice: `${label}ยังไม่เปิดใช้งานในรุ่นนี้` })
             }}

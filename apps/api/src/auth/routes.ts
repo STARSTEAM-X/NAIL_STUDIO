@@ -1,8 +1,8 @@
 import { Router } from 'express'
 import rateLimit from 'express-rate-limit'
-import { loginSchema, registerSchema } from '@nail-studio/contracts'
+import { loginSchema, registerSchema, updateProfileSchema } from '@nail-studio/contracts'
 import { env } from '../config/env.ts'
-import { requireUser } from '../middleware/requireUser.ts'
+import { currentUser, requireUser } from '../middleware/requireUser.ts'
 import { clearAuthCookies, createCsrfToken, setAuthCookies } from './session.ts'
 import * as service from './service.ts'
 
@@ -51,4 +51,10 @@ authRouter.post('/logout', requireUser, async (request, response) => {
 
 authRouter.get('/me', requireUser, (request, response) => {
   response.json({ success: true, data: request.user })
+})
+
+authRouter.patch('/me', requireUser, async (request, response) => {
+  const input = updateProfileSchema.parse(request.body)
+  const user = await service.updateProfile(currentUser(request).id, input)
+  response.json({ success: true, data: user })
 })

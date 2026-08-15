@@ -1,4 +1,4 @@
-import type { LoginInput, PublicUser, RegisterInput } from '@nail-studio/contracts'
+import type { LoginInput, PublicUser, RegisterInput, UpdateProfileInput } from '@nail-studio/contracts'
 import { AppError } from '../errors/AppError.ts'
 import { hashPassword, verifyPassword } from './password.ts'
 import { createSessionToken, hashSessionToken, sessionExpiry } from './session.ts'
@@ -69,6 +69,11 @@ export async function logout(sessionId: string): Promise<void> {
     // ลบ session ที่ถูกลบไปแล้วไม่ใช่ข้อผิดพลาด — ผลลัพธ์ที่ผู้ใช้ต้องการคือ "ออกจากระบบ"
     // ซึ่งเป็นจริงอยู่แล้ว จึงทำให้ endpoint นี้เป็น idempotent
   })
+}
+
+export async function updateProfile(userId: string, input: UpdateProfileInput): Promise<PublicUser> {
+  const user = await repository.updateUserDisplayName(userId, input.displayName)
+  return repository.toPublicUser(user)
 }
 
 export interface ResolvedSession {

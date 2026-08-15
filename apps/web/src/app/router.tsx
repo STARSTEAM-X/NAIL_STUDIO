@@ -4,6 +4,7 @@ import { useCurrentUser } from '@/features/auth/useAuth.ts'
 import { LoginPage } from '@/pages/LoginPage.tsx'
 import { RegisterPage } from '@/pages/RegisterPage.tsx'
 import { ProjectsPage } from '@/pages/ProjectsPage.tsx'
+import { ProfilePage } from '@/pages/ProfilePage.tsx'
 import { AppShell } from '@/components/AppShell.tsx'
 
 // The 3D editor and community feed are not needed for auth/project startup.
@@ -38,6 +39,10 @@ export function AppRouter() {
         <Route
           path="/projects"
           element={<Protected><AppShell><ProjectsPage /></AppShell></Protected>}
+        />
+        <Route
+          path="/profile"
+          element={<Protected><AppShell><ProfilePage /></AppShell></Protected>}
         />
         <Route
           path="/community"

@@ -33,6 +33,10 @@ export function createUser(input: {
   return prisma.user.create({ data: input })
 }
 
+export function updateUserDisplayName(id: string, displayName: string) {
+  return prisma.user.update({ where: { id }, data: { displayName } })
+}
+
 export function createSession(input: {
   userId: string
   tokenHash: Uint8Array<ArrayBuffer>

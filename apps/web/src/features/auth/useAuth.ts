@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { LoginInput, PublicUser, RegisterInput } from '@nail-studio/contracts'
+import type { LoginInput, PublicUser, RegisterInput, UpdateProfileInput } from '@nail-studio/contracts'
 import { ApiRequestError, apiFetch } from '@/api/client.ts'
 
 export const authKeys = {
@@ -51,6 +51,17 @@ export function useRegister() {
   return useMutation({
     mutationFn: (input: RegisterInput) =>
       apiFetch<PublicUser>('/auth/register', { method: 'POST', body: input }),
+    onSuccess: (user) => {
+      queryClient.setQueryData(authKeys.me, user)
+    },
+  })
+}
+
+export function useUpdateProfile() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: UpdateProfileInput) =>
+      apiFetch<PublicUser>('/auth/me', { method: 'PATCH', body: input }),
     onSuccess: (user) => {
       queryClient.setQueryData(authKeys.me, user)
     },

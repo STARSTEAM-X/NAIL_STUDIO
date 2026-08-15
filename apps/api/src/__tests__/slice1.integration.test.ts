@@ -98,6 +98,24 @@ describe('Slice 1 — walking skeleton', () => {
     expect(theirs.status).toBe(401)
   })
 
+  it('แก้ไขชื่อโปรไฟล์ของบัญชีที่ล็อกอินอยู่ได้เท่านั้น', async () => {
+    const updated = await clientA.send('patch', '/auth/me', { displayName: 'ผู้ใช้ A คนใหม่' })
+    expect(updated.status).toBe(200)
+    expect(updated.body.data.displayName).toBe('ผู้ใช้ A คนใหม่')
+    expect(updated.body.data.email).toBe(emailA)
+
+    const mine = await clientA.send('get', '/auth/me')
+    expect(mine.body.data.displayName).toBe('ผู้ใช้ A คนใหม่')
+
+    const anonymous = new Client(() => app)
+    await anonymous.send('get', '/health')
+    const unauthorized = await anonymous.send('patch', '/auth/me', { displayName: 'ไม่ควรแก้ได้' })
+    expect(unauthorized.status).toBe(401)
+
+    const invalid = await clientA.send('patch', '/auth/me', { displayName: ' ' })
+    expect(invalid.status).toBe(400)
+  })
+
   it('ล็อกอินผิดรหัสได้ข้อความเดียวกับอีเมลที่ไม่มีอยู่จริง', async () => {
     const wrongPassword = await clientA.send('post', '/auth/login', {
       email: emailA,
