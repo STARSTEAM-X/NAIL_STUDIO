@@ -4,6 +4,7 @@ import {
   MAX_LAYERS_PER_NAIL,
   createEmptyDocument,
   nailKeysOfHand,
+  type Decoration,
   type DesignDocument,
   type Hand,
   type Layer,
@@ -33,6 +34,12 @@ import {
   SetLayerOpacityCommand,
   SetLayerVisibilityCommand,
 } from '@/3d/history/commands/layerCommands.ts'
+import {
+  AddDecorationCommand,
+  MoveDecorationCommand,
+  RemoveDecorationCommand,
+  ScaleDecorationCommand,
+} from '@/3d/history/commands/decorationCommands.ts'
 import { DEFAULT_PAINT_SETTINGS, type PaintSettings } from '@/3d/painting/paintSettings.ts'
 
 export const EDITABLE_HAND: Hand = 'right'
@@ -49,6 +56,8 @@ export interface DesignState {
   revision: number
   notice: string | null
   history: HistoryStack
+  mode: 'paint' | 'decorate'
+  selectedDecoration: { key: NailKey; decorationId: string } | null
 }
 
 export interface DesignActions {
@@ -72,6 +81,12 @@ export interface DesignActions {
   setShape: (shape: Nail['shape'], mergeKey?: string) => void
   setLength: (length: Nail['length'], mergeKey?: string) => void
   setBaseColor: (color: string, mergeKey?: string) => void
+  setMode: (mode: 'paint' | 'decorate') => void
+  selectDecoration: (target: { key: NailKey; decorationId: string } | null) => void
+  addDecoration: (key: NailKey, decoration: Decoration) => void
+  removeDecoration: (key: NailKey, decorationId: string) => void
+  moveDecoration: (key: NailKey, decorationId: string, u: number, v: number, rotation: number, mergeKey?: string) => void
+  scaleDecoration: (key: NailKey, decorationId: string, scale: number, mergeKey?: string) => void
   copyActiveNailToAll: () => void
   addLayer: (key: NailKey, layer: Layer, index?: number) => void
   removeLayer: (key: NailKey, layerId: string) => void
@@ -214,6 +229,8 @@ export function createDesignStore(options: CreateDesignStoreOptions = {}): Desig
       revision: 0,
       notice: null,
       history,
+      mode: 'paint',
+      selectedDecoration: null,
 
       loadDocument: (next) => {
         history.clear()
@@ -313,6 +330,49 @@ export function createDesignStore(options: CreateDesignStoreOptions = {}): Desig
         const commands = editableSelection(state.selection)
           .map((key) => new SetBaseColorCommand(key, state.document.nails[key].baseColor, color, mergeKey))
         if (commands.length > 0) execute(commandFor('เปลี่ยนสีเล็บ', commands, mergeKey))
+      },
+
+      setMode: (mode) => set({ mode, selectedDecoration: mode === 'paint' ? null : get().selectedDecoration }),
+
+      selectDecoration: (target) => set({ selectedDecoration: target }),
+
+      addDecoration: (key, decoration) => {
+        if (!isEditable(key)) return
+        const nail = get().document.nails[key]
+        execute(new AddDecorationCommand(key, decoration, nail.decorations.length))
+      },
+
+      removeDecoration: (key, decorationId) => {
+        if (!isEditable(key)) return
+        const decorations = get().document.nails[key].decorations
+        const index = decorations.findIndex((decoration) => decoration.id === decorationId)
+        const decoration = decorations[index]
+        if (!decoration) return
+        if (execute(new RemoveDecorationCommand(key, decoration, index))) {
+          const selected = get().selectedDecoration
+          if (selected && selected.key === key && selected.decorationId === decorationId) {
+            set({ selectedDecoration: null })
+          }
+        }
+      },
+
+      moveDecoration: (key, decorationId, u, v, rotation, mergeKey) => {
+        if (!isEditable(key)) return
+        const decoration = get().document.nails[key].decorations.find((item) => item.id === decorationId)
+        if (!decoration) return
+        execute(new MoveDecorationCommand(
+          key, decorationId,
+          { u: decoration.u, v: decoration.v, rotation: decoration.rotation },
+          { u, v, rotation },
+          mergeKey,
+        ))
+      },
+
+      scaleDecoration: (key, decorationId, scale, mergeKey) => {
+        if (!isEditable(key)) return
+        const decoration = get().document.nails[key].decorations.find((item) => item.id === decorationId)
+        if (!decoration) return
+        execute(new ScaleDecorationCommand(key, decorationId, decoration.scale, scale, mergeKey))
       },
 
       copyActiveNailToAll: () => {
