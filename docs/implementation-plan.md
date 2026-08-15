@@ -392,6 +392,13 @@ Sprint 0, งานทำคลัง asset จริง, เวลา hardening
 
 ตามการออกแบบใหม่ใน `architecture.md §5B` (D-18 ถึง D-22)
 
+> **Progress 2026-08-15**: วาง `apps/ai` FastAPI foundation แล้ว พร้อม internal-token guard,
+> lazy embedding provider, Thai lexical fallback, hybrid RRF retrieval, intent routing,
+> grounded SSE chat, confirm-first command proposal, Recipe validation/repair/fallback,
+> และ Express/Web proxy clients. งานที่ยังเหลือใน Slice นี้คือ migration/seed ของตาราง AI,
+> เชื่อม retrieval กับข้อมูลจริงแบบ vector query, UI editor สำหรับยืนยัน Command/เลือก Recipe,
+> และการวัดชุดข้อมูล 100/200/100 ตามเกณฑ์.
+
 1. `apps/ai` FastAPI เดียว รวม 2 service เดิม + internal token + connection pool
 2. **ชั้น retrieval**: embedding · ตัดคำไทย PyThaiNLP · hybrid + RRF (A-18) ·
    intent routing (A-19) · structured SQL retrieval (D-20)

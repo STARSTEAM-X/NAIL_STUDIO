@@ -18,6 +18,8 @@ const envSchema = z.object({
   SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
   STORAGE_DRIVER: z.enum(['local']).default('local'),
   STORAGE_ROOT: z.string().min(1).default('./storage'),
+  AI_SERVICE_URL: z.string().url().default('http://localhost:4100'),
+  AI_INTERNAL_TOKEN: z.string().default(''),
 })
 
 export type Env = z.infer<typeof envSchema>

@@ -123,3 +123,29 @@ export async function apiUploadBinary(path: string, blob: Blob, contentType: str
     )
   }
 }
+
+/** เปิด response แบบ streaming สำหรับ AI chat โดยยังใช้ cookie/CSRF ชุดเดียวกับ API ปกติ */
+export async function apiStream(path: string, body: unknown, signal?: AbortSignal): Promise<ReadableStream<Uint8Array>> {
+  const response = await fetch(`${BASE_URL}/api/v1${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...csrfHeaders('POST') },
+    credentials: 'include',
+    body: JSON.stringify(body),
+    ...(signal ? { signal } : {}),
+  })
+  if (!response.ok || !response.body) {
+    const payload = (await response.json().catch(() => null)) as ApiError | null
+    throw new ApiRequestError(
+      response.status,
+      payload ?? {
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'AI service ไม่พร้อมใช้งาน',
+          requestId: response.headers.get('x-request-id') ?? 'unknown',
+        },
+      },
+    )
+  }
+  return response.body
+}

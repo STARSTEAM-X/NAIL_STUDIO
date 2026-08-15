@@ -10,6 +10,7 @@ import { authRouter } from './auth/routes.ts'
 import { projectsRouter } from './projects/routes.ts'
 import { templatesRouter } from './templates/routes.ts'
 import { notificationsRouter } from './notifications/routes.ts'
+import { aiRouter } from './ai/routes.ts'
 
 export function createApp(): Express {
   const app = express()
@@ -44,6 +45,7 @@ export function createApp(): Express {
   app.use('/api/v1/projects', projectsRouter)
   app.use('/api/v1/templates', templatesRouter)
   app.use('/api/v1/notifications', notificationsRouter)
+  app.use('/api/v1/ai', aiRouter)
 
   app.use(notFoundHandler)
   app.use(errorHandler)
