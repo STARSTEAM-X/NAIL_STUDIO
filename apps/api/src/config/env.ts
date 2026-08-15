@@ -16,6 +16,8 @@ const envSchema = z.object({
     .min(32, 'SESSION_SECRET ต้องยาวอย่างน้อย 32 ตัวอักษร')
     .refine((value) => !value.startsWith('CHANGE_ME'), 'ยังไม่ได้เปลี่ยน SESSION_SECRET จากค่าตัวอย่าง'),
   SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
+  STORAGE_DRIVER: z.enum(['local']).default('local'),
+  STORAGE_ROOT: z.string().min(1).default('./storage'),
 })
 
 export type Env = z.infer<typeof envSchema>

@@ -13,7 +13,8 @@ coverage/
 
 # ไฟล์ที่ระบบสร้าง
 apps/api/src/generated/
-storage/
+# anchor ที่ root เท่านั้น — ไม่งั้นจะบัง apps/api/src/storage/ (โค้ด StorageProvider) ไปด้วย
+/storage/
 playwright-report/
 test-results/
 __pycache__/
