@@ -5,8 +5,10 @@
  * ระยะจ่อเล็บ ต้องใช้ค่าชุดเดียวกัน ถ้าเขียนซ้ำหลายที่จะหลุดกันทีหลัง
  */
 
-export const HOME_POSITION: [number, number, number] = [0, 0.03, 0.85]
-export const HOME_TARGET: [number, number, number] = [0, 0.03, 0.13]
+// มุมมองทั้งมือควรเห็นรายละเอียดของฝ่ามือมากกว่าค่าเริ่มต้นเดิม และให้จุดเล็ง
+// อยู่บริเวณกึ่งกลางมือ ไม่ใช่ค่อนไปทางข้อมือ
+export const HOME_POSITION: [number, number, number] = [0, 0.08, 0.58]
+export const HOME_TARGET: [number, number, number] = [0, 0.08, 0.13]
 
 /**
  * เพดานซูมเข้า — 0.025 ต่ำกว่าระยะที่เล็บก้อย (เล็กสุด รัศมี 4.52 มม.) ต้องใช้คือ 0.0318
