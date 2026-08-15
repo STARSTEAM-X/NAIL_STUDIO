@@ -1,4 +1,5 @@
 import type {
+  TemplateDetail,
   ListTemplatesQuery,
   TemplateCard,
   TemplateLikeResult,
@@ -8,6 +9,7 @@ import type {
   TemplateRemixInput,
   TemplateRemixResult,
 } from '@nail-studio/contracts'
+import { designDocumentSchema } from '@nail-studio/contracts'
 import { AppError } from '../errors/AppError.ts'
 import * as repository from './repository.ts'
 import { decodeTemplateCursor, encodeTemplateCursor } from './cursor.ts'
@@ -65,6 +67,17 @@ export async function list(input: ListTemplatesQuery): Promise<TemplateFeedResul
           },
     ),
   }
+}
+
+export async function detail(templateId: string): Promise<TemplateDetail> {
+  const row = await repository.findPublicTemplateDetail(templateId)
+  if (!row) throw AppError.notFound('ไม่พบดีไซน์ที่ต้องการ')
+
+  const document = designDocumentSchema.safeParse(row.designVersion.document)
+  if (!document.success) {
+    throw AppError.conflict('ดีไซน์นี้อยู่ในรูปแบบที่ระบบยังอ่านไม่ได้')
+  }
+  return { ...toCard(row), document: document.data }
 }
 
 export async function like(userId: string, templateId: string): Promise<TemplateLikeResult> {

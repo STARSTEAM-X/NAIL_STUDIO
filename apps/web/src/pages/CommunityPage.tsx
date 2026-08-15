@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { TEMPLATE_CATEGORIES, TEMPLATE_PRIMARY_COLORS } from '@nail-studio/contracts'
 import { ApiRequestError } from '@/api/client.ts'
 import {
@@ -116,7 +116,7 @@ export function CommunityPage() {
             </div>
             <div className="template-card-body">
               <div className="template-card-title">
-                <h2>{template.name}</h2>
+                <h2><Link to={`/community/templates/${template.id}`}>{template.name}</Link></h2>
                 <span className="template-origin">{ORIGIN_LABELS[template.origin] ?? template.origin}</span>
               </div>
               {template.caption && <p className="template-caption">{template.caption}</p>}

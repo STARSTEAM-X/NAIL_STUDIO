@@ -4,6 +4,7 @@ import { LoginPage } from '@/pages/LoginPage.tsx'
 import { RegisterPage } from '@/pages/RegisterPage.tsx'
 import { ProjectsPage } from '@/pages/ProjectsPage.tsx'
 import { CommunityPage } from '@/pages/CommunityPage.tsx'
+import { TemplatePreviewPage } from '@/pages/TemplatePreviewPage.tsx'
 import { EditorPage } from '@/pages/EditorPage.tsx'
 import { AppShell } from '@/components/AppShell.tsx'
 
@@ -33,6 +34,10 @@ export function AppRouter() {
       <Route
         path="/community"
         element={<Protected><AppShell><CommunityPage /></AppShell></Protected>}
+      />
+      <Route
+        path="/community/templates/:templateId"
+        element={<Protected><AppShell><TemplatePreviewPage /></AppShell></Protected>}
       />
       <Route
         path="/editor/:projectId"

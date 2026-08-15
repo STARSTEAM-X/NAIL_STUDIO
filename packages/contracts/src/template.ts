@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { designDocumentSchema } from './design.ts'
 import { projectNameSchema, projectSummarySchema } from './project.ts'
 
 export const TEMPLATE_SORTS = ['latest', 'popular'] as const
@@ -35,6 +36,10 @@ export const templateCardSchema = z.object({
   viewCount: z.number().int().nonnegative(),
   createdAt: z.string(),
   author: templateAuthorSchema,
+})
+
+export const templateDetailSchema = templateCardSchema.extend({
+  document: designDocumentSchema,
 })
 
 export const templateLikeResultSchema = z.object({
@@ -80,6 +85,7 @@ export const templateModerationReportSchema = z.object({
 
 export type ListTemplatesQuery = z.infer<typeof listTemplatesQuerySchema>
 export type TemplateCard = z.infer<typeof templateCardSchema>
+export type TemplateDetail = z.infer<typeof templateDetailSchema>
 export type TemplateLikeResult = z.infer<typeof templateLikeResultSchema>
 export type TemplateRemixInput = z.infer<typeof templateRemixSchema>
 export type TemplateRemixResult = z.infer<typeof templateRemixResultSchema>

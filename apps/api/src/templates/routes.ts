@@ -14,6 +14,12 @@ templatesRouter.get('/', async (request, response) => {
   response.json({ success: true, data: result.items, meta: { nextCursor: result.nextCursor } })
 })
 
+templatesRouter.get('/:id', async (request, response) => {
+  const { id } = templateIdParamSchema.parse(request.params)
+  const result = await service.detail(id)
+  response.json({ success: true, data: result })
+})
+
 templatesRouter.put('/:id/like', requireUser, async (request, response) => {
   const { id } = templateIdParamSchema.parse(request.params)
   const result = await service.like(currentUser(request).id, id)

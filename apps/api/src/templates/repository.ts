@@ -64,6 +64,13 @@ const templateListSelect = {
 
 export type TemplateListRow = Prisma.NailTemplateGetPayload<{ select: typeof templateListSelect }>
 
+const templateDetailSelect = {
+  ...templateListSelect,
+  designVersion: { select: { document: true } },
+} satisfies Prisma.NailTemplateSelect
+
+export type TemplateDetailRow = Prisma.NailTemplateGetPayload<{ select: typeof templateDetailSelect }>
+
 export function listTemplates(options: ListTemplatesOptions): Promise<TemplateListRow[]> {
   const where: Prisma.NailTemplateWhereInput = {
     visibility: 'public',
@@ -100,6 +107,13 @@ export function listTemplates(options: ListTemplatesOptions): Promise<TemplateLi
     orderBy,
     select: templateListSelect,
     take: options.limit + 1,
+  })
+}
+
+export function findPublicTemplateDetail(templateId: string): Promise<TemplateDetailRow | null> {
+  return prisma.nailTemplate.findFirst({
+    where: { id: templateId, visibility: 'public', deletedAt: null },
+    select: templateDetailSelect,
   })
 }
 

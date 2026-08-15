@@ -1,5 +1,5 @@
-import { useInfiniteQuery, useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query'
-import type { TemplateCard, TemplateLikeResult, TemplateRemixResult } from '@nail-studio/contracts'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query'
+import type { TemplateCard, TemplateDetail, TemplateLikeResult, TemplateRemixResult } from '@nail-studio/contracts'
 import {
   TEMPLATE_CATEGORIES,
   TEMPLATE_PRIMARY_COLORS,
@@ -21,6 +21,7 @@ export interface TemplateFilters {
 export const templateKeys = {
   all: ['templates'] as const,
   feed: (filters: TemplateFilters) => [...templateKeys.all, 'feed', filters] as const,
+  detail: (id: string) => [...templateKeys.all, 'detail', id] as const,
 }
 
 function templateFeedPath(filters: TemplateFilters, cursor: string | null): string {
@@ -38,6 +39,14 @@ export function useTemplates(filters: TemplateFilters) {
     queryFn: ({ pageParam }) =>
       apiFetchPage<TemplateCard[]>(templateFeedPath(filters, pageParam)),
     getNextPageParam: (page) => page.nextCursor ?? undefined,
+  })
+}
+
+export function useTemplate(id: string | undefined) {
+  return useQuery({
+    queryKey: templateKeys.detail(id ?? ''),
+    queryFn: () => apiFetch<TemplateDetail>(`/templates/${id}`),
+    enabled: Boolean(id),
   })
 }
 
