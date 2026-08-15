@@ -57,8 +57,19 @@ describe('applyProportions', () => {
 function makeSkinnedMesh(): SkinnedMesh {
   const geometry = new BufferGeometry()
   geometry.setAttribute('position', new BufferAttribute(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), 3))
+  geometry.setAttribute('skinIndex', new BufferAttribute(new Uint16Array([
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+  ]), 4))
+  geometry.setAttribute('skinWeight', new BufferAttribute(new Float32Array([
+    1, 0, 0, 0,
+    1, 0, 0, 0,
+    1, 0, 0, 0,
+  ]), 4))
   const bone = new Bone()
   const mesh = new SkinnedMesh(geometry)
+  mesh.add(bone)
   mesh.bind(new Skeleton([bone]))
   return mesh
 }
@@ -66,18 +77,29 @@ function makeSkinnedMesh(): SkinnedMesh {
 describe('refreshSkinnedBounds', () => {
   it('คำนวณ boundingSphere/boundingBox ใหม่ (ไม่ null หลังเรียก)', () => {
     const mesh = makeSkinnedMesh()
-    expect(mesh.geometry.boundingSphere).toBeNull()
-    expect(mesh.geometry.boundingBox).toBeNull()
+    expect(mesh.boundingSphere).toBeNull()
+    expect(mesh.boundingBox).toBeNull()
 
     refreshSkinnedBounds([mesh])
 
-    expect(mesh.geometry.boundingSphere).not.toBeNull()
-    expect(mesh.geometry.boundingBox).not.toBeNull()
+    expect(mesh.boundingSphere).not.toBeNull()
+    expect(mesh.boundingBox).not.toBeNull()
   })
 
   it('ทำงานกับ mesh หลายตัวในคราวเดียว', () => {
     const meshes = [makeSkinnedMesh(), makeSkinnedMesh()]
     expect(() => refreshSkinnedBounds(meshes)).not.toThrow()
-    for (const mesh of meshes) expect(mesh.geometry.boundingSphere).not.toBeNull()
+    for (const mesh of meshes) expect(mesh.boundingSphere).not.toBeNull()
+  })
+
+  it('คำนวณ bounds จากตำแหน่ง vertex หลัง bone scale ไม่ใช่ geometry rest pose', () => {
+    const mesh = makeSkinnedMesh()
+    refreshSkinnedBounds([mesh])
+    const beforeRadius = mesh.boundingSphere!.radius
+
+    mesh.skeleton.bones[0]!.scale.setScalar(2)
+    refreshSkinnedBounds([mesh])
+
+    expect(mesh.boundingSphere!.radius).toBeGreaterThan(beforeRadius)
   })
 })

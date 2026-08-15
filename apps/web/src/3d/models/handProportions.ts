@@ -32,7 +32,7 @@ export function refreshSkinnedBounds(meshes: readonly SkinnedMesh[]): void {
   for (const mesh of meshes) {
     for (const bone of mesh.skeleton.bones) bone.updateWorldMatrix(true, false)
     mesh.updateMatrixWorld(true)
-    mesh.geometry.computeBoundingSphere()
-    mesh.geometry.computeBoundingBox()
+    mesh.computeBoundingSphere()
+    mesh.computeBoundingBox()
   }
 }
