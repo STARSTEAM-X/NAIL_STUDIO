@@ -3,6 +3,7 @@ import { PaintController } from '@/3d/painting/PaintController.tsx'
 import { TransformController } from '@/3d/interactions/TransformController.tsx'
 import type { NailTextureSet } from '@/3d/painting/NailTextureSet.ts'
 import { DecorationInstances } from '@/3d/decorations/DecorationInstances.tsx'
+import { useHandProportions } from '@/3d/models/useHandProportions.ts'
 import { useDesign } from '@/features/design/DesignStoreProvider.tsx'
 import { NailFocus } from './NailFocus.tsx'
 
@@ -15,6 +16,7 @@ interface Props {
 
 export function DesignScene({ scale, parts, textures, onReady }: Props) {
   const mode = useDesign((state) => state.mode)
+  useHandProportions(parts)
   return (
     <>
       <HandModel scale={scale} onReady={onReady} />
