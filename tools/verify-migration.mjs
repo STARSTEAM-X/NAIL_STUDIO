@@ -36,8 +36,13 @@ const EXPECTED = {
     'id', 'user_id', 'name', 'status', 'version_count',
     'created_at', 'updated_at', 'deleted_at',
     'draft_document', 'draft_updated_at', 'draft_base_version',
+    'thumbnail_asset_id',
   ],
   design_versions: ['id', 'project_id', 'version_number', 'schema_version', 'document', 'label', 'created_at'],
+  assets: [
+    'id', 'owner_id', 'kind', 'storage_key', 'mime_type',
+    'size_bytes', 'checksum_sha256', 'metadata', 'created_at',
+  ],
 }
 
 /**
@@ -56,6 +61,7 @@ const EXPECTED_UNIQUE = [
   { table: 'users', columns: ['email'] },
   { table: 'sessions', columns: ['token_hash'] },
   { table: 'design_versions', columns: ['project_id', 'version_number'] },
+  { table: 'assets', columns: ['storage_key'] },
 ]
 
 const databaseUrl = process.env.DATABASE_URL

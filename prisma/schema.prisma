@@ -40,6 +40,7 @@ model User {
 
   sessions Session[]
   projects Project[]
+  assets   Asset[]
 
   @@map("users")
 }
@@ -70,6 +71,7 @@ model Project {
   createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt    DateTime?     @map("deleted_at") @db.Timestamptz
+  thumbnailAssetId String?   @map("thumbnail_asset_id") @db.Uuid
 
   // งานที่ยังไม่ได้กดบันทึกเป็นเวอร์ชัน — ปลายทางของ autosave (Slice 2)
   //
@@ -86,11 +88,31 @@ model Project {
 
   user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   versions DesignVersion[]
+  thumbnailAsset Asset? @relation("ProjectThumbnail", fields: [thumbnailAssetId], references: [id], onDelete: SetNull)
 
   // ดัชนีหลักของหน้ารายการงาน — รองรับทั้งการกรองเจ้าของ เรียงล่าสุด และ keyset pagination (A-14)
   // เป็น partial index จึงไม่เก็บแถวที่ถูกลบ ทำให้ดัชนีเล็กลงและไม่ต้องกรองซ้ำ
   @@index([userId, updatedAt(sort: Desc), id(sort: Desc)])
   @@map("projects")
+}
+
+model Asset {
+  id             String   @id @default(uuid()) @db.Uuid
+  ownerId        String?  @map("owner_id") @db.Uuid
+  kind           String   @db.Text
+  storageKey     String   @unique @map("storage_key") @db.Text
+  mimeType       String   @map("mime_type") @db.Text
+  sizeBytes      BigInt   @map("size_bytes")
+  checksumSha256 Bytes    @map("checksum_sha256")
+  metadata       Json     @default("{}") @db.JsonB
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  owner    User?     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  projects Project[] @relation("ProjectThumbnail")
+
+  @@index([ownerId, kind, createdAt(sort: Desc)])
+  @@index([checksumSha256])
+  @@map("assets")
 }
 
 model DesignVersion {
