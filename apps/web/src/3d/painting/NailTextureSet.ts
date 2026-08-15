@@ -92,7 +92,6 @@ export class NailTextureSet {
   private wetLayers = new Map<NailKey, number>()
   private wetDirty = false
   private rebuildScheduled = false
-  private pendingPaint: Array<{ dabs: Dab[]; color: string; softness: number }> = []
   private scheduleGeneration = 0
   private painting = false
   private updateListeners = new Set<(key: NailKey) => void>()
@@ -150,7 +149,6 @@ export class NailTextureSet {
     owner = 'default',
   ): boolean {
     if (this.painting) return false
-    this.pendingPaint = []
     this.rebuildScheduled = false
     this.painting = true
     this.owner = owner
@@ -167,7 +165,9 @@ export class NailTextureSet {
 
   paintDabs(dabs: Dab[], color: string, softness: number): void {
     if (!this.painting || dabs.length === 0) return
-    this.pendingPaint.push({ dabs, color, softness })
+    // Rasterize dabs immediately so the 3D preview follows the pointer.
+    // Keep the expensive layer composite batched to one callback per frame.
+    drawDabs(this.wet.ctx, dabs, color, softness)
     this.wetDirty = true
     if (this.rebuildScheduled) return
     this.rebuildScheduled = true
@@ -175,7 +175,6 @@ export class NailTextureSet {
     this.schedule(() => {
       if (!this.rebuildScheduled || this.disposed || generation !== this.scheduleGeneration) return
       this.rebuildScheduled = false
-      this.flushPendingPaint()
       this.rebuildWetTargets()
     })
   }
@@ -196,7 +195,6 @@ export class NailTextureSet {
     if (!this.painting) return
     // ปล่อยให้ปิดได้เฉพาะเจ้าของเส้น ไม่งั้นโหมดหนึ่งจะไปตัดเส้นที่อีกโหมดกำลังลากอยู่
     if (owner !== undefined && this.owner !== owner) return
-    this.flushPendingPaint()
     this.scheduleGeneration += 1
     this.painting = false
     this.owner = null
@@ -246,7 +244,6 @@ export class NailTextureSet {
 
   dispose(): void {
     this.disposed = true
-    this.pendingPaint = []
     this.updateListeners.clear()
     // ไม่ล้างทันที: effect เก่าของ React อาจยังวาดเฟรมสุดท้ายระหว่าง cleanup
     // แต่ปล่อยค้างไว้ก็ไม่ได้ เพราะ Map ถือแคนวาสรวมกันหลายสิบ MB
@@ -259,20 +256,6 @@ export class NailTextureSet {
 
   private rebuildWetTargets(): void {
     for (const key of this.wetTargets) this.rebuild(key)
-  }
-
-  private flushPendingPaint(): void {
-    if (this.pendingPaint.length === 0) return
-    const pending = this.pendingPaint
-    this.pendingPaint = []
-    const first = pending[0]!
-    if (pending.length === 1) {
-      drawDabs(this.wet.ctx, first.dabs, first.color, first.softness)
-      return
-    }
-    const dabs: Dab[] = []
-    for (const entry of pending) dabs.push(...entry.dabs)
-    drawDabs(this.wet.ctx, dabs, first.color, first.softness)
   }
 
   private surfaceOf(key: NailKey): Surface {

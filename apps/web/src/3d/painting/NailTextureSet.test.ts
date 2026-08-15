@@ -259,6 +259,7 @@ describe('เส้นสดระหว่างลากนิ้ว', () => {
       schedule: (task) => pending.push(task),
     })
     textures.setVisibleNails(['right.index'])
+    const wet = surfaces[0]!
     const composite = surfaces[2]!
     const before = composite.calls.length
 
@@ -266,6 +267,7 @@ describe('เส้นสดระหว่างลากนิ้ว', () => {
     for (let index = 0; index < 20; index += 1) {
       textures.paintDabs([{ x: index, y: index, r: 4, alpha: 1 }], '#ff0000', 0)
     }
+    expect(wet.calls.some((call) => call.op === 'fill')).toBe(true)
     // pointermove ยิงถี่กว่าเฟรม — ต้องเหลืองานประกอบภาพรอบเดียวเท่านั้น
     expect(pending).toHaveLength(1)
     expect(composite.calls.length).toBe(before)
