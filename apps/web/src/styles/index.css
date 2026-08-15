@@ -1026,6 +1026,22 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .nail-strip { position: sticky; bottom: 0; z-index: 5; box-shadow: 0 -4px 16px rgb(80 45 30 / 8%); }
 .nail-strip .chip { min-width: 2.8rem; }
+.nail-strip .nail-buttons { align-items: center; }
+.nail-strip .nail-buttons .chip { display: inline-flex; align-items: center; gap: 0.35rem; }
+.nail-chip-key {
+  display: grid;
+  width: 1.15rem;
+  height: 1.15rem;
+  place-items: center;
+  border: 1px solid var(--rule);
+  border-radius: 0.35rem;
+  background: var(--ground);
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.nail-strip .chip-on .nail-chip-key { border-color: rgb(255 255 255 / 45%); background: rgb(255 255 255 / 16%); color: #fff; }
 
 @media (max-width: 1080px) {
   .editor-body { flex-wrap: wrap; overflow-y: auto; }

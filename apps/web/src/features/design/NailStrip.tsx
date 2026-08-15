@@ -1,6 +1,8 @@
+import { useEffect } from 'react'
 import { FINGERS, nailKey, type Finger } from '@nail-studio/contracts'
 import { EDITABLE_HAND } from './designStore.ts'
 import { useDesign } from './DesignStoreProvider.tsx'
+import { fingerIndexFromShortcut } from './fingerShortcuts.ts'
 
 const FINGER_LABELS: Record<Finger, string> = {
   thumb: 'โป้ง',
@@ -25,10 +27,27 @@ export function NailStrip() {
   const focusNail = useDesign((state) => state.focusNail)
   const focusHome = useDesign((state) => state.focusHome)
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const index = fingerIndexFromShortcut(event)
+      if (index === null) return
+
+      const finger = FINGERS[index]
+      if (!finger) return
+      const key = nailKey(EDITABLE_HAND, finger)
+      event.preventDefault()
+      selectNail(key, 'replace')
+      focusNail(key)
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [focusNail, selectNail])
+
   return (
     <section className="nail-strip" aria-label="เลือกเล็บ">
       <div className="nail-buttons" role="group" aria-label={`เล็บ${HAND_LABEL}`}>
-        {FINGERS.map((finger) => {
+        {FINGERS.map((finger, index) => {
           const key = nailKey(EDITABLE_HAND, finger)
           const on = selection.has(key)
           return (
@@ -37,6 +56,8 @@ export function NailStrip() {
               type="button"
               className={`chip ${on ? 'chip-on' : ''}`}
               aria-pressed={on}
+              aria-keyshortcuts={String(index + 1)}
+              title={`${FINGER_LABELS[finger]} · กด ${index + 1}`}
               // คลิกธรรมดา = เลือกนิ้วเดียว, กด Shift หรือ Ctrl ค้าง = เลือกเพิ่ม
               // เป็นข้อตกลงเดียวกับการเลือกไฟล์ในระบบปฏิบัติการ จึงไม่ต้องสอน
               //
@@ -48,7 +69,8 @@ export function NailStrip() {
                 if (!additive) focusNail(key)
               }}
             >
-              {FINGER_LABELS[finger]}
+              <span className="nail-chip-key" aria-hidden="true">{index + 1}</span>
+              <span>{FINGER_LABELS[finger]}</span>
             </button>
           )
         })}
