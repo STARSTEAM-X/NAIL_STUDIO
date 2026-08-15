@@ -43,6 +43,12 @@ const EXPECTED = {
     'id', 'owner_id', 'kind', 'storage_key', 'mime_type',
     'size_bytes', 'checksum_sha256', 'metadata', 'created_at',
   ],
+  brand_colors: ['id', 'brand', 'name', 'hex', 'is_available'],
+  color_palettes: ['id', 'code', 'name_th', 'colors', 'harmony', 'source', 'popularity', 'is_active'],
+  design_archetypes: [
+    'id', 'code', 'name_th', 'composer_key', 'default_params',
+    'supported_zones', 'popularity', 'is_active',
+  ],
 }
 
 /**
@@ -62,6 +68,9 @@ const EXPECTED_UNIQUE = [
   { table: 'sessions', columns: ['token_hash'] },
   { table: 'design_versions', columns: ['project_id', 'version_number'] },
   { table: 'assets', columns: ['storage_key'] },
+  { table: 'brand_colors', columns: ['brand', 'hex'] },
+  { table: 'color_palettes', columns: ['code'] },
+  { table: 'design_archetypes', columns: ['code'] },
 ]
 
 const databaseUrl = process.env.DATABASE_URL

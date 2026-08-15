@@ -29,6 +29,22 @@ enum ProjectStatus {
   @@map("project_status")
 }
 
+enum PaletteHarmony {
+  analogous
+  complementary
+  triadic
+  monochrome
+
+  @@map("palette_harmony")
+}
+
+enum PaletteSource {
+  curated
+  extracted
+
+  @@map("palette_source")
+}
+
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
@@ -63,15 +79,15 @@ model Session {
 }
 
 model Project {
-  id           String        @id @default(uuid()) @db.Uuid
-  userId       String        @map("user_id") @db.Uuid
-  name         String
-  status       ProjectStatus @default(draft)
-  versionCount Int           @default(0) @map("version_count")
-  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz
-  deletedAt    DateTime?     @map("deleted_at") @db.Timestamptz
-  thumbnailAssetId String?   @map("thumbnail_asset_id") @db.Uuid
+  id               String        @id @default(uuid()) @db.Uuid
+  userId           String        @map("user_id") @db.Uuid
+  name             String
+  status           ProjectStatus @default(draft)
+  versionCount     Int           @default(0) @map("version_count")
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt        DateTime?     @map("deleted_at") @db.Timestamptz
+  thumbnailAssetId String?       @map("thumbnail_asset_id") @db.Uuid
 
   // งานที่ยังไม่ได้กดบันทึกเป็นเวอร์ชัน — ปลายทางของ autosave (Slice 2)
   //
@@ -86,9 +102,9 @@ model Project {
   // เวอร์ชันที่ draft นี้ถูกแก้ต่อยอดมา — ใช้ตรวจว่า draft ล้าสมัยไปแล้วหรือยัง
   draftBaseVersion Int?      @map("draft_base_version")
 
-  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  versions DesignVersion[]
-  thumbnailAsset Asset? @relation("ProjectThumbnail", fields: [thumbnailAssetId], references: [id], onDelete: SetNull)
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  versions       DesignVersion[]
+  thumbnailAsset Asset?          @relation("ProjectThumbnail", fields: [thumbnailAssetId], references: [id], onDelete: SetNull)
 
   // ดัชนีหลักของหน้ารายการงาน — รองรับทั้งการกรองเจ้าของ เรียงล่าสุด และ keyset pagination (A-14)
   // เป็น partial index จึงไม่เก็บแถวที่ถูกลบ ทำให้ดัชนีเล็กลงและไม่ต้องกรองซ้ำ
@@ -129,4 +145,44 @@ model DesignVersion {
   // บังคับไม่ให้เลขเวอร์ชันซ้ำ — เป็นรากฐานของ optimistic concurrency
   @@unique([projectId, versionNumber])
   @@map("design_versions")
+}
+
+model BrandColor {
+  id          String  @id @default(uuid()) @db.Uuid
+  brand       String  @db.Text
+  name        String  @db.Text
+  hex         String  @db.VarChar(7)
+  isAvailable Boolean @default(true) @map("is_available")
+
+  @@unique([brand, hex])
+  @@index([brand, isAvailable])
+  @@map("brand_colors")
+}
+
+model ColorPalette {
+  id         String         @id @default(uuid()) @db.Uuid
+  code       String         @unique @db.Text
+  nameTh     String         @map("name_th") @db.Text
+  colors     Json           @db.JsonB
+  harmony    PaletteHarmony
+  source     PaletteSource  @default(curated)
+  popularity Int            @default(0)
+  isActive   Boolean        @default(true) @map("is_active")
+
+  @@index([isActive, popularity(sort: Desc)])
+  @@map("color_palettes")
+}
+
+model DesignArchetype {
+  id             String   @id @default(uuid()) @db.Uuid
+  code           String   @unique @db.Text
+  nameTh         String   @map("name_th") @db.Text
+  composerKey    String   @map("composer_key") @db.Text
+  defaultParams  Json     @default("{}") @map("default_params") @db.JsonB
+  supportedZones String[] @map("supported_zones")
+  popularity     Int      @default(0)
+  isActive       Boolean  @default(true) @map("is_active")
+
+  @@index([isActive, popularity(sort: Desc)])
+  @@map("design_archetypes")
 }

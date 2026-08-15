@@ -364,7 +364,8 @@ Sprint 0, งานทำคลัง asset จริง, เวลา hardening
    ง่าย และ `CatalogEntry.modelUrl` สงวนไว้สำหรับสลับเป็น GLB ที่ผ่าน license/visual review
    ภายหลัง · ตรวจบนเบราว์เซอร์จริงแล้วว่าครบ 30 ชิ้นและกดวาง asset ได้ไม่มี error
    → **GLB ภายนอกและพาเลท/archetype เป็นงานต่อยอดของ Slice 5 ถัดไป**
-2. ตาราง `brand_colors`, `color_palettes`, `design_archetypes` + seed
+2. [x] ตาราง `brand_colors`, `color_palettes`, `design_archetypes` + seed — เพิ่ม migration พร้อม
+   constraints/indexes, seed แบบ idempotent และ validation ที่ตรวจ hex/reference สีและ archetype key
 3. `nail_templates` + `template_likes/shares/remixes/comments` + `content_reports`
 4. ฟีดล่าสุด/ยอดนิยม (keyset) + ตัวกรอง category/color + หน้า `/community`
 5. ไลก์ **idempotent** ด้วย composite PK; counter อัปเดตใน transaction เดียว
