@@ -683,6 +683,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .editor-topbar-action,
 .editor-topbar-link,
 .editor-topbar-user,
+.editor-topbar-brand,
 .editor-profile-trigger {
   border: 0;
   background: transparent;
@@ -704,11 +705,13 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .editor-topbar-icon-button:hover,
 .editor-topbar-action:hover,
-.editor-topbar-link:hover { background: #f7f1f2; color: var(--accent); }
+.editor-topbar-link:hover,
+.editor-topbar-brand:hover { background: #f7f1f2; color: var(--accent); }
 .editor-topbar-icon-button:focus-visible,
 .editor-topbar-action:focus-visible,
 .editor-topbar-link:focus-visible,
 .editor-topbar-user:focus-visible,
+.editor-topbar-brand:focus-visible,
 .editor-profile-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .editor-topbar-brand {
@@ -716,9 +719,11 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   flex: 0 0 auto;
   align-items: center;
   gap: 0.4rem;
+  padding: 0;
   color: var(--deep);
   font-size: 0.85rem;
   font-weight: 800;
+  text-align: left;
   white-space: nowrap;
 }
 
@@ -756,6 +761,44 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.editor-topbar-project-name {
+  display: block;
+  max-width: min(28vw, 280px);
+  overflow: hidden;
+  margin: -0.15rem -0.25rem;
+  padding: 0.15rem 0.25rem;
+  border: 0;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: #2f2627;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: text;
+}
+
+.editor-topbar-project-name:hover { background: #f7f1f2; color: var(--accent); }
+.editor-topbar-project-name:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.editor-topbar-project-input {
+  width: min(28vw, 280px);
+  min-width: 8rem;
+  padding: 0.15rem 0.3rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.35rem;
+  background: #fff;
+  color: #2f2627;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.editor-topbar-project-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .editor-topbar-project span {
   overflow: hidden;
@@ -1136,7 +1179,9 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .editor-topbar-nav .editor-topbar-link,
   .editor-profile-trigger-copy,
   .editor-profile-chevron { display: none; }
-  .editor-topbar-project strong { max-width: min(24vw, 220px); }
+  .editor-topbar-project strong,
+  .editor-topbar-project-name,
+  .editor-topbar-project-input { max-width: min(24vw, 220px); }
 }
 
 @media (max-width: 900px) {
@@ -1166,7 +1211,9 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .editor-topbar-action { width: 2rem; height: 2rem; justify-content: center; padding: 0; }
   .editor-topbar-primary { width: 2.1rem; justify-content: center; padding: 0.4rem; }
   .editor-topbar-primary span:last-child { display: none; }
-  .editor-topbar-project strong { max-width: 38vw; }
+  .editor-topbar-project strong,
+  .editor-topbar-project-name,
+  .editor-topbar-project-input { max-width: 38vw; }
   .editor-topbar-project span { display: none; }
 }
 

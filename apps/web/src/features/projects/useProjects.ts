@@ -53,6 +53,32 @@ export function useProject(id: string | undefined) {
   })
 }
 
+export interface RenameProjectInput {
+  projectId: string
+  name: string
+}
+
+export function useRenameProject() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ projectId, name }: RenameProjectInput) =>
+      apiFetch<ProjectSummary>(`/projects/${projectId}`, {
+        method: 'PATCH',
+        body: { name },
+      }),
+    onSuccess: (_project, input) => {
+      void queryClient.invalidateQueries({
+        queryKey: projectKeys.detail(input.projectId),
+        exact: true,
+      })
+      void queryClient.invalidateQueries({
+        queryKey: projectKeys.list(),
+        exact: true,
+      })
+    },
+  })
+}
+
 export function fetchProjectDetail(projectId: string) {
   return apiFetch<ProjectDetail>(`/projects/${projectId}`)
 }

@@ -16,6 +16,7 @@ import {
   fetchProjectDetail,
   openingDocument,
   projectKeys,
+  useRenameProject,
   useDuplicateProject,
   useSaveVersion,
   type ProjectDetail,
@@ -72,6 +73,9 @@ export function NailEditor({ projectId, detail }: Props) {
   const store = useDesignStoreApi()
   const [activePanel, setActivePanel] = useState<EditorPanelId>('paint')
   const [rightPanel, setRightPanel] = useState<'canvas' | 'history'>('canvas')
+  const [projectName, setProjectName] = useState(detail.project.name)
+  const [editingProjectName, setEditingProjectName] = useState(false)
+  const [projectNameDraft, setProjectNameDraft] = useState('')
   const handScale = useDesign((state) => state.document.hand.proportions.handScale)
   const notice = useDesign((state) => state.notice)
   const dismissNotice = useDesign((state) => state.dismissNotice)
@@ -101,6 +105,7 @@ export function NailEditor({ projectId, detail }: Props) {
     serverUpdatedAt: detail.draft?.updatedAt ?? detail.version.createdAt,
   })
   const autosave = useAutosave(projectId, saveBaseVersion, offlineDraft)
+  const renameProject = useRenameProject()
   const saveVersion = useSaveVersion()
   const duplicateProject = useDuplicateProject()
   const [draftSourceVersion, setDraftSourceVersion] = useState<number | null>(null)
@@ -184,6 +189,47 @@ export function NailEditor({ projectId, detail }: Props) {
     )
   }
 
+  useEffect(() => {
+    setProjectName(detail.project.name)
+  }, [detail.project.name])
+
+  const beginProjectRename = () => {
+    setEditingProjectName(true)
+    setProjectNameDraft(projectName)
+  }
+
+  const cancelProjectRename = () => {
+    setEditingProjectName(false)
+    setProjectNameDraft('')
+  }
+
+  const commitProjectRename = () => {
+    const value = projectNameDraft.trim()
+    if (!value) {
+      store.setState({ notice: 'กรุณาตั้งชื่อโปรเจกต์' })
+      cancelProjectRename()
+      return
+    }
+    if (value === projectName) {
+      cancelProjectRename()
+      return
+    }
+
+    renameProject.mutate(
+      { projectId, name: value },
+      {
+        onSuccess: (updatedProject) => {
+          setProjectName(updatedProject.name)
+          cancelProjectRename()
+        },
+        onError: (error) => {
+          store.setState({ notice: localizedTaskError(error, 'เปลี่ยนชื่อโปรเจกต์ไม่สำเร็จ') })
+          cancelProjectRename()
+        },
+      },
+    )
+  }
+
   const handleLogout = () => {
     logout.mutate(undefined, { onSuccess: () => navigate('/login', { replace: true }) })
   }
@@ -201,13 +247,49 @@ export function NailEditor({ projectId, detail }: Props) {
           >
             <span aria-hidden="true">←</span>
           </button>
-          <div className="editor-topbar-brand" aria-label="Nail Studio">
+          <button
+            type="button"
+            className="editor-topbar-brand"
+            aria-label="กลับไปหน้าโปรเจกต์ Nail Studio"
+            title="กลับไปหน้าโปรเจกต์ Nail Studio"
+            onClick={() => navigate('/projects')}
+          >
             <span className="editor-topbar-logo" aria-hidden="true">NS</span>
             <span className="editor-topbar-brand-name">Nail Studio</span>
-          </div>
+          </button>
           <span className="editor-topbar-divider" aria-hidden="true" />
           <div className="editor-topbar-project">
-            <strong title={detail.project.name}>{detail.project.name}</strong>
+            {editingProjectName ? (
+              <input
+                className="editor-topbar-project-input"
+                autoFocus
+                value={projectNameDraft}
+                maxLength={120}
+                disabled={renameProject.isPending}
+                aria-label="ชื่อโปรเจกต์"
+                onChange={(event) => setProjectNameDraft(event.target.value)}
+                onBlur={commitProjectRename}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    event.currentTarget.blur()
+                  }
+                  if (event.key === 'Escape') {
+                    event.preventDefault()
+                    cancelProjectRename()
+                  }
+                }}
+              />
+            ) : (
+              <button
+                type="button"
+                className="editor-topbar-project-name"
+                title="คลิกเพื่อเปลี่ยนชื่อโปรเจกต์"
+                onClick={beginProjectRename}
+              >
+                {projectName}
+              </button>
+            )}
             <span>{versionSummary}</span>
           </div>
         </div>
@@ -229,7 +311,7 @@ export function NailEditor({ projectId, detail }: Props) {
                 try {
                   if (!snapshotRef.current) throw new Error('canvas ยังไม่พร้อม')
                   const blob = await snapshotRef.current.capture()
-                  downloadBlob(blob, `${sanitizeFilename(detail.project.name)}.png`)
+                  downloadBlob(blob, `${sanitizeFilename(projectName)}.png`)
                 } catch (error) {
                   store.setState({ notice: 'ดาวน์โหลดภาพไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' })
                   console.error('[export] PNG capture failed', error)
@@ -247,7 +329,7 @@ export function NailEditor({ projectId, detail }: Props) {
             onClick={() => {
               try {
                 const json = exportProjectJson(store.getState().document)
-                downloadBlob(new Blob([json], { type: 'application/json' }), `${sanitizeFilename(detail.project.name)}.nail.json`)
+                downloadBlob(new Blob([json], { type: 'application/json' }), `${sanitizeFilename(projectName)}.nail.json`)
               } catch (error) {
                 store.setState({ notice: 'ดาวน์โหลดไฟล์งานไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' })
                 console.error('[export] JSON export failed', error)
@@ -385,7 +467,7 @@ export function NailEditor({ projectId, detail }: Props) {
             {rightPanel === 'history' && (
               <VersionHistoryPanel
                 projectId={projectId}
-                projectName={detail.project.name}
+                projectName={projectName}
                 latestVersion={latestVersion}
                 onLoadedVersion={setDraftSourceVersion}
               />
@@ -398,7 +480,7 @@ export function NailEditor({ projectId, detail }: Props) {
 
       {conflict && (
         <ConflictDialog
-          projectName={detail.project.name}
+          projectName={projectName}
           isReloading={isReloading}
           isDuplicating={duplicateProject.isPending}
           errorMessage={conflictActionError}
