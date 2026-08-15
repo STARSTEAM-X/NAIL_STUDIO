@@ -26,14 +26,14 @@ export function AuthLayout({ active, children }: AuthLayoutProps) {
             className={active === 'login' ? 'is-active' : undefined}
             aria-current={active === 'login' ? 'page' : undefined}
           >
-            Log In
+            Sign IN
           </Link>
           <Link
             to="/register"
             className={active === 'register' ? 'is-active' : undefined}
             aria-current={active === 'register' ? 'page' : undefined}
           >
-            Sign Up
+            Sign UP
           </Link>
         </nav>
         {children}
