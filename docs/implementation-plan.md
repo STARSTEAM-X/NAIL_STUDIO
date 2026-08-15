@@ -303,7 +303,11 @@ Sprint 0, งานทำคลัง asset จริง, เวลา hardening
      little 5.428 — ตำแหน่ง/รูปเส้นบนแผงวาด 2 มิติถูกต้องแล้ว (ยืนยันบนเบราว์เซอร์จริง: เลือกทรง
      `stiletto` แล้วแผง 2 มิติแสดงรูปทรงแหลมตรงกับโมเดล ไม่ใช่วงรีทรงมนแบบเดิม) เหลือเฉพาะรอยหัวแปรง
      ที่ยังบิดสำหรับเล็บที่มีความบิด UV สูง — ดู D-27 สำหรับรายละเอียด
-5. สัดส่วนมือ + สีผิว (`handProportions` + `refreshSkinnedBounds`)
+5. [x] สัดส่วนมือ + สีผิว (`handProportions` + `refreshSkinnedBounds`)
+   - เพิ่ม `HandPanel` สำหรับสีผิวและสไลเดอร์สัดส่วน 4 ค่า, Command + HistoryStack สำหรับ
+     undo/redo, bone scaling และรีเฟรช skinned bounds ตาม
+     `docs/superpowers/plans/2026-08-15-hand-proportions.md` และ
+     `docs/superpowers/specs/2026-08-15-hand-proportions-design.md`
 6. Thumbnail: capture จาก canvas → WebP → `StorageProvider`
 7. Exporters: `.nail.json` · PNG · GLB (ถ้าประเมินแล้วเหมาะสม)
 
