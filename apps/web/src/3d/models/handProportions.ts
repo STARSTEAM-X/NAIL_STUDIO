@@ -24,7 +24,7 @@ export function applyProportions(bones: HandBones, proportions: HandSettings['pr
 /**
  * รีเฟรช bounding volume ของ mesh ที่ผูก skeleton หลังสเกลบอร์นเปลี่ยน
  *
- * three.js แคช boundingSphere/boundingBox ไว้ที่ geometry ไม่รู้ตัวว่าบอร์น
+ * three.js แคช boundingSphere/boundingBox ไว้ที่ SkinnedMesh และไม่รู้ตัวว่าบอร์น
  * ขยับ ถ้าไม่เรียกฟังก์ชันนี้ raycast วาดสี (picking.ts) และ frustum culling
  * จะใช้ bounding เดิมที่ผิดไปแล้วเงียบ ๆ ไม่มี error ให้เห็น
  */
