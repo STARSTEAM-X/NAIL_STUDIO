@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
+import type { CreateTemplateInput } from '@nail-studio/contracts'
 import { useCurrentUser, useLogout } from '@/features/auth/useAuth.ts'
+import { useCreateTemplate } from '@/features/community/useTemplates.ts'
 import { NotificationBell } from '@/components/NotificationBell.tsx'
 import { NailScene } from '@/3d/scene/NailScene.tsx'
 import { ThumbnailCapture, type ThumbnailCaptureHandle } from '@/3d/scene/ThumbnailCapture.tsx'
@@ -37,6 +39,7 @@ import { DecorationPanel } from './DecorationPanel.tsx'
 import { HandPanel } from './HandPanel.tsx'
 import { HistoryControls } from './HistoryControls.tsx'
 import { EditorProfileDropdown } from './EditorProfileDropdown.tsx'
+import { ShareTemplateDialog } from './ShareTemplateDialog.tsx'
 import { VersionHistoryPanel } from './VersionHistoryPanel.tsx'
 import { EditorToolRail, type EditorPanelId } from './EditorToolRail.tsx'
 import { useAutosave, type AutosaveStatus } from './useAutosave.ts'
@@ -107,11 +110,14 @@ export function NailEditor({ projectId, detail }: Props) {
   const autosave = useAutosave(projectId, saveBaseVersion, offlineDraft)
   const renameProject = useRenameProject()
   const saveVersion = useSaveVersion()
+  const createTemplate = useCreateTemplate()
   const duplicateProject = useDuplicateProject()
   const [draftSourceVersion, setDraftSourceVersion] = useState<number | null>(null)
   const [conflict, setConflict] = useState<ServerVersionConflict | null>(null)
   const [isReloading, setIsReloading] = useState(false)
   const [conflictActionError, setConflictActionError] = useState<string | null>(null)
+  const [shareDialogOpen, setShareDialogOpen] = useState(false)
+  const [shareError, setShareError] = useState<string | null>(null)
   const latestVersion = saveBaseVersion
   const versionSummary = draftSourceVersion === null
     ? `เวอร์ชัน ${latestVersion}`
@@ -234,6 +240,42 @@ export function NailEditor({ projectId, detail }: Props) {
     logout.mutate(undefined, { onSuccess: () => navigate('/login', { replace: true }) })
   }
 
+  const saveCurrentVersion = () => autosave.runVersionSave(async ({ document }, lifecycle) => {
+    const result = await saveVersion.mutateAsync({
+      projectId,
+      document,
+      expectedVersion: latestVersion,
+    })
+    if (lifecycle.isActive()) explicitSaveUi.current.success(result.versionNumber)
+    void captureAndUploadThumbnail(projectId, thumbnailRef, queryClient).catch((error) => {
+      console.warn('[thumbnail] อัปโหลดภาพตัวอย่างไม่สำเร็จ ไม่กระทบการบันทึกเวอร์ชัน', error)
+    })
+    return result
+  })
+
+  const handleShareTemplate = (input: Omit<CreateTemplateInput, 'projectId' | 'versionNumber'>) => {
+    setShareError(null)
+    void saveCurrentVersion().then((saved) => {
+      if (!saved) {
+        setShareError('กำลังบันทึกงานอยู่ กรุณาลองแชร์อีกครั้ง')
+        return
+      }
+      createTemplate.mutate(
+        { ...input, projectId, versionNumber: saved.versionNumber },
+        {
+          onSuccess: () => {
+            setShareDialogOpen(false)
+            store.setState({ notice: 'แชร์ผลงานลง Community และโปรไฟล์ของคุณแล้ว' })
+          },
+          onError: (error) => setShareError(localizedTaskError(error, 'แชร์ผลงานไม่สำเร็จ กรุณาลองใหม่อีกครั้ง')),
+        },
+      )
+    }).catch((error: unknown) => {
+      explicitSaveUi.current.failure(error)
+      setShareError(localizedTaskError(error, 'บันทึกงานก่อนแชร์ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'))
+    })
+  }
+
   return (
     <section className="editor">
       <header className="editor-topbar">
@@ -339,6 +381,19 @@ export function NailEditor({ projectId, detail }: Props) {
             <span className="editor-topbar-action-icon" aria-hidden="true">⇩</span>
             <span className="editor-topbar-action-label">JSON</span>
           </button>
+          <button
+            type="button"
+            className="editor-topbar-action editor-topbar-share"
+            title="แชร์ผลงานลง Community"
+            disabled={saveVersion.isPending || autosave.isVersionSavePending || createTemplate.isPending}
+            onClick={() => {
+              setShareError(null)
+              setShareDialogOpen(true)
+            }}
+          >
+            <span className="editor-topbar-action-icon" aria-hidden="true">↗</span>
+            <span className="editor-topbar-action-label">แชร์</span>
+          </button>
           <div className="editor-topbar-nav" aria-label="ทางลัด">
             <button type="button" className="editor-topbar-link" onClick={() => navigate('/community')}>ชุมชน</button>
             <button type="button" className="editor-topbar-link" onClick={() => navigate('/appointments')}>นัดหมาย</button>
@@ -348,7 +403,9 @@ export function NailEditor({ projectId, detail }: Props) {
             user={user}
             isLoggingOut={logout.isPending}
             onLogout={handleLogout}
-            onEditProfile={() => navigate('/profile')}
+            onViewProfile={() => {
+              if (user) navigate(`/users/${user.id}`)
+            }}
             onUnavailableAction={(label) => {
               store.setState({ notice: `${label}ยังไม่เปิดใช้งานในรุ่นนี้` })
             }}
@@ -494,6 +551,15 @@ export function NailEditor({ projectId, detail }: Props) {
           isUsingServer={offlineDraft.isUsingServer}
           onRecoverLocal={offlineDraft.recoverLocal}
           onUseServer={() => { void offlineDraft.useServerDocument() }}
+        />
+      )}
+      {shareDialogOpen && (
+        <ShareTemplateDialog
+          defaultName={projectName}
+          pending={saveVersion.isPending || autosave.isVersionSavePending || createTemplate.isPending}
+          errorMessage={shareError}
+          onClose={() => setShareDialogOpen(false)}
+          onSubmit={handleShareTemplate}
         />
       )}
     </section>

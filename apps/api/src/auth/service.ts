@@ -31,6 +31,10 @@ export async function register(input: RegisterInput, userAgent: string | null): 
     passwordHash,
     displayName: input.displayName,
     role: input.role,
+    ...(input.dateOfBirth
+      ? { dateOfBirth: new Date(`${input.dateOfBirth}T00:00:00.000Z`) }
+      : {}),
+    ...(input.termsAccepted ? { termsAcceptedAt: new Date() } : {}),
   })
 
   return issueSession(user, userAgent)

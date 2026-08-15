@@ -1,0 +1,62 @@
+Table users {
+  user_id uuid [pk]
+  username varchar [unique]
+  email varchar [unique]
+  password_hash text
+  full_name varchar
+  is_active boolean
+  is_verified boolean
+  created_at timestamp
+  updated_at timestamp
+  last_login_at timestamp
+}
+
+Table roles {
+  role_id uuid [pk]
+  role_name varchar [unique]
+}
+
+Table user_roles {
+  user_id uuid
+  role_id uuid
+
+  Indexes {
+    (user_id, role_id) [pk]
+  }
+}
+
+Table login_sessions {
+  session_id uuid [pk]
+  user_id uuid
+  refresh_token text
+  ip_address varchar
+  user_agent text
+  created_at timestamp
+  expires_at timestamp
+  revoked boolean
+}
+
+Table password_resets {
+  reset_id uuid [pk]
+  user_id uuid
+  token_hash text
+  expires_at timestamp
+  used boolean
+  created_at timestamp
+}
+
+Table login_history {
+  log_id uuid [pk]
+  user_id uuid
+  login_time timestamp
+  success boolean
+  ip_address varchar
+  user_agent text
+}
+
+Ref: user_roles.user_id > users.user_id
+Ref: user_roles.role_id > roles.role_id
+
+Ref: login_sessions.user_id > users.user_id
+Ref: password_resets.user_id > users.user_id
+Ref: login_history.user_id > users.user_id

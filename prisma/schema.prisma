@@ -140,6 +140,8 @@ model User {
   passwordHash String   @map("password_hash")
   role         UserRole @default(user)
   displayName  String   @map("display_name")
+  dateOfBirth  DateTime? @map("date_of_birth") @db.Date
+  termsAcceptedAt DateTime? @map("terms_accepted_at") @db.Timestamptz
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
 

@@ -1,0 +1,155 @@
+Table users {
+  user_id uuid [pk]
+  username varchar [unique, not null]
+  email varchar [unique, not null]
+  password_hash text [not null]
+  full_name varchar
+  is_active boolean
+  is_verified boolean
+  created_at timestamp
+  updated_at timestamp
+  last_login_at timestamp
+}
+
+Table nail_templates {
+  template_id uuid [pk]
+  owner_id uuid [not null]
+  template_name varchar [not null]
+  description text
+  style_type varchar
+  difficulty smallint
+  is_public boolean
+  preview_image text
+  nail_layers jsonb
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table user_assets {
+  asset_id uuid [pk]
+  owner_id uuid [not null]
+  asset_type varchar
+  file_url text
+  width int
+  height int
+  created_at timestamp
+}
+
+Table template_versions {
+  version_id uuid [pk]
+  template_id uuid [not null]
+  version_no int
+  snapshot_json jsonb
+  created_at timestamp
+
+  Indexes {
+    (template_id, version_no) [unique]
+  }
+}
+
+Table template_categories {
+  category_id uuid [pk]
+  category_name varchar [unique]
+}
+
+Table template_category_map {
+  template_id uuid
+  category_id uuid
+
+  Indexes {
+    (template_id, category_id) [pk]
+  }
+}
+
+Table template_tags {
+  tag_id uuid [pk]
+  tag_name varchar [unique]
+}
+
+Table template_tag_map {
+  template_id uuid
+  tag_id uuid
+  score float
+
+  Indexes {
+    (template_id, tag_id) [pk]
+  }
+}
+
+Table template_reviews {
+  review_id uuid [pk]
+  template_id uuid [not null]
+  user_id uuid [not null]
+  score smallint
+  comment text
+  image_url text
+  is_edited boolean
+  is_hidden boolean
+  created_at timestamp
+  updated_at timestamp
+
+  Indexes {
+    (template_id, user_id) [unique]
+  }
+}
+
+Table template_shares {
+  share_id uuid [pk]
+  template_id uuid
+  share_code varchar [unique]
+  visibility varchar
+  allow_copy boolean
+  expires_at timestamp
+  view_count int
+  copy_count int
+  created_by uuid
+  created_at timestamp
+}
+
+Table template_likes {
+  template_id uuid
+  user_id uuid
+  created_at timestamp
+
+  Indexes {
+    (template_id, user_id) [pk]
+  }
+}
+
+Table template_duplicate {
+  duplicate_id uuid [pk]
+  source_template_id uuid
+  new_template_id uuid
+  duplicated_by uuid
+  created_at timestamp
+}
+
+Ref: "nail_templates"."template_id" < "template_versions"."template_id"
+
+Ref: "users"."user_id" < "nail_templates"."owner_id"
+
+Ref: "users"."user_id" < "user_assets"."owner_id"
+
+Ref: "nail_templates"."template_id" < "template_category_map"."template_id"
+
+Ref: "template_category_map"."category_id" < "template_categories"."category_id"
+
+Ref: "template_tag_map"."tag_id" < "template_tags"."tag_id"
+
+Ref: "nail_templates"."template_id" < "template_tag_map"."template_id"
+
+Ref: "users"."user_id" < "template_reviews"."user_id"
+
+Ref: "nail_templates"."template_id" < "template_reviews"."template_id"
+
+Ref: "nail_templates"."template_id" < "template_shares"."template_id"
+
+Ref: "nail_templates"."template_id" < "template_likes"."template_id"
+
+Ref: "users"."user_id" < "template_likes"."user_id"
+
+Ref: "template_duplicate"."source_template_id" < "nail_templates"."template_id"
+
+Ref: "template_duplicate"."new_template_id" < "nail_templates"."template_id"
+
+Ref: "template_duplicate"."duplicated_by" < "users"."user_id"UserAssets  and NailTemplate

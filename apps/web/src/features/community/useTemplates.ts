@@ -1,11 +1,14 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import type {
+  CreateTemplateInput,
   CreateTemplateCommentInput,
   TemplateCard,
   TemplateCommentResult,
   TemplateDetail,
   TemplateLikeResult,
   TemplateRemixResult,
+  TemplateShareInput,
+  TemplateShareResult,
 } from '@nail-studio/contracts'
 import {
   TEMPLATE_CATEGORIES,
@@ -57,6 +60,19 @@ export function useTemplate(id: string | undefined) {
   })
 }
 
+export function useCreateTemplate() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (input: CreateTemplateInput) =>
+      apiFetch<TemplateCard>('/templates', { method: 'POST', body: input }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: templateKeys.all })
+      void queryClient.invalidateQueries({ queryKey: ['public-profiles'] })
+    },
+  })
+}
+
 export interface TemplateLikeInput {
   templateId: string
   liked: boolean
@@ -83,6 +99,39 @@ export function useTemplateLike() {
           })),
         }
       })
+    },
+  })
+}
+
+export interface TemplateShareRequest extends TemplateShareInput {
+  templateId: string
+}
+
+export function useTemplateShare() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ templateId, channel }: TemplateShareRequest) =>
+      apiFetch<TemplateShareResult>(`/templates/${templateId}/share`, {
+        method: 'POST',
+        body: { channel },
+      }),
+    onSuccess: (result, { templateId }) => {
+      queryClient.setQueriesData<InfiniteData<ApiPage<TemplateCard[]>>>({ queryKey: templateKeys.all }, (current) => {
+        if (!current) return current
+        return {
+          ...current,
+          pages: current.pages.map((page) => ({
+            ...page,
+            data: page.data.map((template) =>
+              template.id === templateId ? { ...template, shareCount: result.shareCount } : template,
+            ),
+          })),
+        }
+      })
+      queryClient.setQueryData<TemplateDetail>(templateKeys.detail(templateId), (current) =>
+        current ? { ...current, shareCount: result.shareCount } : current,
+      )
     },
   })
 }

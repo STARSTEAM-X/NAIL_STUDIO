@@ -1,0 +1,48 @@
+Table users {
+  user_id uuid [pk]
+  username varchar [unique]
+  email varchar [unique]
+  password_hash text
+  full_name varchar
+  is_active boolean
+  is_verified boolean
+  created_at timestamp
+  updated_at timestamp
+  last_login_at timestamp
+}
+
+// =========================
+// CHAT SESSION
+// =========================
+Table chat_sessions_ai {
+  id uuid [pk]
+  user_id uuid [ref: > users.user_id]
+  title varchar
+  model_name varchar // llama3.1:8b
+  created_at timestamp
+  updated_at timestamp
+}
+
+// =========================
+// MESSAGES (CHAT HISTORY)
+// =========================
+Table messages_ai {
+  id uuid [pk]
+  session_id uuid [ref: > chat_sessions_ai.id]
+  sender varchar // user | assistant | system
+  content text
+  created_at timestamp
+}
+
+// =========================
+// KNOWLEDGE (Q&A)
+// =========================
+Table knowledge {
+  id uuid [pk]
+  question text
+  answer text
+  embedding vector
+  created_by uuid [ref: > users.user_id]
+  created_at timestamp
+  is_active boolean
+}

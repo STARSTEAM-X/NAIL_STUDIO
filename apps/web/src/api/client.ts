@@ -1,6 +1,6 @@
 import type { ApiError, ApiResponse } from '@nail-studio/contracts'
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000'
+export const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000'
 const CSRF_COOKIE = 'nscsrf'
 const CSRF_HEADER = 'x-csrf-token'
 
@@ -61,7 +61,7 @@ async function requestApi<T>(path: string, options: RequestOptions = {}) {
     ...csrfHeaders(method),
   }
 
-  const response = await fetch(`${BASE_URL}/api/v1${path}`, {
+  const response = await fetch(`${API_BASE}/api/v1${path}`, {
     method,
     headers,
     credentials: 'include',
@@ -102,7 +102,7 @@ export async function apiFetchPage<T>(path: string, options: RequestOptions = {}
 
 /** อัปโหลดไฟล์ไบนารีตรงๆ (ไม่ JSON-encode) — ปลายทางเดียวที่ใช้ตอนนี้คือ thumbnail */
 export async function apiUploadBinary(path: string, blob: Blob, contentType: string): Promise<void> {
-  const response = await fetch(`${BASE_URL}/api/v1${path}`, {
+  const response = await fetch(`${API_BASE}/api/v1${path}`, {
     method: 'POST',
     headers: { 'Content-Type': contentType, ...csrfHeaders('POST') },
     credentials: 'include',
@@ -126,7 +126,7 @@ export async function apiUploadBinary(path: string, blob: Blob, contentType: str
 
 /** เปิด response แบบ streaming สำหรับ AI chat โดยยังใช้ cookie/CSRF ชุดเดียวกับ API ปกติ */
 export async function apiStream(path: string, body: unknown, signal?: AbortSignal): Promise<ReadableStream<Uint8Array>> {
-  const response = await fetch(`${BASE_URL}/api/v1${path}`, {
+  const response = await fetch(`${API_BASE}/api/v1${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...csrfHeaders('POST') },
     credentials: 'include',

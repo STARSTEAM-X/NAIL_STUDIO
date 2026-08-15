@@ -29,6 +29,8 @@ export function createUser(input: {
   passwordHash: string
   displayName: string
   role: 'user' | 'shop'
+  dateOfBirth?: Date
+  termsAcceptedAt?: Date
 }) {
   return prisma.user.create({ data: input })
 }

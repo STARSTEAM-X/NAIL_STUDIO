@@ -1,12 +1,15 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import {
+  createTemplateSchema,
   createTemplateCommentSchema,
   listTemplatesQuerySchema,
   templateRemixSchema,
   templateReportSchema,
+  templateShareSchema,
 } from '@nail-studio/contracts'
 import { currentUser, requireAdmin, requireUser } from '../middleware/requireUser.ts'
+import { AppError } from '../errors/AppError.ts'
 import * as service from './service.ts'
 
 export const templatesRouter: Router = Router()
@@ -17,6 +20,21 @@ templatesRouter.get('/', async (request, response) => {
   const query = listTemplatesQuerySchema.parse(request.query)
   const result = await service.list(query)
   response.json({ success: true, data: result.items, meta: { nextCursor: result.nextCursor } })
+})
+
+templatesRouter.post('/', requireUser, async (request, response) => {
+  const input = createTemplateSchema.parse(request.body)
+  const result = await service.create(currentUser(request).id, input)
+  response.status(201).json({ success: true, data: result })
+})
+
+templatesRouter.get('/:id/thumbnail', async (request, response) => {
+  const { id } = templateIdParamSchema.parse(request.params)
+  const result = await service.loadThumbnail(id)
+  if (!result) throw AppError.notFound('ไม่พบภาพตัวอย่างผลงาน')
+  response.setHeader('Content-Type', result.mimeType)
+  response.setHeader('Cache-Control', 'public, max-age=300')
+  response.send(result.data)
 })
 
 templatesRouter.get('/:id', async (request, response) => {
@@ -34,6 +52,13 @@ templatesRouter.put('/:id/like', requireUser, async (request, response) => {
 templatesRouter.delete('/:id/like', requireUser, async (request, response) => {
   const { id } = templateIdParamSchema.parse(request.params)
   const result = await service.unlike(currentUser(request).id, id)
+  response.json({ success: true, data: result })
+})
+
+templatesRouter.post('/:id/share', requireUser, async (request, response) => {
+  const { id } = templateIdParamSchema.parse(request.params)
+  const input = templateShareSchema.parse(request.body ?? {})
+  const result = await service.share(currentUser(request).id, id, input)
   response.json({ success: true, data: result })
 })
 

@@ -1,6 +1,7 @@
 import { Prisma } from '../generated/prisma/client.ts'
 import { prisma } from '../db.ts'
 import { createNotification } from '../notifications/repository.ts'
+import type { CreateTemplateInput } from '@nail-studio/contracts'
 import type { TemplateFeedCursor } from './cursor.ts'
 
 export interface ListTemplatesOptions {
@@ -63,6 +64,8 @@ const templateListSelect = {
   caption: true,
   category: true,
   primaryColor: true,
+  thumbnailAsset: { select: { id: true } },
+  designVersion: { select: { project: { select: { thumbnailAssetId: true } } } },
   origin: true,
   likeCount: true,
   shareCount: true,
@@ -75,9 +78,39 @@ const templateListSelect = {
 
 export type TemplateListRow = Prisma.NailTemplateGetPayload<{ select: typeof templateListSelect }>
 
+export function createTemplate(
+  userId: string,
+  input: CreateTemplateInput,
+): Promise<TemplateListRow | null> {
+  return prisma.$transaction(async (tx) => {
+    const version = await tx.designVersion.findFirst({
+      where: {
+        projectId: input.projectId,
+        versionNumber: input.versionNumber,
+        project: { userId, deletedAt: null },
+      },
+      select: { id: true, project: { select: { thumbnailAssetId: true } } },
+    })
+    if (!version) return null
+
+    const data: Prisma.NailTemplateUncheckedCreateInput = {
+      authorId: userId,
+      designVersionId: version.id,
+      name: input.name,
+      visibility: 'public',
+    }
+    if (version.project.thumbnailAssetId) data.thumbnailAssetId = version.project.thumbnailAssetId
+    if (input.caption !== undefined) data.caption = input.caption || null
+    if (input.category !== undefined) data.category = input.category
+    if (input.primaryColor !== undefined) data.primaryColor = input.primaryColor
+
+    return tx.nailTemplate.create({ data, select: templateListSelect })
+  })
+}
+
 const templateDetailSelect = {
   ...templateListSelect,
-  designVersion: { select: { document: true } },
+  designVersion: { select: { document: true, project: { select: { thumbnailAssetId: true } } } },
   comments: {
     where: { deletedAt: null },
     orderBy: [{ createdAt: 'asc' as const }, { id: 'asc' as const }],
@@ -92,6 +125,26 @@ const templateDetailSelect = {
 } satisfies Prisma.NailTemplateSelect
 
 export type TemplateDetailRow = Prisma.NailTemplateGetPayload<{ select: typeof templateDetailSelect }>
+
+export async function findPublicTemplateThumbnail(templateId: string): Promise<{
+  storageKey: string
+  mimeType: string
+} | null> {
+  const template = await prisma.nailTemplate.findFirst({
+    where: { id: templateId, visibility: 'public', deletedAt: null },
+    select: {
+      thumbnailAsset: { select: { storageKey: true, mimeType: true } },
+      designVersion: {
+        select: {
+          project: {
+            select: { thumbnailAsset: { select: { storageKey: true, mimeType: true } } },
+          },
+        },
+      },
+    },
+  })
+  return template?.thumbnailAsset ?? template?.designVersion.project.thumbnailAsset ?? null
+}
 
 export function listTemplates(options: ListTemplatesOptions): Promise<TemplateListRow[]> {
   const where: Prisma.NailTemplateWhereInput = {
@@ -245,6 +298,28 @@ export function removeTemplateLike(templateId: string, userId: string): Promise<
       select: { likeCount: true },
     })
     return { liked: false, likeCount: current.likeCount }
+  })
+}
+
+export function shareTemplate(
+  templateId: string,
+  userId: string,
+  channel: 'link' | 'facebook' | 'line' | 'instagram' | 'copy',
+): Promise<{ shareCount: number } | null> {
+  return prisma.$transaction(async (tx) => {
+    const template = await tx.nailTemplate.findFirst({
+      where: { id: templateId, visibility: 'public', deletedAt: null },
+      select: { id: true },
+    })
+    if (!template) return null
+
+    await tx.templateShare.create({ data: { templateId: template.id, userId, channel } })
+    const updated = await tx.nailTemplate.update({
+      where: { id: template.id },
+      data: { shareCount: { increment: 1 } },
+      select: { shareCount: true },
+    })
+    return updated
   })
 }
 

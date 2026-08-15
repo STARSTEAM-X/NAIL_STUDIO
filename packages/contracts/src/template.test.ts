@@ -24,6 +24,7 @@ describe('template contracts', () => {
       caption: null,
       category: 'Minimalistic',
       primaryColor: 'Pink',
+      hasThumbnail: false,
       origin: 'original',
       likeCount: 2,
       shareCount: 1,

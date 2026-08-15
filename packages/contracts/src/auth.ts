@@ -26,6 +26,8 @@ export const registerSchema = z.object({
   password: passwordSchema,
   displayName: z.string().trim().min(1, 'กรุณาระบุชื่อที่แสดง').max(60),
   role: z.enum(['user', 'shop']).default('user'),
+  dateOfBirth: z.string().date().optional(),
+  termsAccepted: z.literal(true).optional(),
 })
 
 export const loginSchema = z.object({

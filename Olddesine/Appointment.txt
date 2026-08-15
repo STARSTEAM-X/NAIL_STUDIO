@@ -1,0 +1,94 @@
+Table users {
+  user_id uuid [pk]
+  username varchar [unique]
+  email varchar [unique]
+  password_hash text
+  full_name varchar
+  is_active boolean
+  is_verified boolean
+  created_at timestamp
+  updated_at timestamp
+  last_login_at timestamp
+}
+
+Table provider_availability {
+  availability_id uuid [pk]
+  provider_id uuid [not null]  // ช่าง / ร้าน (user)
+  day_of_week int // 0=Sun, 1=Mon ... 6=Sat
+  start_time time
+  end_time time
+  is_active boolean
+}
+
+Table provider_time_off {
+  time_off_id uuid [pk]
+  provider_id uuid [not null]
+  start_datetime timestamp
+  end_datetime timestamp
+  reason varchar
+}
+
+Table appointment_requests {
+  request_id uuid [pk]
+
+  customer_id uuid [not null]
+  provider_id uuid [not null]
+
+  requested_start_time timestamp
+  requested_end_time timestamp
+
+  template_id uuid   // nullable
+  image_url text     // nullable
+  note text
+
+  status varchar 
+  // pending
+  // priced
+  // accepted
+  // rejected
+  // expired
+
+  proposed_price decimal
+  currency varchar
+
+  expires_at timestamp 
+
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table appointments {
+  appointment_id uuid [pk]
+  request_id uuid [not null,unique]
+  
+  customer_id uuid [not null]
+  provider_id uuid [not null]
+
+  start_time timestamp
+  end_time timestamp
+
+  status varchar   // confirmed, completed, cancelled, no_show
+  note text
+
+  template_id uuid   // nullable
+  image_url text     // nullable
+
+  total_price decimal
+  currency varchar
+
+  created_at timestamp
+  updated_at timestamp
+}
+
+
+Ref: "users"."user_id" < "provider_availability"."provider_id"
+Ref: "users"."user_id" < "provider_time_off"."provider_id"
+
+Ref: "users"."user_id" < "appointment_requests"."customer_id"
+Ref: "users"."user_id" < "appointment_requests"."provider_id"
+
+Ref: "users"."user_id" < "appointments"."customer_id"
+Ref: "users"."user_id" < "appointments"."provider_id"
+
+Ref: "appointment_requests"."request_id" - "appointments"."request_id"
+  // Ref: "appointment_requests"."request_id" - "appointments"."request_id"

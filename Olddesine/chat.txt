@@ -1,0 +1,89 @@
+Table users {
+  user_id uuid [pk]
+  username varchar [unique]
+  email varchar [unique]
+  password_hash text
+  full_name varchar
+  is_active boolean
+  is_verified boolean
+  created_at timestamp
+  updated_at timestamp
+  last_login_at timestamp
+}
+
+Table conversations {
+  conversation_id uuid [pk]
+  is_group boolean
+  created_at timestamp
+  created_by uuid
+}
+
+Table conversation_members {
+  conversation_id uuid
+  user_id uuid
+  joined_at timestamp
+  last_read_message_id uuid
+
+  Indexes {
+    (conversation_id, user_id) [pk]
+  }
+}
+
+Table messages {
+  message_id uuid [pk]
+  conversation_id uuid
+  sender_id uuid
+  message_type varchar   // text, image, file, system
+  content text
+  // reply_to_message_id uuid
+  is_deleted boolean
+  created_at timestamp
+  edited_at timestamp
+}
+
+Table message_reads {
+  message_id uuid
+  user_id uuid
+  read_at timestamp
+
+  Indexes {
+    (message_id, user_id) [pk]
+  }
+}
+
+Table message_attachments {
+  attachment_id uuid [pk]
+  message_id uuid
+  file_url text
+  file_type varchar
+  file_size int
+  width int
+  height int
+}
+
+// Table user_blocks {
+//   blocker_id uuid
+//   blocked_id uuid
+//   created_at timestamp
+
+//   Indexes {
+//     (blocker_id, blocked_id) [pk]
+//   }
+// }
+
+Ref: conversations.created_by > users.user_id
+
+Ref: conversation_members.user_id > users.user_id
+Ref: conversation_members.conversation_id > conversations.conversation_id
+
+Ref: messages.conversation_id > conversations.conversation_id
+Ref: messages.sender_id > users.user_id
+// Ref: messages.reply_to_message_id > messages.message_id
+
+Ref: message_reads.message_id > messages.message_id
+Ref: message_reads.user_id > users.user_id
+
+Ref: message_attachments.message_id > messages.message_id
+
+// Ref: user_blocks.blocker_id > users.user_id
+// Ref: user_blocks.blocked_id > users.user_id

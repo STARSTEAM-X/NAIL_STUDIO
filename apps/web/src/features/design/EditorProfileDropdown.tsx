@@ -5,7 +5,7 @@ interface EditorProfileDropdownProps {
   user: PublicUser | null | undefined
   isLoggingOut: boolean
   onLogout: () => void
-  onEditProfile?: () => void
+  onViewProfile?: () => void
   onUnavailableAction?: (label: string) => void
 }
 
@@ -25,7 +25,7 @@ export function EditorProfileDropdown({
   user,
   isLoggingOut,
   onLogout,
-  onEditProfile,
+  onViewProfile,
   onUnavailableAction,
 }: EditorProfileDropdownProps) {
   const [open, setOpen] = useState(false)
@@ -98,12 +98,12 @@ export function EditorProfileDropdown({
             className="editor-profile-menu-item"
             onClick={() => {
               setOpen(false)
-              if (onEditProfile) onEditProfile()
-              else runUnavailableAction('แก้ไขโปรไฟล์')
+              if (onViewProfile) onViewProfile()
+              else runUnavailableAction('ดูโปรไฟล์')
             }}
           >
             <span className="editor-profile-menu-icon" aria-hidden="true">♙</span>
-            <span>แก้ไขโปรไฟล์</span>
+            <span>ดูโปรไฟล์</span>
             <kbd>⌘ E</kbd>
           </button>
           <button

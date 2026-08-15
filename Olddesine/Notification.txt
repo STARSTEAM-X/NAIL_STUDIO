@@ -1,0 +1,41 @@
+Table users {
+  user_id uuid [pk]
+  username varchar
+}
+
+Table notifications {
+  notification_id uuid [pk]
+  user_id uuid              // ผู้รับ
+  type varchar              // chat, like, review, system
+  title varchar
+  body text
+  data_json jsonb           // payload เพิ่มเติม
+  source_type varchar       // message, template, review
+  source_id uuid
+  is_read boolean
+  read_at timestamp
+  created_at timestamp
+}
+
+Table notification_deliveries {
+  delivery_id uuid [pk]
+  notification_id uuid
+  channel varchar           // realtime, email
+  status varchar            // sent, failed
+  sent_at timestamp
+  error_text text
+}
+
+Table user_notification_settings {
+  user_id uuid [pk]
+  allow_chat boolean
+  allow_like boolean
+  allow_review boolean
+  allow_system boolean
+  push_enabled boolean
+  email_enabled boolean
+}
+
+Ref: notifications.user_id > users.user_id
+Ref: notification_deliveries.notification_id > notifications.notification_id
+Ref: user_notification_settings.user_id > users.user_id

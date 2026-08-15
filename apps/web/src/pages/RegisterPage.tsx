@@ -19,7 +19,14 @@ export function RegisterPage() {
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
     register.mutate(
-      { email, password, displayName, role },
+      {
+        email,
+        password,
+        displayName,
+        role,
+        ...(dateOfBirth ? { dateOfBirth } : {}),
+        ...(termsAccepted ? { termsAccepted: true as const } : {}),
+      },
       { onSuccess: () => navigate('/projects', { replace: true }) },
     )
   }

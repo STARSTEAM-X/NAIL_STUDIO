@@ -1,4 +1,5 @@
 import type {
+  CreateTemplateInput,
   TemplateDetail,
   CreateTemplateCommentInput,
   ListTemplatesQuery,
@@ -10,15 +11,24 @@ import type {
   TemplateReportResult,
   TemplateRemixInput,
   TemplateRemixResult,
+  TemplateShareInput,
+  TemplateShareResult,
 } from '@nail-studio/contracts'
 import { designDocumentSchema } from '@nail-studio/contracts'
 import { AppError } from '../errors/AppError.ts'
+import { storage } from '../storage/index.ts'
 import * as repository from './repository.ts'
 import { decodeTemplateCursor, encodeTemplateCursor } from './cursor.ts'
 
 export interface TemplateFeedResult {
   items: TemplateCard[]
   nextCursor: string | null
+}
+
+export async function create(userId: string, input: CreateTemplateInput): Promise<TemplateCard> {
+  const row = await repository.createTemplate(userId, input)
+  if (!row) throw AppError.notFound('ไม่พบเวอร์ชันงานที่ต้องการแชร์')
+  return toCard(row)
 }
 
 function toCard(row: repository.TemplateListRow): TemplateCard {
@@ -28,6 +38,7 @@ function toCard(row: repository.TemplateListRow): TemplateCard {
     caption: row.caption,
     category: row.category,
     primaryColor: row.primaryColor,
+    hasThumbnail: row.thumbnailAsset !== null || row.designVersion.project.thumbnailAssetId !== null,
     origin: row.origin,
     likeCount: row.likeCount,
     shareCount: row.shareCount,
@@ -91,6 +102,12 @@ export async function detail(templateId: string): Promise<TemplateDetail> {
   }
 }
 
+export async function loadThumbnail(templateId: string): Promise<{ data: Buffer; mimeType: string } | null> {
+  const asset = await repository.findPublicTemplateThumbnail(templateId)
+  if (!asset) return null
+  return { data: await storage.get(asset.storageKey), mimeType: asset.mimeType }
+}
+
 export async function like(userId: string, templateId: string): Promise<TemplateLikeResult> {
   const result = await repository.addTemplateLike(templateId, userId)
   if (!result) throw AppError.notFound('ไม่พบดีไซน์ที่ต้องการ')
@@ -100,6 +117,16 @@ export async function like(userId: string, templateId: string): Promise<Template
 export async function unlike(userId: string, templateId: string): Promise<TemplateLikeResult> {
   const result = await repository.removeTemplateLike(templateId, userId)
   if (!result) throw AppError.notFound('ไม่พบดีไซน์ที่ต้องการ')
+  return result
+}
+
+export async function share(
+  userId: string,
+  templateId: string,
+  input: TemplateShareInput,
+): Promise<TemplateShareResult> {
+  const result = await repository.shareTemplate(templateId, userId, input.channel)
+  if (!result) throw AppError.notFound('ไม่พบผลงานที่ต้องการแชร์')
   return result
 }
 

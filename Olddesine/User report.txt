@@ -1,0 +1,29 @@
+Table users {
+  user_id uuid [pk]
+  username varchar [unique, not null]
+  email varchar [unique, not null]
+  password_hash text [not null]
+  full_name varchar
+  is_active boolean
+  is_verified boolean
+  created_at timestamp
+  updated_at timestamp
+  last_login_at timestamp
+}
+
+Table reports {
+  report_id uuid [pk] // User, Store
+  reporter_id uuid
+  target_type varchar
+  target_id uuid
+  reason_code varchar
+  description text
+  evidence_url text
+  status varchar
+  reviewed_by uuid // Admin
+  reviewed_at timestamp
+  created_at timestamp
+}
+
+Ref: reports.reporter_id > users.user_id
+Ref: reports.reviewed_by > users.user_id

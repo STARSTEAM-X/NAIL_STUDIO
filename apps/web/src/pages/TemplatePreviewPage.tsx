@@ -4,14 +4,40 @@ import { ApiRequestError } from '@/api/client.ts'
 import { NailScene } from '@/3d/scene/NailScene.tsx'
 import { ReadOnlyDesignScene } from '@/3d/scene/ReadOnlyDesignScene.tsx'
 import { WebGlGuard } from '@/3d/scene/WebGlGuard.tsx'
-import { useCreateTemplateComment, useTemplate } from '@/features/community/useTemplates.ts'
+import { useCreateTemplateComment, useTemplate, useTemplateShare } from '@/features/community/useTemplates.ts'
 import { DesignStoreProvider } from '@/features/design/DesignStoreProvider.tsx'
 
 export function TemplatePreviewPage() {
   const { templateId } = useParams<{ templateId: string }>()
   const template = useTemplate(templateId)
   const createComment = useCreateTemplateComment()
+  const shareMutation = useTemplateShare()
   const [commentText, setCommentText] = useState('')
+  const [shareMessage, setShareMessage] = useState<string | null>(null)
+
+  const shareTemplate = async (name: string) => {
+    if (!templateId) return
+    setShareMessage(null)
+    try {
+      let channel: 'link' | 'copy' = 'link'
+      const url = `${window.location.origin}/community/templates/${templateId}`
+      if (navigator.share) {
+        await navigator.share({ title: name, url })
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url)
+        channel = 'copy'
+      } else {
+        throw new Error('เบราว์เซอร์นี้ไม่รองรับการแชร์ลิงก์')
+      }
+      shareMutation.mutate(
+        { templateId, channel },
+        { onSuccess: (result) => setShareMessage(`แชร์แล้ว · ${result.shareCount} ครั้ง`) },
+      )
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      setShareMessage(error instanceof Error ? error.message : 'แชร์ผลงานไม่สำเร็จ')
+    }
+  }
 
   if (!templateId) return <p className="error center">ไม่พบรหัสดีไซน์</p>
   if (template.isPending) return <p className="muted center">กำลังโหลดตัวอย่าง 3D…</p>
@@ -34,14 +60,25 @@ export function TemplatePreviewPage() {
             <Link to="/community" className="back-link">← กลับไปชุมชน</Link>
             <p className="eyebrow">READ-ONLY 3D PREVIEW</p>
             <h1>{detail.name}</h1>
-            <p className="muted">โดย {detail.author.displayName}</p>
+            <p className="muted">โดย <Link to={`/users/${detail.author.id}`}>{detail.author.displayName}</Link></p>
           </div>
           <div className="template-preview-stats" aria-label="สถิติการมีส่วนร่วม">
             <span>♥ {detail.likeCount}</span>
+            <span>↗ {detail.shareCount}</span>
             <span>↻ {detail.remixCount}</span>
             <span>💬 {detail.commentCount}</span>
+            <button
+              type="button"
+              className="template-preview-share"
+              disabled={shareMutation.isPending}
+              onClick={() => { void shareTemplate(detail.name) }}
+            >
+              {shareMutation.isPending ? 'กำลังแชร์…' : 'แชร์'}
+            </button>
           </div>
         </header>
+
+        {shareMessage && <p className="community-success" role="status">{shareMessage}</p>}
 
         <div className="template-preview-stage">
           <WebGlGuard>
