@@ -4,6 +4,10 @@ setlocal EnableExtensions
 set "ROOT=%~dp0"
 cd /d "%ROOT%"
 
+echo Stopping any existing Nail Studio development processes...
+call "%ROOT%stop.bat"
+timeout /t 1 /nobreak >nul
+
 if not exist "node_modules\" (
   echo [ERROR] node_modules was not found. Run npm install first.
   exit /b 1
