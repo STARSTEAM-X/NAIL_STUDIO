@@ -1,4 +1,5 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
+import { useFrame } from '@react-three/fiber'
 import { InstancedMesh, Matrix4, MeshStandardMaterial, Object3D, Vector3 } from 'three'
 import { EDITABLE_NAILS } from '@/features/design/designStore.ts'
 import { useDesignStoreApi } from '@/features/design/DesignStoreProvider.tsx'
@@ -36,6 +37,8 @@ const MAX_INSTANCES_PER_CATALOG_ENTRY = 30 * 5
  */
 export function DecorationInstances({ parts }: Props) {
   const store = useDesignStoreApi()
+  const needsRebuildRef = useRef(false)
+  const rebuildRef = useRef<() => void>(() => {})
 
   const meshes = useMemo(() => DECORATION_CATALOG.map((entry) => {
     const mesh = new InstancedMesh(
@@ -111,15 +114,26 @@ export function DecorationInstances({ parts }: Props) {
       }
     }
 
+    rebuildRef.current = rebuild
     rebuild()
     let previous = store.getState().document
+    // ห้ามเรียก rebuild() ตรง ๆ ในนี้ — subscriber นี้รันแบบ synchronous ทันทีที่
+    // document เปลี่ยน โดยไม่มีการรับประกันลำดับกับ subscriber อื่น (เช่น
+    // useNailTextures.ts ที่ sync morph target influences) แค่ตั้ง flag ไว้เบา ๆ
+    // แล้วให้ useFrame ด้านล่างทำงานหนักจริงหลังจาก r3f อัปเดตฉากของเฟรมนั้นแล้ว
     const unsubscribe = store.subscribe((state) => {
       if (state.document === previous) return
       previous = state.document
-      rebuild()
+      needsRebuildRef.current = true
     })
     return unsubscribe
   }, [parts, store, meshes, meshByCatalogId])
+
+  useFrame(() => {
+    if (!needsRebuildRef.current) return
+    needsRebuildRef.current = false
+    rebuildRef.current()
+  })
 
   return (
     <group name="decoration-instances-group">

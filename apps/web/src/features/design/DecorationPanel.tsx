@@ -32,7 +32,7 @@ export function DecorationPanel() {
       u: 0.5,
       v: 0.5,
       rotation: 0,
-      scale: 1,
+      scale: 0.3,
     })
   }
 
@@ -63,7 +63,10 @@ export function DecorationPanel() {
               value={Math.round((selected.rotation * 180) / Math.PI)}
               onChange={(event) => {
                 const degrees = Number(event.target.value)
-                moveDecoration(activeKey, selected.id, selected.u, selected.v, (degrees * Math.PI) / 180)
+                moveDecoration(
+                  activeKey, selected.id, selected.u, selected.v, (degrees * Math.PI) / 180,
+                  `decoration-rotate:${activeKey}:${selected.id}`,
+                )
               }}
             />
           </label>
@@ -73,7 +76,10 @@ export function DecorationPanel() {
             <input
               type="range" min={10} max={100} step={1}
               value={Math.round(selected.scale * 100)}
-              onChange={(event) => scaleDecoration(activeKey, selected.id, Number(event.target.value) / 100)}
+              onChange={(event) => scaleDecoration(
+                activeKey, selected.id, Number(event.target.value) / 100,
+                `decoration-scale:${activeKey}:${selected.id}`,
+              )}
             />
           </label>
 

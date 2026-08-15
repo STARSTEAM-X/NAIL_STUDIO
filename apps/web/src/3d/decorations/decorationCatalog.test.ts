@@ -10,6 +10,8 @@ describe('decorationCatalog', () => {
     for (const entry of DECORATION_CATALOG) {
       expect(entry.label.length).toBeGreaterThan(0)
       expect(entry.defaultScale).toBeGreaterThan(0)
+      // ต้องเล็กพอที่จะไม่ใหญ่กว่าเล็บตอน scale สูงสุด (1.0) — เคยตั้งค่าผิดมาแล้วครั้งหนึ่ง
+      expect(entry.defaultScale).toBeLessThan(0.01)
     }
   })
 

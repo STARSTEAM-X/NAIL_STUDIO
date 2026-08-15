@@ -2,6 +2,7 @@ import { createStore, type StoreApi } from 'zustand/vanilla'
 import {
   MAX_STROKES_PER_LAYER,
   MAX_LAYERS_PER_NAIL,
+  MAX_DECORATIONS_PER_NAIL,
   createEmptyDocument,
   nailKeysOfHand,
   type Decoration,
@@ -339,6 +340,10 @@ export function createDesignStore(options: CreateDesignStoreOptions = {}): Desig
       addDecoration: (key, decoration) => {
         if (!isEditable(key)) return
         const nail = get().document.nails[key]
+        if (nail.decorations.length >= MAX_DECORATIONS_PER_NAIL) {
+          set({ notice: `เล็บหนึ่งนิ้วมีได้สูงสุด ${MAX_DECORATIONS_PER_NAIL} ชิ้นตกแต่ง` })
+          return
+        }
         execute(new AddDecorationCommand(key, decoration, nail.decorations.length))
       },
 

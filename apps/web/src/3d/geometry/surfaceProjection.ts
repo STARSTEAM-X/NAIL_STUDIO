@@ -1,4 +1,4 @@
-import { Matrix3, Vector3, type Mesh } from 'three'
+import { Matrix3, Vector3, type Mesh, type SkinnedMesh } from 'three'
 import { morphedNormal, morphedPosition } from '@/3d/scene/nailMorph.ts'
 import { nailMatrix } from '@/3d/scene/nailViews.ts'
 
@@ -29,6 +29,12 @@ function fallbackTangent(normal: Vector3): Vector3 {
  * คืน null เมื่อจุดไม่ตกในสามเหลี่ยมไหนเลย (นอกรูปเล็บ)
  */
 export function projectUvToSurface(mesh: Mesh, u: number, v: number): SurfacePoint | null {
+  // ต้องอัปเดต matrixWorld/bindMatrixInverse ก่อนเรียก nailMatrix เสมอ — ดูคำอธิบายใน
+  // nailViewOf (nailViews.ts) ว่าทำไมสองค่านี้ไม่ตรงกันได้ถ้าลืมเรียกก่อน
+  mesh.updateWorldMatrix(true, false)
+  const skinned = mesh as SkinnedMesh
+  if (skinned.isSkinnedMesh) skinned.updateMatrixWorld(true)
+
   const uvAttribute = mesh.geometry.getAttribute('uv')
   if (!uvAttribute) throw new Error(`mesh ${mesh.name} ไม่มี uv attribute`)
 
