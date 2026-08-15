@@ -7,7 +7,7 @@
 
 // มุมมองทั้งมือควรเห็นรายละเอียดของฝ่ามือมากกว่าค่าเริ่มต้นเดิม และให้จุดเล็ง
 // อยู่บริเวณกึ่งกลางมือ ไม่ใช่ค่อนไปทางข้อมือ
-export const HOME_POSITION: [number, number, number] = [0, 0.08, 0.58]
+export const HOME_POSITION: [number, number, number] = [0, 0.08, 0.45]
 export const HOME_TARGET: [number, number, number] = [0, 0.08, 0.13]
 
 /**
