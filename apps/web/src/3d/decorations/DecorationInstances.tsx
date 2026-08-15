@@ -43,7 +43,11 @@ export function DecorationInstances({ parts }: Props) {
   const meshes = useMemo(() => DECORATION_CATALOG.map((entry) => {
     const mesh = new InstancedMesh(
       entry.geometry(),
-      new MeshStandardMaterial({ color: '#d9d9d9', metalness: 0.3, roughness: 0.4 }),
+      new MeshStandardMaterial({
+        color: entry.defaultColor,
+        metalness: entry.metalness,
+        roughness: entry.roughness,
+      }),
       MAX_INSTANCES_PER_CATALOG_ENTRY,
     )
     mesh.name = `decorations-${entry.id}`

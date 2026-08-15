@@ -261,6 +261,14 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .chip-on { background: var(--accent); border-color: var(--accent); color: #fff; }
 
 .swatches { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
+.decoration-catalog { display: flex; flex-direction: column; gap: 0.55rem; }
+.decoration-category { display: flex; flex-direction: column; gap: 0.25rem; }
+.decoration-category-label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
 .swatch {
   width: 24px;
   height: 24px;

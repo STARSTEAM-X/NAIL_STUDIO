@@ -1,4 +1,8 @@
-import { DECORATION_CATALOG } from '@/3d/decorations/decorationCatalog.ts'
+import {
+  DECORATION_CATALOG,
+  DECORATION_CATEGORY_LABELS,
+  type DecorationCategory,
+} from '@/3d/decorations/decorationCatalog.ts'
 import { useDesign } from './DesignStoreProvider.tsx'
 import { primaryOf } from './designStore.ts'
 
@@ -36,20 +40,31 @@ export function DecorationPanel() {
     })
   }
 
+  const categories = Object.keys(DECORATION_CATEGORY_LABELS) as DecorationCategory[]
+
   return (
     <aside className="toolbar" aria-label="ของตกแต่ง">
       <div className="field">
         เพิ่มของตกแต่ง
-        <div className="swatches">
-          {DECORATION_CATALOG.map((entry) => (
-            <button
-              key={entry.id}
-              type="button"
-              className="chip"
-              onClick={() => handleAdd(entry.id)}
-            >
-              {entry.label}
-            </button>
+        <div className="decoration-catalog">
+          {categories.map((category) => (
+            <div className="decoration-category" key={category}>
+              <span className="decoration-category-label">{DECORATION_CATEGORY_LABELS[category]}</span>
+              <div className="swatches">
+                {DECORATION_CATALOG.filter((entry) => entry.category === category).map((entry) => (
+                  <button
+                    key={entry.id}
+                    type="button"
+                    className="chip"
+                    aria-label={entry.label}
+                    title={entry.label}
+                    onClick={() => handleAdd(entry.id)}
+                  >
+                    {entry.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       </div>

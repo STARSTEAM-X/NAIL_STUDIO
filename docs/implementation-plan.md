@@ -359,9 +359,11 @@ Sprint 0, งานทำคลัง asset จริง, เวลา hardening
 
 > **สัปดาห์ที่ 14 มีงานที่ไม่ใช่โค้ดและสำคัญที่สุดต่อคุณภาพปลายทาง**
 
-1. **ทำคลัง asset จริง 30–50 ชิ้น** — ของตกแต่ง 3D (แทน mock ที่วนรูปซ้ำ 2 รูปและ
-   `model3dUrl: null`), พาเลทดีไซน์ที่คัดแล้ว, archetype 6–8 แบบ
-   → **ไม่มีอัลกอริทึมใดทำให้ asset ที่ไม่สวยกลายเป็นสวย คุณภาพ asset คือเพดานของผลลัพธ์**
+1. [x] **ทำคลัง asset built-in 30 ชิ้น** — เพิ่ม geometry ที่ authored แยกชิ้น พร้อมสี,
+   metalness, roughness และหมวดหมู่ 5 กลุ่มใน `decorationCatalog.ts`; แผงเลือกจัดกลุ่มให้ค้นหา
+   ง่าย และ `CatalogEntry.modelUrl` สงวนไว้สำหรับสลับเป็น GLB ที่ผ่าน license/visual review
+   ภายหลัง · ตรวจบนเบราว์เซอร์จริงแล้วว่าครบ 30 ชิ้นและกดวาง asset ได้ไม่มี error
+   → **GLB ภายนอกและพาเลท/archetype เป็นงานต่อยอดของ Slice 5 ถัดไป**
 2. ตาราง `brand_colors`, `color_palettes`, `design_archetypes` + seed
 3. `nail_templates` + `template_likes/shares/remixes/comments` + `content_reports`
 4. ฟีดล่าสุด/ยอดนิยม (keyset) + ตัวกรอง category/color + หน้า `/community`
