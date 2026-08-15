@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { BLEND_MODES, MAX_LAYERS_PER_NAIL, type Layer } from '@nail-studio/contracts'
 import { useDesign } from './DesignStoreProvider.tsx'
 import { primaryOf } from './designStore.ts'
@@ -21,6 +22,27 @@ export function LayerPanel() {
   const setLayerOpacity = useDesign((state) => state.setLayerOpacity)
   const setLayerBlend = useDesign((state) => state.setLayerBlend)
   const moveLayer = useDesign((state) => state.moveLayer)
+  const [editingLayerId, setEditingLayerId] = useState<string | null>(null)
+  const [draftName, setDraftName] = useState('')
+
+  const beginRename = (layer: Layer) => {
+    selectLayer(nailKey, layer.id)
+    setEditingLayerId(layer.id)
+    setDraftName(layer.name)
+  }
+
+  const cancelRename = () => {
+    setEditingLayerId(null)
+    setDraftName('')
+  }
+
+  const commitRename = (layer: Layer) => {
+    const value = draftName.trim()
+    if (value !== layer.name) {
+      renameLayer(nailKey, layer.id, value, `layer-name:${nailKey}:${layer.id}`)
+    }
+    cancelRename()
+  }
 
   const add = () => {
     addLayer(nailKey, {
@@ -38,7 +60,7 @@ export function LayerPanel() {
       <div className="layer-panel-head">
         <div>
           <h2>เลเยอร์</h2>
-          <p className="hint">แก้ไขเล็บที่เลือกหลัก</p>
+          <p className="hint">คลิกชื่อเพื่อเปลี่ยนชื่อแบบ inline</p>
         </div>
         <button
           type="button"
@@ -53,29 +75,40 @@ export function LayerPanel() {
       <div className="layer-list">
         {layers.map((layer, index) => {
           const active = layer.id === activeLayerId
+          const editing = layer.id === editingLayerId
           return (
             <article key={layer.id} className={`layer-card ${active ? 'layer-card-active' : ''}`}>
-              <button
-                type="button"
-                className="layer-select"
-                aria-pressed={active}
-                onClick={() => selectLayer(nailKey, layer.id)}
-              >
-                เลเยอร์ {index + 1}
-              </button>
-              <label className="field">
-                ชื่อเลเยอร์
+              {editing ? (
                 <input
-                  key={`${layer.id}:${layer.name}`}
-                  defaultValue={layer.name}
+                  className="layer-name-input"
+                  autoFocus
+                  value={draftName}
                   maxLength={60}
-                  onBlur={(event) => {
-                    const value = event.currentTarget.value.trim()
-                    renameLayer(nailKey, layer.id, value, `layer-name:${nailKey}:${layer.id}`)
-                    if (value.length === 0 || value.length > 60) event.currentTarget.value = layer.name
+                  aria-label={`ชื่อเลเยอร์ ${index + 1}`}
+                  onChange={(event) => setDraftName(event.target.value)}
+                  onBlur={() => commitRename(layer)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      event.currentTarget.blur()
+                    }
+                    if (event.key === 'Escape') {
+                      event.preventDefault()
+                      cancelRename()
+                    }
                   }}
                 />
-              </label>
+              ) : (
+                <button
+                  type="button"
+                  className="layer-select"
+                  aria-pressed={active}
+                  title="คลิกเพื่อเปลี่ยนชื่อเลเยอร์"
+                  onClick={() => beginRename(layer)}
+                >
+                  {layer.name || `เลเยอร์ ${index + 1}`}
+                </button>
+              )}
               <div className="layer-row">
                 <label className="check-field">
                   <input
@@ -96,7 +129,7 @@ export function LayerPanel() {
                 </label>
               </div>
               <label className="field">
-                ความทึบ {Math.round(layer.opacity * 100)}%
+                ความทึบ <output>{Math.round(layer.opacity * 100)}%</output>
                 <input
                   type="range"
                   min={0}

@@ -372,6 +372,11 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .layer-card { padding: 0.6rem; border: 1px solid var(--rule); border-radius: 8px; display: flex; flex-direction: column; gap: 0.45rem; }
 .layer-card-active { border-color: var(--accent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent); }
 .layer-select { align-self: flex-start; border: 0; padding: 0; background: transparent; color: var(--deep); font: inherit; font-weight: 700; cursor: pointer; }
+.layer-select { width: 100%; padding: 0.2rem 0.3rem; border-radius: 0.35rem; text-align: left; }
+.layer-select:hover { background: var(--chip); }
+.layer-name-input { width: 100%; min-width: 0; padding: 0.35rem 0.45rem; border: 1px solid var(--accent); border-radius: 0.35rem; background: #fff; color: var(--ink); font: inherit; font-weight: 700; box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent); }
+.layer-name-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.layer-card .field output { align-self: flex-end; margin-top: -1.25rem; color: var(--deep); font-size: 0.75rem; }
 .layer-row, .layer-actions { display: flex; align-items: end; gap: 0.4rem; }
 .layer-actions .btn { flex: 1; padding-inline: 0.45rem; }
 .layer-blend { flex: 1; }
