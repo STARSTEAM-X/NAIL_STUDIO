@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { strokeSchema, type Point } from '@nail-studio/contracts'
 import {
   BRUSH_PRESETS,
+  createDabAccumulator,
   pathToDabs,
   presetOf,
   pressureToRadius,
@@ -78,6 +79,13 @@ describe('pathToDabs', () => {
 })
 
 describe('settingsToDabs / strokeToDabs', () => {
+  it('สร้าง dabs แบบ incremental ได้ผลเท่ากับการคำนวณทั้งเส้น', () => {
+    const points = horizontal(24)
+    const accumulator = createDabAccumulator(SETTINGS)
+    const incremental = points.flatMap((point) => accumulator.append(point))
+    expect(incremental).toEqual(settingsToDabs(points, SETTINGS))
+  })
+
   it('ยางลบใช้ความทึบเต็มเสมอ ไม่ว่าผู้ใช้ตั้ง opacity ไว้เท่าไร', () => {
     const erase = settingsToDabs(horizontal(3), { ...SETTINGS, tool: 'erase', opacity: 0.2 })
     for (const dab of erase) expect(dab.alpha).toBe(1)

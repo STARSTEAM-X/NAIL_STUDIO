@@ -4,7 +4,7 @@ import { Raycaster, Vector2 } from 'three'
 import type { NailKey, Point } from '@nail-studio/contracts'
 import { useDesignStoreApi } from '@/features/design/DesignStoreProvider.tsx'
 import type { HandParts } from '@/3d/models/HandModel.tsx'
-import { settingsToDabs, settingsToStroke } from './brush.ts'
+import { createDabAccumulator, settingsToStroke, type DabAccumulator } from './brush.ts'
 import type { NailTextureSet } from './NailTextureSet.ts'
 import { pickNail, pointerToNdc } from './picking.ts'
 import { simplifyPath } from './simplify.ts'
@@ -43,7 +43,8 @@ export function PaintController({ parts, textures }: Props) {
 
     let painting: NailKey | null = null
     let points: Point[] = []
-    let emitted = 0
+    let strokeSettings: ReturnType<typeof store.getState>['settings'] | null = null
+    let dabs: DabAccumulator | null = null
 
     const hit = (event: PointerEvent) => {
       const rect = canvas.getBoundingClientRect()
@@ -59,11 +60,10 @@ export function PaintController({ parts, textures }: Props) {
     }
 
     /** ส่งเฉพาะแต้มที่ยังไม่เคยส่ง — ไม่งั้นส่วนต้นของเส้นจะถูกทับซ้ำจนสีเข้มขึ้นเรื่อย ๆ */
-    const emit = () => {
-      const settings = store.getState().settings
-      const dabs = settingsToDabs(points, settings)
-      const fresh = dabs.slice(emitted)
-      emitted = dabs.length
+    const emit = (point: Point) => {
+      const settings = strokeSettings
+      const fresh = dabs?.append(point) ?? []
+      if (!settings || fresh.length === 0) return
       textures.paintDabs(
         fresh,
         settings.tool === 'erase' ? '#000000' : settings.color,
@@ -82,11 +82,16 @@ export function PaintController({ parts, textures }: Props) {
       textures.endStroke(OWNER)
       if (!painting) return
       if (commit && points.length > 0) {
-        store.getState().addStroke(settingsToStroke(store.getState().settings, simplifyPath(points)))
+        store.getState().addStroke(settingsToStroke(
+          strokeSettings ?? store.getState().settings,
+          simplifyPath(points),
+        ))
       }
       painting = null
       points = []
-      emitted = 0
+      strokeSettings = null
+      dabs?.reset()
+      dabs = null
       if (controls) controls.enabled = true
       if (canvas.hasPointerCapture(event.pointerId)) {
         try {
@@ -127,7 +132,8 @@ export function PaintController({ parts, textures }: Props) {
 
       painting = target.key
       points = [target.point]
-      emitted = 0
+      strokeSettings = paintState.settings
+      dabs = createDabAccumulator(strokeSettings)
       // ปิดการหมุนกล้องระหว่างลาก ไม่งั้นเส้นจะเบี้ยวเพราะฉากขยับไปพร้อมนิ้ว
       if (controls) controls.enabled = false
       // การจับ pointer ล้มเหลวได้จริง (pointer ถูกจับไว้ที่อื่น หรือถูกยกเลิกไปแล้ว)
@@ -138,7 +144,7 @@ export function PaintController({ parts, textures }: Props) {
       } catch {
         // ไม่มี capture ก็ยังวาดได้ เพียงแต่ลากออกนอกแคนวาสแล้วเส้นจะจบเอง
       }
-      emit()
+      emit(target.point)
     }
 
     const onMove = (event: PointerEvent) => {
@@ -147,7 +153,7 @@ export function PaintController({ parts, textures }: Props) {
       // ลากออกนอกเล็บที่เริ่มไว้แล้วเงียบไว้ ไม่ใช่จบเส้น — ผู้ใช้ลากกลับเข้ามาต่อได้
       if (!target || target.key !== painting) return
       points.push(target.point)
-      emit()
+      emit(target.point)
     }
 
     const onUp = (event: PointerEvent) => finish(event, true)

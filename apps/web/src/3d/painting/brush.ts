@@ -105,6 +105,70 @@ export function pathToDabs(
   return dabs
 }
 
+export interface DabAccumulator {
+  append(point: Point): Dab[]
+  reset(): void
+}
+
+/**
+ * Incremental equivalent of settingsToDabs for an active pointer stroke.
+ * Rebuilding dabs from the complete point list on every pointermove makes a
+ * long stroke O(n²), so keep the last pixel and spacing carry between events.
+ */
+export function createDabAccumulator(
+  settings: PaintSettings,
+  texSize = TEX_SIZE,
+): DabAccumulator {
+  const preset = presetOf(settings.brush)
+  const opacity = settings.tool === 'erase' ? 1 : settings.opacity
+  const step = Math.max(MIN_STEP_PX, preset.spacing * settings.size)
+  let previous: { x: number; y: number; p: number } | null = null
+  let carry = 0
+
+  return {
+    append(point) {
+      const pixel = uvToPixel(point.x, point.y, texSize)
+      const next = { x: pixel.x, y: pixel.y, p: point.p }
+      if (!previous) {
+        previous = next
+        return [{
+          x: next.x,
+          y: next.y,
+          r: pressureToRadius(settings.size, next.p, preset.minPressure),
+          alpha: opacity,
+        }]
+      }
+
+      const start = previous
+      previous = next
+      const dx = next.x - start.x
+      const dy = next.y - start.y
+      const length = Math.hypot(dx, dy)
+      if (length < 1e-9) return []
+
+      const dabs: Dab[] = []
+      let travelled = step - carry
+      while (travelled <= length + 1e-9) {
+        const t = Math.min(1, travelled / length)
+        const pressure = start.p + (next.p - start.p) * t
+        dabs.push({
+          x: start.x + dx * t,
+          y: start.y + dy * t,
+          r: pressureToRadius(settings.size, pressure, preset.minPressure),
+          alpha: opacity,
+        })
+        travelled += step
+      }
+      carry = (carry + length) % step
+      return dabs
+    },
+    reset() {
+      previous = null
+      carry = 0
+    },
+  }
+}
+
 /**
  * ทั้งพรีวิวสดตอนลากนิ้วและการ replay ตอนบันทึก ต้องเข้าประตูเดียวกันสองบานนี้เท่านั้น
  *

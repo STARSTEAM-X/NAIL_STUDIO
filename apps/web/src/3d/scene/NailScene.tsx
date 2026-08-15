@@ -19,7 +19,10 @@ export function NailScene({ children, fallback }: Props) {
   return (
     <Canvas
       shadows={false}
-      dpr={[1, 2]}
+      // A 2x DPR makes every frame (and every live paint texture upload) up to
+      // four times more expensive on HiDPI screens. Keep the editor responsive
+      // while retaining enough resolution for the hand preview and exports.
+      dpr={[1, 1.5]}
       camera={{ position: HOME_POSITION, fov: 35, near: 0.01, far: 10 }}
       gl={{ antialias: true, preserveDrawingBuffer: true }}
     >
