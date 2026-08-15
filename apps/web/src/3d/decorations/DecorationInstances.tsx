@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo } from 'react'
 import { InstancedMesh, Matrix4, MeshStandardMaterial, Object3D, Vector3 } from 'three'
 import { EDITABLE_NAILS } from '@/features/design/designStore.ts'
 import { useDesignStoreApi } from '@/features/design/DesignStoreProvider.tsx'
@@ -25,10 +25,17 @@ const MAX_INSTANCES_PER_CATALOG_ENTRY = 30 * 5
  * ทุกเฟรม) ครอบคลุมทั้งการเพิ่ม/ลบ/ย้ายของตกแต่ง และการเปลี่ยนทรง/ความยาวเล็บหรือ
  * สัดส่วนมือ (ซึ่งเปลี่ยนตำแหน่งที่ projectUvToSurface คำนวณได้โดยอัตโนมัติ เพราะสิ่ง
  * เหล่านั้นก็เปลี่ยน document เหมือนกัน)
+ *
+ * เมช InstancedMesh ทั้งหมดสร้างและตั้งค่าใน useMemo — ห้ามมีผลข้างเคียง (side effect)
+ * ในนั้นเด็ดขาด (เช่น เขียนลง ref) เพราะ React StrictMode เรียก factory ของ useMemo
+ * สองรอบใน dev เพื่อจับโค้ดที่ไม่บริสุทธิ์ ถ้าเขียนลง ref ในนั้น รอบที่สองจะทับรอบแรก
+ * ทำให้ ref ชี้ไปยัง mesh คนละก้อนกับที่ useMemo คืนค่าจริงและถูกเรนเดอร์ — แล้วโค้ดที่
+ * แก้ instance matrix ผ่าน ref จะแก้ mesh ที่ไม่เคยถูกใส่เข้าฉากเลย ของตกแต่งจึงมีข้อมูล
+ * ตำแหน่งถูกต้องสมบูรณ์แต่ไม่ปรากฏบนจอเลยแม้แต่พิกเซลเดียว (บั๊กจริงที่เจอและแก้ไปแล้ว
+ * ระหว่างตรวจงานด้วยเบราว์เซอร์จริง — ห้ามกลับไปใช้รูปแบบ ref เดิม)
  */
 export function DecorationInstances({ parts }: Props) {
   const store = useDesignStoreApi()
-  const meshRefs = useRef<Map<string, InstancedMesh>>(new Map())
 
   const meshes = useMemo(() => DECORATION_CATALOG.map((entry) => {
     const mesh = new InstancedMesh(
@@ -38,16 +45,22 @@ export function DecorationInstances({ parts }: Props) {
     )
     mesh.name = `decorations-${entry.id}`
     mesh.count = 0
-    meshRefs.current.set(entry.id, mesh)
+    mesh.frustumCulled = false
     return mesh
   }), [])
 
+  // อนุพันธ์ล้วนจาก meshes (อาร์เรย์เดียวกับที่เรนเดอร์จริง) ไม่ใช่ ref แยกที่เสี่ยงหลุดจากกัน
+  const meshByCatalogId = useMemo(
+    () => new Map(meshes.map((mesh, index) => [DECORATION_CATALOG[index]!.id, mesh])),
+    [meshes],
+  )
+
   useEffect(() => () => {
-    for (const mesh of meshRefs.current.values()) {
+    for (const mesh of meshes) {
       mesh.geometry.dispose()
       if (mesh.material instanceof MeshStandardMaterial) mesh.material.dispose()
     }
-  }, [])
+  }, [meshes])
 
   useEffect(() => {
     const object = new Object3D()
@@ -55,14 +68,14 @@ export function DecorationInstances({ parts }: Props) {
     const rebuild = () => {
       const document = store.getState().document
       const counters = new Map<string, number>()
-      for (const mesh of meshRefs.current.values()) mesh.count = 0
+      for (const mesh of meshes) mesh.count = 0
 
       for (const key of EDITABLE_NAILS) {
         const mesh = parts.nails.get(key)
         const nail = document.nails[key]
         if (!mesh) continue
         for (const decoration of nail.decorations) {
-          const target = meshRefs.current.get(decoration.catalogId)
+          const target = meshByCatalogId.get(decoration.catalogId)
           const entry = DECORATION_CATALOG.find((item) => item.id === decoration.catalogId)
           if (!target || !entry) continue
 
@@ -91,7 +104,8 @@ export function DecorationInstances({ parts }: Props) {
         }
       }
 
-      for (const [catalogId, mesh] of meshRefs.current) {
+      for (const mesh of meshes) {
+        const catalogId = mesh.name.replace('decorations-', '')
         mesh.count = counters.get(catalogId) ?? 0
         mesh.instanceMatrix.needsUpdate = true
       }
@@ -105,11 +119,11 @@ export function DecorationInstances({ parts }: Props) {
       rebuild()
     })
     return unsubscribe
-  }, [parts, store])
+  }, [parts, store, meshes, meshByCatalogId])
 
   return (
-    <>
+    <group name="decoration-instances-group">
       {meshes.map((mesh) => <primitive key={mesh.name} object={mesh} />)}
-    </>
+    </group>
   )
 }

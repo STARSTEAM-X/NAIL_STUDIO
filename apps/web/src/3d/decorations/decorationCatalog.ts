@@ -16,9 +16,9 @@ export interface CatalogEntry {
 }
 
 export const DECORATION_CATALOG: readonly CatalogEntry[] = [
-  { id: 'gem', label: 'เพชร', geometry: () => new IcosahedronGeometry(1, 0), defaultScale: 0.08 },
-  { id: 'bow', label: 'โบว์', geometry: () => new BoxGeometry(1.6, 0.4, 0.6), defaultScale: 0.06 },
-  { id: 'star', label: 'ดาว', geometry: () => new ConeGeometry(1, 1, 5), defaultScale: 0.07 },
+  { id: 'gem', label: 'เพชร', geometry: () => new IcosahedronGeometry(1, 0), defaultScale: 0.006 },
+  { id: 'bow', label: 'โบว์', geometry: () => new BoxGeometry(1.6, 0.4, 0.6), defaultScale: 0.004 },
+  { id: 'star', label: 'ดาว', geometry: () => new ConeGeometry(1, 1, 5), defaultScale: 0.005 },
 ]
 
 export function catalogEntry(id: string): CatalogEntry | undefined {
