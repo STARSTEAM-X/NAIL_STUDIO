@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { ApiRequestError } from '@/api/client.ts'
+import { AuthLayout, AuthPasswordField } from '@/components/AuthLayout.tsx'
 import { useLogin } from '@/features/auth/useAuth.ts'
 
 export function LoginPage() {
@@ -8,6 +9,7 @@ export function LoginPage() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [notice, setNotice] = useState<string | null>(null)
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -25,40 +27,55 @@ export function LoginPage() {
         : null
 
   return (
-    <div className="auth-page">
-      <form className="card auth-card" onSubmit={handleSubmit}>
-        <h1>เข้าสู่ระบบ</h1>
+    <AuthLayout active="login">
+      <form className="auth-form" onSubmit={handleSubmit}>
+        <div className="auth-field">
+          <label htmlFor="email">Email</label>
+          <input
+            id="email"
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+          />
+        </div>
 
-        <label htmlFor="email">อีเมล</label>
-        <input
-          id="email"
-          type="email"
-          autoComplete="email"
-          required
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-        />
-
-        <label htmlFor="password">รหัสผ่าน</label>
-        <input
+        <AuthPasswordField
           id="password"
-          type="password"
+          label="Password"
           autoComplete="current-password"
-          required
           value={password}
           onChange={(event) => setPassword(event.target.value)}
         />
 
-        {message && <p className="error" role="alert">{message}</p>}
+        {message && <p className="error auth-message" role="alert">{message}</p>}
 
-        <button type="submit" className="btn btn-primary" disabled={login.isPending}>
-          {login.isPending ? 'กำลังเข้าสู่ระบบ…' : 'เข้าสู่ระบบ'}
+        <button type="submit" className="auth-submit" disabled={login.isPending}>
+          {login.isPending ? 'Submitting…' : 'Submit'}
         </button>
 
-        <p className="muted">
-          ยังไม่มีบัญชี? <Link to="/register">สมัครสมาชิก</Link>
-        </p>
+        <button
+          type="button"
+          className="auth-inline-link"
+          onClick={() => setNotice('Password reset is not available yet.')}
+        >
+          Forgot Password?
+        </button>
+
+        <div className="auth-divider" aria-hidden="true"><span>or</span></div>
+
+        <button
+          type="button"
+          className="auth-google"
+          aria-label="Continue with Google"
+          onClick={() => setNotice('Google sign-in is not available yet.')}
+        >
+          <span aria-hidden="true">G</span>
+        </button>
+
+        {notice && <p className="auth-note" role="status">{notice}</p>}
       </form>
-    </div>
+    </AuthLayout>
   )
 }
