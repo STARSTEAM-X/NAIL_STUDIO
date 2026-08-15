@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  MAX_DECORATIONS_PER_NAIL,
   NAIL_KEYS,
   createEmptyDocument,
+  type Decoration,
   type DesignDocument,
   type Layer,
   type NailKey,
@@ -10,6 +12,12 @@ import {
 import { EDITABLE_NAILS } from '@/features/design/designStore.ts'
 import type { Command } from '../Command.ts'
 import { CompositeCommand } from './CompositeCommand.ts'
+import {
+  AddDecorationCommand,
+  MoveDecorationCommand,
+  RemoveDecorationCommand,
+  ScaleDecorationCommand,
+} from './decorationCommands.ts'
 import {
   AddStrokeCommand,
   ClearNailCommand,
@@ -219,5 +227,95 @@ describe('document commands', () => {
       expect(changed.nails[key]).toEqual(original.nails[key])
     }
     expect(command.undo(changed).document).toEqual(original)
+  })
+})
+
+function decoration(id: string, u = 0.5, v = 0.5): Decoration {
+  return { id, catalogId: 'gem', u, v, rotation: 0, scale: 0.1 }
+}
+
+describe('decoration commands', () => {
+  it('adds and removes a decoration, restoring the exact original document', () => {
+    const document = createEmptyDocument()
+    const deco = decoration('deco-1')
+    expectRoundTrip(document, new AddDecorationCommand(RIGHT_INDEX, deco, 0))
+  })
+
+  it('does not add a decoration beyond MAX_DECORATIONS_PER_NAIL', () => {
+    const document = createEmptyDocument()
+    document.nails[RIGHT_INDEX] = {
+      ...document.nails[RIGHT_INDEX],
+      decorations: Array.from({ length: MAX_DECORATIONS_PER_NAIL }, (_, i) => decoration(`d-${i}`)),
+    }
+    const command = new AddDecorationCommand(RIGHT_INDEX, decoration('overflow'), MAX_DECORATIONS_PER_NAIL)
+    const result = command.do(document)
+    expect(result.document.nails[RIGHT_INDEX].decorations).toHaveLength(MAX_DECORATIONS_PER_NAIL)
+    expect(result.affects.size).toBe(0)
+  })
+
+  it('restores a removed decoration at its original index', () => {
+    const document = createEmptyDocument()
+    document.nails[RIGHT_INDEX] = {
+      ...document.nails[RIGHT_INDEX],
+      decorations: [decoration('a'), decoration('b'), decoration('c')],
+    }
+    const target = document.nails[RIGHT_INDEX].decorations[1]!
+    expectRoundTrip(document, new RemoveDecorationCommand(RIGHT_INDEX, target, 1))
+  })
+
+  it('restores decoration position and rotation after a move', () => {
+    const document = createEmptyDocument()
+    document.nails[RIGHT_INDEX] = {
+      ...document.nails[RIGHT_INDEX],
+      decorations: [decoration('a', 0.3, 0.3)],
+    }
+    const command = new MoveDecorationCommand(
+      RIGHT_INDEX, 'a',
+      { u: 0.3, v: 0.3, rotation: 0 },
+      { u: 0.6, v: 0.7, rotation: 1.2 },
+    )
+    expectRoundTrip(document, command)
+  })
+
+  it('merges two consecutive moves with the same mergeKey into one before/after pair', () => {
+    const first = new MoveDecorationCommand(
+      RIGHT_INDEX, 'a', { u: 0.1, v: 0.1, rotation: 0 }, { u: 0.2, v: 0.2, rotation: 0 }, 'drag-1',
+    )
+    const second = new MoveDecorationCommand(
+      RIGHT_INDEX, 'a', { u: 0.2, v: 0.2, rotation: 0 }, { u: 0.3, v: 0.3, rotation: 0 }, 'drag-1',
+    )
+    const merged = first.merge?.(second) as MoveDecorationCommand | null
+    expect(merged).not.toBeNull()
+    expect(merged!.before).toEqual({ u: 0.1, v: 0.1, rotation: 0 })
+    expect(merged!.after).toEqual({ u: 0.3, v: 0.3, rotation: 0 })
+  })
+
+  it('does not merge moves with different mergeKeys', () => {
+    const first = new MoveDecorationCommand(
+      RIGHT_INDEX, 'a', { u: 0.1, v: 0.1, rotation: 0 }, { u: 0.2, v: 0.2, rotation: 0 }, 'drag-1',
+    )
+    const second = new MoveDecorationCommand(
+      RIGHT_INDEX, 'a', { u: 0.2, v: 0.2, rotation: 0 }, { u: 0.3, v: 0.3, rotation: 0 }, 'drag-2',
+    )
+    expect(first.merge?.(second)).toBeNull()
+  })
+
+  it('restores a decoration scale after resizing', () => {
+    const document = createEmptyDocument()
+    document.nails[RIGHT_INDEX] = {
+      ...document.nails[RIGHT_INDEX],
+      decorations: [decoration('a')],
+    }
+    document.nails[RIGHT_INDEX].decorations[0] = { ...document.nails[RIGHT_INDEX].decorations[0]!, scale: 0.1 }
+    expectRoundTrip(document, new ScaleDecorationCommand(RIGHT_INDEX, 'a', 0.1, 0.4))
+  })
+
+  it('merges two consecutive scale changes with the same mergeKey', () => {
+    const first = new ScaleDecorationCommand(RIGHT_INDEX, 'a', 0.1, 0.2, 'resize-1')
+    const second = new ScaleDecorationCommand(RIGHT_INDEX, 'a', 0.2, 0.3, 'resize-1')
+    const merged = first.merge?.(second) as ScaleDecorationCommand | null
+    expect(merged).not.toBeNull()
+    expect(merged!.before).toBe(0.1)
+    expect(merged!.after).toBe(0.3)
   })
 })
