@@ -6,7 +6,7 @@ import { useDesignStoreApi } from '@/features/design/DesignStoreProvider.tsx'
 import type { HandParts } from '@/3d/models/HandModel.tsx'
 import { createDabAccumulator, settingsToStroke, type DabAccumulator } from './brush.ts'
 import type { NailTextureSet } from './NailTextureSet.ts'
-import { pickNail, pointerToNdc } from './picking.ts'
+import { pickNail, pointerToNdc, type ScreenRect } from './picking.ts'
 import { simplifyPath } from './simplify.ts'
 
 interface Props {
@@ -16,6 +16,7 @@ interface Props {
 
 /** ชื่อเจ้าของเส้น — แยกจากแผงวาด 2 มิติที่ใช้แคนวาสเส้นสดใบเดียวกัน */
 const OWNER = '3d'
+const MIN_POINTER_DISTANCE_PX = 0.75
 
 /**
  * ต่อ pointer event เข้ากับระบบวาด
@@ -45,9 +46,13 @@ export function PaintController({ parts, textures }: Props) {
     let points: Point[] = []
     let strokeSettings: ReturnType<typeof store.getState>['settings'] | null = null
     let dabs: DabAccumulator | null = null
+    let strokeRect: ScreenRect | null = null
+    let lastPointerX = 0
+    let lastPointerY = 0
+    let lastPressure = 0.5
 
     const hit = (event: PointerEvent) => {
-      const rect = canvas.getBoundingClientRect()
+      const rect = strokeRect ?? canvas.getBoundingClientRect()
       const screen = pointerToNdc(event.clientX, event.clientY, rect)
       ndc.set(screen.x, screen.y)
       raycaster.setFromCamera(ndc, camera)
@@ -80,7 +85,10 @@ export function PaintController({ parts, textures }: Props) {
       // ผลคือ "วาดไม่ได้อีกเลยจนกว่าจะรีโหลด" โดยไม่มีข้อความผิดพลาดใด ๆ ให้ผู้ใช้เห็น
       // — เป็นความล้มเหลวแบบที่ผู้ใช้ไม่มีทางรู้สาเหตุและกู้เองไม่ได้ จึงต้องกันไว้ที่นี่
       textures.endStroke(OWNER)
-      if (!painting) return
+      if (!painting) {
+        strokeRect = null
+        return
+      }
       if (commit && points.length > 0) {
         store.getState().addStroke(settingsToStroke(
           strokeSettings ?? store.getState().settings,
@@ -92,6 +100,7 @@ export function PaintController({ parts, textures }: Props) {
       strokeSettings = null
       dabs?.reset()
       dabs = null
+      strokeRect = null
       if (controls) controls.enabled = true
       if (canvas.hasPointerCapture(event.pointerId)) {
         try {
@@ -108,8 +117,12 @@ export function PaintController({ parts, textures }: Props) {
       // ดีกว่าปฏิเสธจนผู้ใช้วาดไม่ได้อีกเลย ส่วนเส้นของแผง 2 มิติที่กำลังลากอยู่ต้องไม่ไปแตะ
       if (textures.strokeOwner() === OWNER) textures.endStroke(OWNER)
       if (textures.isPainting()) return
+      strokeRect = canvas.getBoundingClientRect()
       const target = hit(event)
-      if (!target) return
+      if (!target) {
+        strokeRect = null
+        return
+      }
 
       const state = store.getState()
       // แตะเล็บที่ยังไม่ได้เลือก = เลือกนิ้วนั้นแทน ส่วนการกดค้าง Shift คือเลือกเพิ่ม
@@ -134,6 +147,9 @@ export function PaintController({ parts, textures }: Props) {
       points = [target.point]
       strokeSettings = paintState.settings
       dabs = createDabAccumulator(strokeSettings)
+      lastPointerX = event.clientX
+      lastPointerY = event.clientY
+      lastPressure = event.pressure > 0 ? event.pressure : 0.5
       // ปิดการหมุนกล้องระหว่างลาก ไม่งั้นเส้นจะเบี้ยวเพราะฉากขยับไปพร้อมนิ้ว
       if (controls) controls.enabled = false
       // การจับ pointer ล้มเหลวได้จริง (pointer ถูกจับไว้ที่อื่น หรือถูกยกเลิกไปแล้ว)
@@ -149,9 +165,17 @@ export function PaintController({ parts, textures }: Props) {
 
     const onMove = (event: PointerEvent) => {
       if (!painting) return
+      const pressure = event.pressure > 0 ? event.pressure : 0.5
+      const dx = event.clientX - lastPointerX
+      const dy = event.clientY - lastPointerY
+      if (dx * dx + dy * dy < MIN_POINTER_DISTANCE_PX ** 2
+        && Math.abs(pressure - lastPressure) < 0.03) return
       const target = hit(event)
       // ลากออกนอกเล็บที่เริ่มไว้แล้วเงียบไว้ ไม่ใช่จบเส้น — ผู้ใช้ลากกลับเข้ามาต่อได้
       if (!target || target.key !== painting) return
+      lastPointerX = event.clientX
+      lastPointerY = event.clientY
+      lastPressure = pressure
       points.push(target.point)
       emit(target.point)
     }
@@ -172,6 +196,7 @@ export function PaintController({ parts, textures }: Props) {
       canvas.removeEventListener('lostpointercapture', onCancel)
       // ถอด listener ระหว่างที่ยังลากค้างอยู่ต้องไม่ทิ้งเส้นสดค้างบนแคนวาส
       if (painting) textures.endStroke()
+      strokeRect = null
     }
   }, [gl, camera, controls, parts, textures, store])
 
