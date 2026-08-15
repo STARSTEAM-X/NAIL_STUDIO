@@ -36,6 +36,7 @@ import {
   SetLayerOpacityCommand,
   SetLayerVisibilityCommand,
 } from './layerCommands.ts'
+import { SetProportionsCommand, SetSkinToneCommand } from './handCommands.ts'
 
 const RIGHT_INDEX = 'right.index' as NailKey
 
@@ -317,5 +318,54 @@ describe('decoration commands', () => {
     expect(merged).not.toBeNull()
     expect(merged!.before).toBe(0.1)
     expect(merged!.after).toBe(0.3)
+  })
+})
+
+describe('hand commands', () => {
+  it('SetSkinToneCommand: ตั้งสีผิวแล้ว undo กลับค่าเดิม', () => {
+    const document = createEmptyDocument()
+    const command = new SetSkinToneCommand(document.hand.skinTone, '#4f382f')
+    expectRoundTrip(document, command)
+
+    const after = command.do(document).document
+    expect(after.hand.skinTone).toBe('#4f382f')
+    expect(command.do(document).affects.size).toBe(0)
+  })
+
+  it('SetSkinToneCommand: do() คืน document เดิมถ้าค่าไม่เปลี่ยน', () => {
+    const document = createEmptyDocument()
+    const command = new SetSkinToneCommand(document.hand.skinTone, document.hand.skinTone)
+    expect(command.do(document).document).toBe(document)
+  })
+
+  it('SetProportionsCommand: ปรับสัดส่วนแล้ว undo กลับค่าเดิม', () => {
+    const document = createEmptyDocument()
+    const before = document.hand.proportions
+    const after = { handScale: 1.1, palmWidth: 1.2, fingerLength: 0.9, fingerWidth: 1 }
+    const command = new SetProportionsCommand(before, after)
+    expectRoundTrip(document, command)
+
+    const result = command.do(document).document
+    expect(result.hand.proportions).toEqual(after)
+  })
+
+  it('SetProportionsCommand: merge รวม 2 คำสั่งที่มี mergeKey เดียวกันเป็นรายการเดียว', () => {
+    const before = { handScale: 1, palmWidth: 1, fingerLength: 1, fingerWidth: 1 }
+    const mid = { handScale: 1, palmWidth: 1.1, fingerLength: 1, fingerWidth: 1 }
+    const after = { handScale: 1, palmWidth: 1.2, fingerLength: 1, fingerWidth: 1 }
+    const first = new SetProportionsCommand(before, mid, 'hand-proportions')
+    const second = new SetProportionsCommand(mid, after, 'hand-proportions')
+
+    const merged = first.merge?.(second)
+    expect(merged).toBeInstanceOf(SetProportionsCommand)
+    expect((merged as SetProportionsCommand).before).toEqual(before)
+    expect((merged as SetProportionsCommand).after).toEqual(after)
+  })
+
+  it('SetProportionsCommand: merge คืน null เมื่อ mergeKey ไม่ตรงกัน', () => {
+    const proportions = { handScale: 1, palmWidth: 1, fingerLength: 1, fingerWidth: 1 }
+    const first = new SetProportionsCommand(proportions, proportions, 'a')
+    const second = new SetProportionsCommand(proportions, proportions, 'b')
+    expect(first.merge?.(second)).toBeNull()
   })
 })
