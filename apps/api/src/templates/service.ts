@@ -1,4 +1,5 @@
-import type { ListTemplatesQuery, TemplateCard } from '@nail-studio/contracts'
+import type { ListTemplatesQuery, TemplateCard, TemplateLikeResult } from '@nail-studio/contracts'
+import { AppError } from '../errors/AppError.ts'
 import * as repository from './repository.ts'
 import { decodeTemplateCursor, encodeTemplateCursor } from './cursor.ts'
 
@@ -55,4 +56,16 @@ export async function list(input: ListTemplatesQuery): Promise<TemplateFeedResul
           },
     ),
   }
+}
+
+export async function like(userId: string, templateId: string): Promise<TemplateLikeResult> {
+  const result = await repository.addTemplateLike(templateId, userId)
+  if (!result) throw AppError.notFound('ไม่พบดีไซน์ที่ต้องการ')
+  return result
+}
+
+export async function unlike(userId: string, templateId: string): Promise<TemplateLikeResult> {
+  const result = await repository.removeTemplateLike(templateId, userId)
+  if (!result) throw AppError.notFound('ไม่พบดีไซน์ที่ต้องการ')
+  return result
 }

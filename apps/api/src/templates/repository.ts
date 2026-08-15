@@ -10,6 +10,11 @@ export interface ListTemplatesOptions {
   cursor: TemplateFeedCursor | null
 }
 
+export interface TemplateLikeMutationRow {
+  liked: boolean
+  likeCount: number
+}
+
 const templateListSelect = {
   id: true,
   name: true,
@@ -64,5 +69,63 @@ export function listTemplates(options: ListTemplatesOptions): Promise<TemplateLi
     orderBy,
     select: templateListSelect,
     take: options.limit + 1,
+  })
+}
+
+/**
+ * เพิ่มไลก์แบบ idempotent — composite primary key กันคำขอซ้ำที่ระดับ DB
+ * และ increment counter อยู่ใน transaction เดียวกับ insert เสมอ
+ */
+export function addTemplateLike(templateId: string, userId: string): Promise<TemplateLikeMutationRow | null> {
+  return prisma.$transaction(async (tx) => {
+    const template = await tx.nailTemplate.findFirst({
+      where: { id: templateId, visibility: 'public', deletedAt: null },
+      select: { id: true },
+    })
+    if (!template) return null
+
+    const inserted = await tx.templateLike.createMany({
+      data: { templateId: template.id, userId },
+      skipDuplicates: true,
+    })
+    if (inserted.count === 1) {
+      await tx.nailTemplate.update({
+        where: { id: template.id },
+        data: { likeCount: { increment: 1 } },
+      })
+    }
+
+    const current = await tx.nailTemplate.findUniqueOrThrow({
+      where: { id: template.id },
+      select: { likeCount: true },
+    })
+    return { liked: true, likeCount: current.likeCount }
+  })
+}
+
+/**
+ * ลบไลก์แบบ idempotent — ถ้าไม่มีไลก์อยู่แล้วจะไม่ลด counter
+ */
+export function removeTemplateLike(templateId: string, userId: string): Promise<TemplateLikeMutationRow | null> {
+  return prisma.$transaction(async (tx) => {
+    const template = await tx.nailTemplate.findFirst({
+      where: { id: templateId, visibility: 'public', deletedAt: null },
+      select: { id: true },
+    })
+    if (!template) return null
+
+    const removed = await tx.templateLike.deleteMany({ where: { templateId: template.id, userId } })
+    if (removed.count === 1) {
+      await tx.nailTemplate.update({
+        where: { id: template.id },
+        data: { likeCount: { decrement: 1 } },
+      })
+    }
+
+    const current = await tx.nailTemplate.findUniqueOrThrow({
+      where: { id: template.id },
+      select: { likeCount: true },
+    })
+    return { liked: false, likeCount: current.likeCount }
   })
 }

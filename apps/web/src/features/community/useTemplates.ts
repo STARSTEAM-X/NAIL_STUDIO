@@ -1,11 +1,11 @@
-import { useInfiniteQuery } from '@tanstack/react-query'
-import type { TemplateCard } from '@nail-studio/contracts'
+import { useInfiniteQuery, useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query'
+import type { TemplateCard, TemplateLikeResult } from '@nail-studio/contracts'
 import {
   TEMPLATE_CATEGORIES,
   TEMPLATE_PRIMARY_COLORS,
   TEMPLATE_SORTS,
 } from '@nail-studio/contracts'
-import { apiFetchPage } from '@/api/client.ts'
+import { apiFetch, apiFetchPage, type ApiPage } from '@/api/client.ts'
 
 export type TemplateSort = (typeof TEMPLATE_SORTS)[number]
 export type TemplateCategory = (typeof TEMPLATE_CATEGORIES)[number]
@@ -37,5 +37,35 @@ export function useTemplates(filters: TemplateFilters) {
     queryFn: ({ pageParam }) =>
       apiFetchPage<TemplateCard[]>(templateFeedPath(filters, pageParam)),
     getNextPageParam: (page) => page.nextCursor ?? undefined,
+  })
+}
+
+export interface TemplateLikeInput {
+  templateId: string
+  liked: boolean
+}
+
+export function useTemplateLike() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ templateId, liked }: TemplateLikeInput) =>
+      apiFetch<TemplateLikeResult>(`/templates/${templateId}/like`, {
+        method: liked ? 'DELETE' : 'PUT',
+      }),
+    onSuccess: (result, { templateId }) => {
+      queryClient.setQueriesData<InfiniteData<ApiPage<TemplateCard[]>>>({ queryKey: templateKeys.all }, (current) => {
+        if (!current) return current
+        return {
+          ...current,
+          pages: current.pages.map((page) => ({
+            ...page,
+            data: page.data.map((template) =>
+              template.id === templateId ? { ...template, likeCount: result.likeCount } : template,
+            ),
+          })),
+        }
+      })
+    },
   })
 }

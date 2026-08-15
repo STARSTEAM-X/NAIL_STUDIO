@@ -5,6 +5,7 @@ import {
   type TemplateCategory,
   type TemplatePrimaryColor,
   type TemplateSort,
+  useTemplateLike,
   useTemplates,
 } from '@/features/community/useTemplates.ts'
 
@@ -26,6 +27,7 @@ export function CommunityPage() {
   const [sort, setSort] = useState<TemplateSort>('latest')
   const [category, setCategory] = useState<TemplateCategory | ''>('')
   const [color, setColor] = useState<TemplatePrimaryColor | ''>('')
+  const [likedTemplateIds, setLikedTemplateIds] = useState<Set<string>>(() => new Set())
   const filters = useMemo(
     () => ({
       sort,
@@ -35,6 +37,7 @@ export function CommunityPage() {
     [category, color, sort],
   )
   const templates = useTemplates(filters)
+  const likeMutation = useTemplateLike()
   const items = templates.data?.pages.flatMap((page) => page.data) ?? []
 
   return (
@@ -115,7 +118,31 @@ export function CommunityPage() {
               {template.caption && <p className="template-caption">{template.caption}</p>}
               <p className="muted template-author">โดย {template.author.displayName}</p>
               <div className="template-stats" aria-label="สถิติการมีส่วนร่วม">
-                <span>♥ {template.likeCount}</span>
+                <button
+                  type="button"
+                  className={`template-like ${likedTemplateIds.has(template.id) ? 'template-like-on' : ''}`}
+                  aria-label={likedTemplateIds.has(template.id) ? 'เลิกไลก์ดีไซน์นี้' : 'ไลก์ดีไซน์นี้'}
+                  aria-pressed={likedTemplateIds.has(template.id)}
+                  disabled={likeMutation.isPending && likeMutation.variables?.templateId === template.id}
+                  onClick={() => {
+                    const liked = likedTemplateIds.has(template.id)
+                    likeMutation.mutate(
+                      { templateId: template.id, liked },
+                      {
+                        onSuccess: (result) => {
+                          setLikedTemplateIds((current) => {
+                            const next = new Set(current)
+                            if (result.liked) next.add(template.id)
+                            else next.delete(template.id)
+                            return next
+                          })
+                        },
+                      },
+                    )
+                  }}
+                >
+                  <span aria-hidden="true">♥</span> {template.likeCount}
+                </button>
                 <span>↗ {template.shareCount}</span>
                 <span>↻ {template.remixCount}</span>
                 <span>💬 {template.commentCount}</span>

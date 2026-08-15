@@ -34,5 +34,11 @@ export const templateCardSchema = z.object({
   author: templateAuthorSchema,
 })
 
+export const templateLikeResultSchema = z.object({
+  liked: z.boolean(),
+  likeCount: z.number().int().nonnegative(),
+})
+
 export type ListTemplatesQuery = z.infer<typeof listTemplatesQuerySchema>
 export type TemplateCard = z.infer<typeof templateCardSchema>
+export type TemplateLikeResult = z.infer<typeof templateLikeResultSchema>

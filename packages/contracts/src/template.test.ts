@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { listTemplatesQuerySchema, templateCardSchema } from './template.ts'
+import { listTemplatesQuerySchema, templateCardSchema, templateLikeResultSchema } from './template.ts'
 
 describe('template contracts', () => {
   it('applies safe feed defaults and rejects unsupported filters', () => {
@@ -30,5 +30,13 @@ describe('template contracts', () => {
 
     expect(templateCardSchema.safeParse(card).success).toBe(true)
     expect(templateCardSchema.safeParse({ ...card, likeCount: -1 }).success).toBe(false)
+  })
+
+  it('validates the idempotent like response', () => {
+    expect(templateLikeResultSchema.parse({ liked: true, likeCount: 3 })).toEqual({
+      liked: true,
+      likeCount: 3,
+    })
+    expect(templateLikeResultSchema.safeParse({ liked: false, likeCount: -1 }).success).toBe(false)
   })
 })

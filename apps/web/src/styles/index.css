@@ -170,6 +170,20 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .template-caption { min-height: 1.6em; margin: 0; color: var(--ink); font-size: 0.85rem; overflow-wrap: anywhere; }
 .template-author { font-size: 0.78rem; }
 .template-stats { display: flex; flex-wrap: wrap; gap: 0.65rem; margin-top: 0.25rem; color: var(--muted); font-size: 0.78rem; }
+.template-like {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.template-like:hover, .template-like-on { color: var(--accent); }
+.template-like:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+.template-like:disabled { cursor: wait; opacity: 0.65; }
 .community-load-more { display: block; margin: 1.25rem auto 0; }
 
 /* ---------- editor ---------- */
