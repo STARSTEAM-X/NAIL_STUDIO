@@ -274,9 +274,20 @@ Sprint 0, งานทำคลัง asset จริง, เวลา hardening
 
 ### Slice 4 — ของตกแต่ง + ทรงเล็บ + สัดส่วนมือ (สัปดาห์ 11–13)
 
-1. `geometry/surfaceProjection.ts` (A-11) + `pointInHull.ts` (A-21) + unit test ครบ edge case
-2. `NailDecoration` + `DecorationInstances` (InstancedMesh สำหรับชิ้นซ้ำเยอะ)
-3. `TransformController` — ย้าย (ลากบนผิว) · หมุน (รอบ normal) · ย่อขยาย
+1. [x] `geometry/surfaceProjection.ts` (A-11) + `pointInHull.ts` (A-21) + unit test ครบ edge case (D-31)
+   - เพิ่ม `geometry/hull.ts` (A-01) เข้าขอบเขตด้วย — เป็น prerequisite ของ `pointInHull.ts`
+     ที่ยังไม่มีไฟล์จริงมาก่อน (ค้นพบระหว่างเขียนสเปก ไม่ได้อยู่ในแผนเดิม)
+2. [x] `NailDecoration` + `DecorationInstances` (InstancedMesh สำหรับชิ้นซ้ำเยอะ) — placeholder
+   geometry ล้วน (ยังไม่มี asset 3D จริง รอ Slice 5)
+3. [x] `TransformController` — ย้าย (ลากบนผิว) ผ่านเมาส์, หมุน/ย่อขยายผ่านแผงตัวเลข (D-29:
+   ไม่ทำ 3D gizmo) — เลือกของตกแต่งด้วยระยะ UV ใกล้ที่สุดแทนการ raycast InstancedMesh โดยตรง
+   - **บั๊กสำคัญที่พบตอนตรวจด้วยเบราว์เซอร์จริง (ไม่ใช่แค่ unit test)**: `useMemo` ที่สร้าง
+     `InstancedMesh` เขียนผลข้างเคียงลง `useRef` ข้างในตัวเอง ทำให้ React StrictMode (เรียก
+     factory สองรอบโดยตั้งใจใน dev) ทำให้ mesh ที่ถูกแก้ matrix กับ mesh ที่ถูกเรนเดอร์จริง
+     เป็นคนละก้อนกัน — ของตกแต่งมีข้อมูลถูกต้องสมบูรณ์แต่ไม่ปรากฏบนจอเลย ไม่มี error ใน
+     console แก้แล้วโดยเปลี่ยนให้ derive mesh lookup map จากผลลัพธ์ `useMemo` ตัวแรกแทน (ดู
+     D-31 สำหรับรายละเอียดเต็มและบทเรียน) — ค่า `defaultScale` ใน catalog ก็ถูกวัดใหม่จาก
+     โมเดลจริงในรอบนี้ด้วย (เดิมเดามาโดยไม่มีข้อมูลอ้างอิง ใหญ่เกินจริง 15-80 เท่า)
 4. [x] **ทรงเล็บ + ความยาว** — ยกวิธี PCA + morph target จาก [Spike S2](spikes/S2-nail-shapes.md) (D-27)
    - เขียน `tools/build_shapes.py` ใหม่พร้อมเทส (spike เป็นโค้ดทิ้ง)
    - [ ] **ปรับค่าเชิงศิลป์ของ square/squoval** ซึ่ง spike พบว่าจางเกินไป (S2 §6) —
