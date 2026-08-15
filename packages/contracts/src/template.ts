@@ -38,8 +38,25 @@ export const templateCardSchema = z.object({
   author: templateAuthorSchema,
 })
 
+export const templateCommentSchema = z.object({
+  id: z.string().uuid(),
+  content: z.string().min(1).max(1000),
+  createdAt: z.string(),
+  author: templateAuthorSchema,
+})
+
+export const createTemplateCommentSchema = z.object({
+  content: z.string().trim().min(1, 'กรุณาเขียนคอมเมนต์').max(1000, 'คอมเมนต์ยาวเกิน 1,000 ตัวอักษร'),
+})
+
 export const templateDetailSchema = templateCardSchema.extend({
   document: designDocumentSchema,
+  comments: z.array(templateCommentSchema),
+})
+
+export const templateCommentResultSchema = z.object({
+  comment: templateCommentSchema,
+  commentCount: z.number().int().nonnegative(),
 })
 
 export const templateLikeResultSchema = z.object({
@@ -86,6 +103,9 @@ export const templateModerationReportSchema = z.object({
 export type ListTemplatesQuery = z.infer<typeof listTemplatesQuerySchema>
 export type TemplateCard = z.infer<typeof templateCardSchema>
 export type TemplateDetail = z.infer<typeof templateDetailSchema>
+export type TemplateComment = z.infer<typeof templateCommentSchema>
+export type CreateTemplateCommentInput = z.infer<typeof createTemplateCommentSchema>
+export type TemplateCommentResult = z.infer<typeof templateCommentResultSchema>
 export type TemplateLikeResult = z.infer<typeof templateLikeResultSchema>
 export type TemplateRemixInput = z.infer<typeof templateRemixSchema>
 export type TemplateRemixResult = z.infer<typeof templateRemixResultSchema>

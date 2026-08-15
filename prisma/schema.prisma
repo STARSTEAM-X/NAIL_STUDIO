@@ -96,6 +96,16 @@ enum ContentReportStatus {
   @@map("content_report_status")
 }
 
+enum NotificationKind {
+  post_like
+  post_comment
+  template_remix
+  appointment_status
+  appointment_message
+
+  @@map("notification_kind")
+}
+
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
@@ -114,6 +124,7 @@ model User {
   templateRemixes  TemplateRemix[]
   templateComments TemplateComment[]
   contentReports   ContentReport[]
+  notifications    Notification[]
 
   @@map("users")
 }
@@ -359,4 +370,20 @@ model ContentReport {
   @@unique([targetType, targetId, reporterId])
   @@index([status, createdAt(sort: Desc)])
   @@map("content_reports")
+}
+
+model Notification {
+  id         String           @id @default(uuid()) @db.Uuid
+  userId     String           @map("user_id") @db.Uuid
+  kind       NotificationKind
+  title      String           @db.Text
+  sourceType String           @map("source_type") @db.Text
+  sourceId   String           @map("source_id") @db.Uuid
+  isRead     Boolean          @default(false) @map("is_read")
+  createdAt  DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("notifications")
 }

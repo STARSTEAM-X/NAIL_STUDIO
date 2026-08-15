@@ -145,6 +145,34 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .navbar-link { color: var(--deep); text-decoration: none; font-size: 0.9rem; }
 .navbar-link:hover { color: var(--accent); text-decoration: underline; }
+.notification-menu { position: relative; }
+.notification-trigger {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--rule);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--deep);
+  cursor: pointer;
+}
+.notification-trigger:hover { border-color: var(--accent); color: var(--accent); }
+.notification-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.notification-badge { position: absolute; top: -0.35rem; right: -0.45rem; min-width: 1.1rem; padding: 0.05rem 0.2rem; border-radius: 999px; background: var(--accent); color: #fff; font-size: 0.65rem; line-height: 1.1; text-align: center; }
+.notification-popover { position: absolute; top: calc(100% + 0.6rem); right: 0; z-index: 30; width: min(360px, 82vw); overflow: hidden; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); box-shadow: 0 12px 30px rgb(80 45 30 / 16%); }
+.notification-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.75rem 0.85rem; border-bottom: 1px solid var(--rule); color: var(--deep); }
+.notification-read-all { border: 0; background: transparent; color: var(--accent); font: inherit; font-size: 0.75rem; cursor: pointer; }
+.notification-read-all:disabled { cursor: default; opacity: 0.45; }
+.notification-list { max-height: 340px; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
+.notification-item { border-bottom: 1px solid color-mix(in srgb, var(--rule) 60%, transparent); }
+.notification-item:last-child { border-bottom: 0; }
+.notification-item button { display: flex; width: 100%; flex-direction: column; gap: 0.25rem; padding: 0.7rem 0.85rem; border: 0; background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.notification-item button:hover { background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+.notification-item time { color: var(--muted); font-size: 0.7rem; }
+.notification-unread { background: #fff7f2; }
+.notification-empty { margin: 0; padding: 1rem; font-size: 0.82rem; }
 .community-page { max-width: 1180px; }
 .community-head { align-items: flex-end; }
 .community-head h1 { margin: 0; }
@@ -210,6 +238,14 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .template-preview-stage { min-height: min(68vh, 720px); overflow: hidden; border-radius: 14px; background: #17120f; box-shadow: 0 8px 28px rgb(80 45 30 / 12%); }
 .template-preview-stage > div, .template-preview-stage canvas { display: block; width: 100%; height: 100%; min-height: min(68vh, 720px); }
 .template-preview-caption { margin: 1rem 0 0; color: var(--ink); }
+.template-comments { margin-top: 1.5rem; }
+.template-comments-head h2 { margin: 0 0 0.75rem; color: var(--deep); font-size: 1.05rem; }
+.template-comment-form { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: flex-start; }
+.template-comment-form textarea { flex: 1 1 420px; min-height: 4.5rem; resize: vertical; }
+.template-comment-list { display: flex; flex-direction: column; gap: 0.6rem; margin: 1rem 0 0; padding: 0; list-style: none; }
+.template-comment-list li { padding: 0.75rem 0.85rem; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); }
+.template-comment-list p { margin: 0 0 0.35rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.template-comment-list .muted { font-size: 0.75rem; }
 
 /* ---------- editor ---------- */
 

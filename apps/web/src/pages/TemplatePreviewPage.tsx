@@ -1,14 +1,17 @@
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ApiRequestError } from '@/api/client.ts'
 import { NailScene } from '@/3d/scene/NailScene.tsx'
 import { ReadOnlyDesignScene } from '@/3d/scene/ReadOnlyDesignScene.tsx'
 import { WebGlGuard } from '@/3d/scene/WebGlGuard.tsx'
-import { useTemplate } from '@/features/community/useTemplates.ts'
+import { useCreateTemplateComment, useTemplate } from '@/features/community/useTemplates.ts'
 import { DesignStoreProvider } from '@/features/design/DesignStoreProvider.tsx'
 
 export function TemplatePreviewPage() {
   const { templateId } = useParams<{ templateId: string }>()
   const template = useTemplate(templateId)
+  const createComment = useCreateTemplateComment()
+  const [commentText, setCommentText] = useState('')
 
   if (!templateId) return <p className="error center">ไม่พบรหัสดีไซน์</p>
   if (template.isPending) return <p className="muted center">กำลังโหลดตัวอย่าง 3D…</p>
@@ -49,6 +52,40 @@ export function TemplatePreviewPage() {
         </div>
 
         {detail.caption && <p className="template-preview-caption">{detail.caption}</p>}
+
+        <section className="template-comments" aria-labelledby="template-comments-title">
+          <div className="template-comments-head">
+            <h2 id="template-comments-title">ความคิดเห็น ({detail.commentCount})</h2>
+          </div>
+          <form
+            className="template-comment-form"
+            onSubmit={(event) => {
+              event.preventDefault()
+              const content = commentText.trim()
+              if (!content || !templateId) return
+              createComment.mutate({ templateId, content }, { onSuccess: () => setCommentText('') })
+            }}
+          >
+            <textarea
+              value={commentText}
+              maxLength={1000}
+              placeholder="เขียนความคิดเห็น…"
+              aria-label="ความคิดเห็นใหม่"
+              onChange={(event) => setCommentText(event.target.value)}
+            />
+            <button type="submit" className="btn btn-primary" disabled={!commentText.trim() || createComment.isPending}>
+              {createComment.isPending ? 'กำลังส่ง…' : 'ส่งความคิดเห็น'}
+            </button>
+          </form>
+          <ul className="template-comment-list">
+            {detail.comments.map((comment) => (
+              <li key={comment.id}>
+                <p>{comment.content}</p>
+                <span className="muted">โดย {comment.author.displayName}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
       </section>
     </DesignStoreProvider>
   )

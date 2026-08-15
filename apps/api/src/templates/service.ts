@@ -1,8 +1,10 @@
 import type {
   TemplateDetail,
+  CreateTemplateCommentInput,
   ListTemplatesQuery,
   TemplateCard,
   TemplateLikeResult,
+  TemplateCommentResult,
   TemplateModerationReport,
   TemplateReportInput,
   TemplateReportResult,
@@ -77,7 +79,16 @@ export async function detail(templateId: string): Promise<TemplateDetail> {
   if (!document.success) {
     throw AppError.conflict('ดีไซน์นี้อยู่ในรูปแบบที่ระบบยังอ่านไม่ได้')
   }
-  return { ...toCard(row), document: document.data }
+  return {
+    ...toCard(row),
+    document: document.data,
+    comments: row.comments.map((comment) => ({
+      id: comment.id,
+      content: comment.content,
+      createdAt: comment.createdAt.toISOString(),
+      author: comment.user,
+    })),
+  }
 }
 
 export async function like(userId: string, templateId: string): Promise<TemplateLikeResult> {
@@ -136,4 +147,22 @@ export async function moderationQueue(): Promise<TemplateModerationReport[]> {
     reporter: row.reporter,
     template: row.template,
   }))
+}
+
+export async function comment(
+  userId: string,
+  templateId: string,
+  input: CreateTemplateCommentInput,
+): Promise<TemplateCommentResult> {
+  const result = await repository.createTemplateComment(templateId, userId, input.content)
+  if (!result) throw AppError.notFound('ไม่พบดีไซน์ที่ต้องการ')
+  return {
+    comment: {
+      id: result.comment.id,
+      content: result.comment.content,
+      createdAt: result.comment.createdAt.toISOString(),
+      author: result.comment.author,
+    },
+    commentCount: result.commentCount,
+  }
 }

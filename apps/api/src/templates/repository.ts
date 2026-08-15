@@ -1,5 +1,6 @@
 import { Prisma } from '../generated/prisma/client.ts'
 import { prisma } from '../db.ts'
+import { createNotification } from '../notifications/repository.ts'
 import type { TemplateFeedCursor } from './cursor.ts'
 
 export interface ListTemplatesOptions {
@@ -46,6 +47,16 @@ export interface TemplateModerationReportRow {
   template: { name: string; visibility: 'public' | 'unlisted' | 'hidden'; reportCount: number } | null
 }
 
+export interface TemplateCommentMutationRow {
+  comment: {
+    id: string
+    content: string
+    createdAt: Date
+    author: { id: string; displayName: string }
+  }
+  commentCount: number
+}
+
 const templateListSelect = {
   id: true,
   name: true,
@@ -67,6 +78,17 @@ export type TemplateListRow = Prisma.NailTemplateGetPayload<{ select: typeof tem
 const templateDetailSelect = {
   ...templateListSelect,
   designVersion: { select: { document: true } },
+  comments: {
+    where: { deletedAt: null },
+    orderBy: [{ createdAt: 'asc' as const }, { id: 'asc' as const }],
+    take: 100,
+    select: {
+      id: true,
+      content: true,
+      createdAt: true,
+      user: { select: { id: true, displayName: true } },
+    },
+  },
 } satisfies Prisma.NailTemplateSelect
 
 export type TemplateDetailRow = Prisma.NailTemplateGetPayload<{ select: typeof templateDetailSelect }>
@@ -117,6 +139,48 @@ export function findPublicTemplateDetail(templateId: string): Promise<TemplateDe
   })
 }
 
+export function createTemplateComment(
+  templateId: string,
+  userId: string,
+  content: string,
+): Promise<TemplateCommentMutationRow | null> {
+  return prisma.$transaction(async (tx) => {
+    const template = await tx.nailTemplate.findFirst({
+      where: { id: templateId, visibility: 'public', deletedAt: null },
+      select: { id: true, authorId: true, name: true },
+    })
+    if (!template) return null
+
+    const comment = await tx.templateComment.create({
+      data: { templateId: template.id, userId, content },
+      select: {
+        id: true,
+        content: true,
+        createdAt: true,
+        user: { select: { id: true, displayName: true } },
+      },
+    })
+    const updated = await tx.nailTemplate.update({
+      where: { id: template.id },
+      data: { commentCount: { increment: 1 } },
+      select: { commentCount: true },
+    })
+    if (template.authorId !== userId) {
+      await createNotification(tx, {
+        userId: template.authorId,
+        kind: 'post_comment',
+        title: `มีคอมเมนต์ใหม่ในดีไซน์ “${template.name}”`,
+        sourceType: 'post',
+        sourceId: template.id,
+      })
+    }
+    return {
+      comment: { id: comment.id, content: comment.content, createdAt: comment.createdAt, author: comment.user },
+      commentCount: updated.commentCount,
+    }
+  })
+}
+
 /**
  * เพิ่มไลก์แบบ idempotent — composite primary key กันคำขอซ้ำที่ระดับ DB
  * และ increment counter อยู่ใน transaction เดียวกับ insert เสมอ
@@ -125,7 +189,7 @@ export function addTemplateLike(templateId: string, userId: string): Promise<Tem
   return prisma.$transaction(async (tx) => {
     const template = await tx.nailTemplate.findFirst({
       where: { id: templateId, visibility: 'public', deletedAt: null },
-      select: { id: true },
+      select: { id: true, authorId: true, name: true },
     })
     if (!template) return null
 
@@ -144,6 +208,15 @@ export function addTemplateLike(templateId: string, userId: string): Promise<Tem
       where: { id: template.id },
       select: { likeCount: true },
     })
+    if (inserted.count === 1 && template.authorId !== userId) {
+      await createNotification(tx, {
+        userId: template.authorId,
+        kind: 'post_like',
+        title: `มีคนถูกใจดีไซน์ “${template.name}”`,
+        sourceType: 'post',
+        sourceId: template.id,
+      })
+    }
     return { liked: true, likeCount: current.likeCount }
   })
 }
@@ -190,6 +263,7 @@ export function remixTemplate(
       select: {
         id: true,
         name: true,
+        authorId: true,
         designVersion: { select: { document: true } },
       },
     })
@@ -227,6 +301,15 @@ export function remixTemplate(
       data: { remixCount: { increment: 1 } },
       select: { remixCount: true },
     })
+    if (template.authorId !== userId) {
+      await createNotification(tx, {
+        userId: template.authorId,
+        kind: 'template_remix',
+        title: `มีคนรีมิกซ์ดีไซน์ “${template.name}”`,
+        sourceType: 'post',
+        sourceId: template.id,
+      })
+    }
 
     return {
       sourceTemplateId: template.id,

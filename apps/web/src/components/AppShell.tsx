@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useCurrentUser, useLogout } from '@/features/auth/useAuth.ts'
+import { NotificationBell } from './NotificationBell.tsx'
 
 /**
  * โครงหน้าเว็บที่ใช้ร่วมกันทุกหน้าที่ล็อกอินแล้ว
@@ -17,6 +18,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Link to="/projects" className="brand">Nail Studio <span>3D</span></Link>
         <div className="navbar-right">
           <Link to="/community" className="navbar-link">ชุมชน</Link>
+          <NotificationBell />
           {user && <span className="user-name">{user.displayName}</span>}
           <button
             type="button"

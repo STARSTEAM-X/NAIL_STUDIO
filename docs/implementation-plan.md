@@ -374,7 +374,7 @@ Sprint 0, งานทำคลัง asset จริง, เวลา hardening
 6. [x] Remix → สร้างโปรเจกต์ใหม่ + บันทึก lineage ต้นทางผ่าน `template_remixes.template_id` (ส่ง `sourceTemplateId` กลับในผลลัพธ์) — เพิ่ม `POST /templates/:id/remix`, event/counter และปุ่มรีมิกซ์ที่เปิด editor ของโปรเจกต์ใหม่
 7. [x] Moderation: รายงาน → ซ่อนอัตโนมัติที่ 5 → คิว admin — เพิ่ม `POST /templates/:id/report`, dedupe ต่อผู้รายงาน และ `GET /templates/moderation/reports` สำหรับ admin
 8. [x] พรีวิว 3D แบบ read-only (ไม่โหลดเครื่องมือแก้ไข → bundle เล็กกว่า) — เพิ่ม `GET /templates/:id` และหน้า `/community/templates/:templateId` ที่ใช้ฉากเฉพาะ preview
-9. **`notifications`** (A-13, DB-10) — เพิ่มกลับเข้าแผนหลังพบว่าตกหล่นจากรอบ audit ก่อนหน้า
+9. [x] **`notifications`** (A-13, DB-10) — เพิ่มกลับเข้าแผนหลังพบว่าตกหล่นจากรอบ audit ก่อนหน้า
    - เริ่มที่สอง `kind` แรก: `post_like`, `post_comment` (ไลก์/คอมเมนต์เทมเพลตของตัวเอง)
      `template_remix` เพิ่มพร้อมข้อ 6 — สร้างแถวแจ้งเตือนใน transaction เดียวกับ insert
      `post_likes`/`post_comments`/remix (กฎเดียวกับ denormalized counter)

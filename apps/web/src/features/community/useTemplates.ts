@@ -1,5 +1,12 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query'
-import type { TemplateCard, TemplateDetail, TemplateLikeResult, TemplateRemixResult } from '@nail-studio/contracts'
+import type {
+  CreateTemplateCommentInput,
+  TemplateCard,
+  TemplateCommentResult,
+  TemplateDetail,
+  TemplateLikeResult,
+  TemplateRemixResult,
+} from '@nail-studio/contracts'
 import {
   TEMPLATE_CATEGORIES,
   TEMPLATE_PRIMARY_COLORS,
@@ -108,6 +115,25 @@ export function useTemplateRemix() {
           })),
         }
       })
+    },
+  })
+}
+
+export interface TemplateCommentInput extends CreateTemplateCommentInput {
+  templateId: string
+}
+
+export function useCreateTemplateComment() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ templateId, content }: TemplateCommentInput) =>
+      apiFetch<TemplateCommentResult>(`/templates/${templateId}/comments`, {
+        method: 'POST',
+        body: { content },
+      }),
+    onSuccess: (_result, { templateId }) => {
+      void queryClient.invalidateQueries({ queryKey: templateKeys.detail(templateId), exact: true })
+      void queryClient.invalidateQueries({ queryKey: templateKeys.all })
     },
   })
 }
