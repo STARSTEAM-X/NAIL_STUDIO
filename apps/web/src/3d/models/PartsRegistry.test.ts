@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BufferGeometry, Group, Mesh, MeshBasicMaterial } from 'three'
+import { Bone, BufferGeometry, Group, Mesh, MeshBasicMaterial } from 'three'
 import { FINGERS } from '@nail-studio/contracts'
 import { buildPartsRegistry } from './PartsRegistry.ts'
 
@@ -23,9 +23,21 @@ function makeHand(names: string[]): Group {
   return group
 }
 
+const CHAIN_BONE_NAMES = ['Palm', 'Thumb2', 'Index1', 'Middle1', 'Ring1', 'Pinky1']
+
+function makeHandWithBones(meshNames: string[]): Group {
+  const group = makeHand(meshNames)
+  for (const name of CHAIN_BONE_NAMES) {
+    const bone = new Bone()
+    bone.name = name
+    group.add(bone)
+  }
+  return group
+}
+
 describe('buildPartsRegistry', () => {
   it('จับเล็บครบห้านิ้วและแยกผิวมือออกจากเล็บ', () => {
-    const registry = buildPartsRegistry(makeHand(['Hand', ...ALL_NAILS]), 'right')
+    const registry = buildPartsRegistry(makeHandWithBones(['Hand', ...ALL_NAILS]), 'right')
 
     expect(registry.nails.size).toBe(5)
     expect(registry.skin.name).toBe('Hand')
@@ -34,13 +46,13 @@ describe('buildPartsRegistry', () => {
   })
 
   it('mesh ชุดเดียวกันให้คีย์ของมือที่ระบุ — มือซ้ายมาจากการกลับด้านโมเดลเดิม', () => {
-    const registry = buildPartsRegistry(makeHand(['Hand', ...ALL_NAILS]), 'left')
+    const registry = buildPartsRegistry(makeHandWithBones(['Hand', ...ALL_NAILS]), 'left')
     expect([...registry.nails.keys()].every((key) => key.startsWith('left.'))).toBe(true)
     expect(registry.hand).toBe('left')
   })
 
   it('สร้างแผนที่ย้อนกลับจาก object เป็นคีย์เล็บ', () => {
-    const registry = buildPartsRegistry(makeHand(['Hand', ...ALL_NAILS]), 'right')
+    const registry = buildPartsRegistry(makeHandWithBones(['Hand', ...ALL_NAILS]), 'right')
     const mesh = registry.nails.get('right.index')
 
     expect(mesh).toBeDefined()
@@ -49,7 +61,7 @@ describe('buildPartsRegistry', () => {
   })
 
   it('นับ mesh ที่ไม่ใช่เล็บเป็น occluder รวมถึงผิวมือด้วย', () => {
-    const registry = buildPartsRegistry(makeHand(['Hand', 'Sleeve', ...ALL_NAILS]), 'right')
+    const registry = buildPartsRegistry(makeHandWithBones(['Hand', 'Sleeve', ...ALL_NAILS]), 'right')
 
     // ผิวมือต้องอยู่ใน occluder ด้วย ไม่งั้นนิ้วที่บังอยู่จะไม่บังจริง
     // แล้วสีจะทะลุไปลงเล็บที่มองไม่เห็น (PaintController.tsx:35 ของซอร์สเดิม)
@@ -57,13 +69,13 @@ describe('buildPartsRegistry', () => {
   })
 
   it('ตั้ง renderOrder ให้เล็บวาดทับผิวนิ้ว', () => {
-    const registry = buildPartsRegistry(makeHand(['Hand', ...ALL_NAILS]), 'right')
+    const registry = buildPartsRegistry(makeHandWithBones(['Hand', ...ALL_NAILS]), 'right')
     expect(registry.nails.get('right.index')?.renderOrder).toBe(10)
   })
 
   it('ชื่อที่ไม่ตรงรูปแบบ Nail_<นิ้ว> ถูกนับเป็น occluder ไม่ใช่เล็บ', () => {
     const registry = buildPartsRegistry(
-      makeHand(['Hand', ...ALL_NAILS, 'Nail_index_extra', 'Nail_unknown', 'NailIndex']),
+      makeHandWithBones(['Hand', ...ALL_NAILS, 'Nail_index_extra', 'Nail_unknown', 'NailIndex']),
       'right',
     )
     expect(registry.nails.size).toBe(5)
@@ -83,5 +95,16 @@ describe('buildPartsRegistry', () => {
     // ปล่อยให้โหลดแบบขาดนิ้วไม่ได้ ไม่งั้นผู้ใช้จะวาดนิ้วนั้นไม่ได้โดยไม่มีคำอธิบาย
     expect(() => buildPartsRegistry(makeHand(['Hand', 'Nail_index']), 'right'))
       .toThrow(/Nail_thumb/)
+  })
+
+  it('เก็บบอร์นฝ่ามือ+รากนิ้วไว้ใน bones สำหรับสไลเดอร์สัดส่วนมือ', () => {
+    const registry = buildPartsRegistry(makeHandWithBones(['Hand', ...ALL_NAILS]), 'right')
+    expect(registry.bones.palm.name).toBe('Palm')
+    expect(registry.bones.fingerRoots.index.name).toBe('Index1')
+  })
+
+  it('โยนข้อผิดพลาดเมื่อโมเดลขาดบอร์นที่จำเป็นสำหรับสัดส่วนมือ', () => {
+    const hand = makeHand(['Hand', ...ALL_NAILS]) // ไม่มี bones เลย
+    expect(() => buildPartsRegistry(hand, 'right')).toThrow(/Palm/)
   })
 })

@@ -1,5 +1,6 @@
 import type { Mesh, Object3D } from 'three'
 import { FINGERS, nailKey, type Hand, type NailKey } from '@nail-studio/contracts'
+import { collectBones, type HandBones } from './handBones.ts'
 
 /** ชื่อ mesh ผิวมือที่ pipeline ตั้งให้ (tools/build_model.py: HAND_OUT) */
 const SKIN_MESH_NAME = 'Hand'
@@ -7,6 +8,7 @@ const SKIN_MESH_NAME = 'Hand'
 export interface HandParts {
   /** มือที่ registry ชุดนี้แทนอยู่ — คีย์ของเล็บทั้งหมดขึ้นต้นด้วยค่านี้ */
   hand: Hand
+  bones: HandBones
   /** ค้นเล็บจากคีย์ — O(1) ไม่ใช่การไล่ array ทุกครั้งที่ pointer ขยับ (A-12) */
   nails: Map<NailKey, Mesh>
   /** แผนที่ย้อนกลับ ใช้ตอน raycast แล้วได้ object กลับมาแล้วต้องรู้ว่าเป็นเล็บไหน */
@@ -67,5 +69,7 @@ export function buildPartsRegistry(root: Object3D, hand: Hand): HandParts {
     throw new Error(`โมเดลขาด mesh เล็บ: ${missing.map((finger) => `Nail_${finger}`).join(', ')}`)
   }
 
-  return { hand, nails, nailOf, occluders, skin }
+  const bones = collectBones(root)
+
+  return { hand, bones, nails, nailOf, occluders, skin }
 }
