@@ -45,6 +45,57 @@ enum PaletteSource {
   @@map("palette_source")
 }
 
+enum TemplateOrigin {
+  original
+  ai
+  remix
+
+  @@map("template_origin")
+}
+
+enum TemplateVisibility {
+  public
+  unlisted
+  hidden
+
+  @@map("template_visibility")
+}
+
+enum TemplateShareChannel {
+  link
+  facebook
+  line
+  instagram
+  copy
+
+  @@map("template_share_channel")
+}
+
+enum ContentReportTarget {
+  template
+  comment
+
+  @@map("content_report_target")
+}
+
+enum ContentReportReason {
+  spam
+  inappropriate
+  copyright
+  harassment
+  other
+
+  @@map("content_report_reason")
+}
+
+enum ContentReportStatus {
+  pending
+  reviewed
+  dismissed
+
+  @@map("content_report_status")
+}
+
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
@@ -54,9 +105,15 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  sessions Session[]
-  projects Project[]
-  assets   Asset[]
+  sessions         Session[]
+  projects         Project[]
+  assets           Asset[]
+  templates        NailTemplate[]
+  templateLikes    TemplateLike[]
+  templateShares   TemplateShare[]
+  templateRemixes  TemplateRemix[]
+  templateComments TemplateComment[]
+  contentReports   ContentReport[]
 
   @@map("users")
 }
@@ -102,9 +159,10 @@ model Project {
   // เวอร์ชันที่ draft นี้ถูกแก้ต่อยอดมา — ใช้ตรวจว่า draft ล้าสมัยไปแล้วหรือยัง
   draftBaseVersion Int?      @map("draft_base_version")
 
-  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  versions       DesignVersion[]
-  thumbnailAsset Asset?          @relation("ProjectThumbnail", fields: [thumbnailAssetId], references: [id], onDelete: SetNull)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  versions        DesignVersion[]
+  thumbnailAsset  Asset?          @relation("ProjectThumbnail", fields: [thumbnailAssetId], references: [id], onDelete: SetNull)
+  templateRemixes TemplateRemix[]
 
   // ดัชนีหลักของหน้ารายการงาน — รองรับทั้งการกรองเจ้าของ เรียงล่าสุด และ keyset pagination (A-14)
   // เป็น partial index จึงไม่เก็บแถวที่ถูกลบ ทำให้ดัชนีเล็กลงและไม่ต้องกรองซ้ำ
@@ -123,8 +181,9 @@ model Asset {
   metadata       Json     @default("{}") @db.JsonB
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  owner    User?     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  projects Project[] @relation("ProjectThumbnail")
+  owner              User?          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  projects           Project[]      @relation("ProjectThumbnail")
+  templateThumbnails NailTemplate[] @relation("TemplateThumbnail")
 
   @@index([ownerId, kind, createdAt(sort: Desc)])
   @@index([checksumSha256])
@@ -140,7 +199,8 @@ model DesignVersion {
   label         String?
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project   Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  templates NailTemplate[]
 
   // บังคับไม่ให้เลขเวอร์ชันซ้ำ — เป็นรากฐานของ optimistic concurrency
   @@unique([projectId, versionNumber])
@@ -185,4 +245,118 @@ model DesignArchetype {
 
   @@index([isActive, popularity(sort: Desc)])
   @@map("design_archetypes")
+}
+
+model NailTemplate {
+  id               String             @id @default(uuid()) @db.Uuid
+  authorId         String             @map("author_id") @db.Uuid
+  designVersionId  String             @map("design_version_id") @db.Uuid
+  name             String             @db.Text
+  caption          String?            @db.Text
+  category         String?            @db.Text
+  primaryColor     String?            @map("primary_color") @db.Text
+  origin           TemplateOrigin     @default(original)
+  sourceTemplateId String?            @map("source_template_id") @db.Uuid
+  thumbnailAssetId String?            @map("thumbnail_asset_id") @db.Uuid
+  visibility       TemplateVisibility @default(public)
+  likeCount        Int                @default(0) @map("like_count")
+  shareCount       Int                @default(0) @map("share_count")
+  remixCount       Int                @default(0) @map("remix_count")
+  viewCount        Int                @default(0) @map("view_count")
+  commentCount     Int                @default(0) @map("comment_count")
+  reportCount      Int                @default(0) @map("report_count")
+  recipe           Json?              @db.JsonB
+  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime           @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt        DateTime?          @map("deleted_at") @db.Timestamptz
+
+  author         User              @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  designVersion  DesignVersion     @relation(fields: [designVersionId], references: [id], onDelete: Restrict)
+  sourceTemplate NailTemplate?     @relation("TemplateRemixSource", fields: [sourceTemplateId], references: [id], onDelete: SetNull)
+  remixes        NailTemplate[]    @relation("TemplateRemixSource")
+  thumbnailAsset Asset?            @relation("TemplateThumbnail", fields: [thumbnailAssetId], references: [id], onDelete: SetNull)
+  likes          TemplateLike[]
+  shares         TemplateShare[]
+  remixEvents    TemplateRemix[]
+  comments       TemplateComment[]
+
+  @@index([authorId, createdAt(sort: Desc)])
+  @@index([sourceTemplateId])
+  @@map("nail_templates")
+}
+
+model TemplateLike {
+  templateId String   @map("template_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  template NailTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([templateId, userId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("template_likes")
+}
+
+model TemplateShare {
+  id         String               @id @default(uuid()) @db.Uuid
+  templateId String               @map("template_id") @db.Uuid
+  userId     String?              @map("user_id") @db.Uuid
+  channel    TemplateShareChannel
+  createdAt  DateTime             @default(now()) @map("created_at") @db.Timestamptz
+
+  template NailTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  user     User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([templateId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("template_shares")
+}
+
+model TemplateRemix {
+  id         String   @id @default(uuid()) @db.Uuid
+  templateId String   @map("template_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  projectId  String   @map("project_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  template NailTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project  Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, projectId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("template_remixes")
+}
+
+model TemplateComment {
+  id         String    @id @default(uuid()) @db.Uuid
+  templateId String    @map("template_id") @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  content    String    @db.Text
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+
+  template NailTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([templateId, createdAt(sort: Desc)])
+  @@map("template_comments")
+}
+
+model ContentReport {
+  id         String              @id @default(uuid()) @db.Uuid
+  targetType ContentReportTarget @map("target_type")
+  targetId   String              @map("target_id") @db.Uuid
+  reporterId String              @map("reporter_id") @db.Uuid
+  reason     ContentReportReason
+  detail     String?             @db.Text
+  status     ContentReportStatus @default(pending)
+  createdAt  DateTime            @default(now()) @map("created_at") @db.Timestamptz
+
+  reporter User @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@unique([targetType, targetId, reporterId])
+  @@index([status, createdAt(sort: Desc)])
+  @@map("content_reports")
 }

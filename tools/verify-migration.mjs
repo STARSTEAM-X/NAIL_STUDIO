@@ -49,6 +49,17 @@ const EXPECTED = {
     'id', 'code', 'name_th', 'composer_key', 'default_params',
     'supported_zones', 'popularity', 'is_active',
   ],
+  nail_templates: [
+    'id', 'author_id', 'design_version_id', 'name', 'caption', 'category',
+    'primary_color', 'origin', 'source_template_id', 'thumbnail_asset_id',
+    'visibility', 'like_count', 'share_count', 'remix_count', 'view_count',
+    'comment_count', 'report_count', 'recipe', 'created_at', 'updated_at', 'deleted_at',
+  ],
+  template_likes: ['template_id', 'user_id', 'created_at'],
+  template_shares: ['id', 'template_id', 'user_id', 'channel', 'created_at'],
+  template_remixes: ['id', 'template_id', 'user_id', 'project_id', 'created_at'],
+  template_comments: ['id', 'template_id', 'user_id', 'content', 'created_at', 'deleted_at'],
+  content_reports: ['id', 'target_type', 'target_id', 'reporter_id', 'reason', 'detail', 'status', 'created_at'],
 }
 
 /**
@@ -71,6 +82,9 @@ const EXPECTED_UNIQUE = [
   { table: 'brand_colors', columns: ['brand', 'hex'] },
   { table: 'color_palettes', columns: ['code'] },
   { table: 'design_archetypes', columns: ['code'] },
+  { table: 'template_likes', columns: ['template_id', 'user_id'] },
+  { table: 'template_remixes', columns: ['template_id', 'project_id'] },
+  { table: 'content_reports', columns: ['target_type', 'target_id', 'reporter_id'] },
 ]
 
 const databaseUrl = process.env.DATABASE_URL
