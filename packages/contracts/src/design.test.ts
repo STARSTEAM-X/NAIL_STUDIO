@@ -3,7 +3,9 @@ import {
   NAIL_KEYS,
   createEmptyDocument,
   designDocumentSchema,
+  handSettingsSchema,
 } from './design.ts'
+import type { HandSettings } from './design.ts'
 
 describe('DesignDocument', () => {
   it('มีคีย์เล็บครบ 10 นิ้ว ไม่ซ้ำกัน', () => {
@@ -75,5 +77,15 @@ describe('DesignDocument', () => {
     const original = createEmptyDocument()
     const restored = designDocumentSchema.parse(JSON.parse(JSON.stringify(original)))
     expect(restored).toEqual(original)
+  })
+})
+
+describe('HandSettings', () => {
+  it('อนุมานชนิดตรงกับ schema', () => {
+    const settings: HandSettings = {
+      skinTone: '#e8bfa0',
+      proportions: { handScale: 1, palmWidth: 1, fingerLength: 1, fingerWidth: 1 },
+    }
+    expect(handSettingsSchema.safeParse(settings).success).toBe(true)
   })
 })

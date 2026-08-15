@@ -165,6 +165,7 @@ export type Layer = z.infer<typeof layerSchema>
 export type Decoration = z.infer<typeof decorationSchema>
 export type Nail = z.infer<typeof nailSchema>
 export type DesignDocument = z.infer<typeof designDocumentSchema>
+export type HandSettings = z.infer<typeof handSettingsSchema>
 
 /**
  * เล็บเปล่าหนึ่งนิ้ว — สร้างใหม่ทุกครั้งที่เรียก
