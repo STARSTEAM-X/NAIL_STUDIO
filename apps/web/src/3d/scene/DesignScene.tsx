@@ -1,6 +1,7 @@
 import { HandModel, type HandParts } from '@/3d/models/HandModel.tsx'
 import { PaintController } from '@/3d/painting/PaintController.tsx'
 import type { NailTextureSet } from '@/3d/painting/NailTextureSet.ts'
+import { DecorationInstances } from '@/3d/decorations/DecorationInstances.tsx'
 import { NailFocus } from './NailFocus.tsx'
 
 interface Props {
@@ -23,6 +24,7 @@ export function DesignScene({ scale, parts, textures, onReady }: Props) {
       <HandModel scale={scale} onReady={onReady} />
       {parts && <NailFocus parts={parts} />}
       {parts && textures && <PaintController parts={parts} textures={textures} />}
+      {parts && <DecorationInstances parts={parts} />}
     </>
   )
 }
