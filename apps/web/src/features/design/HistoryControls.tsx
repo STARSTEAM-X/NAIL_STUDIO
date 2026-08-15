@@ -29,6 +29,7 @@ export function HistoryControls() {
         className="btn btn-ghost"
         disabled={!state.canUndo}
         onClick={undo}
+        aria-label={state.undoLabel ? `เลิกทำ: ${state.undoLabel}` : 'เลิกทำ'}
         title="Ctrl/Cmd + Z"
       >
         {state.undoLabel ? `เลิกทำ: ${state.undoLabel}` : 'เลิกทำ'}
@@ -38,6 +39,7 @@ export function HistoryControls() {
         className="btn btn-ghost"
         disabled={!state.canRedo}
         onClick={redo}
+        aria-label={state.redoLabel ? `ทำซ้ำ: ${state.redoLabel}` : 'ทำซ้ำ'}
         title="Ctrl/Cmd + Y หรือ Ctrl/Cmd + Shift + Z"
       >
         {state.redoLabel ? `ทำซ้ำ: ${state.redoLabel}` : 'ทำซ้ำ'}

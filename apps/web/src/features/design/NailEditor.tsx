@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { useCurrentUserId } from '@/features/auth/useAuth.ts'
+import { useCurrentUser, useLogout } from '@/features/auth/useAuth.ts'
+import { NotificationBell } from '@/components/NotificationBell.tsx'
 import { NailScene } from '@/3d/scene/NailScene.tsx'
 import { ThumbnailCapture, type ThumbnailCaptureHandle } from '@/3d/scene/ThumbnailCapture.tsx'
 import { SnapshotCapture, type SnapshotCaptureHandle } from '@/3d/scene/SnapshotCapture.tsx'
@@ -64,7 +65,9 @@ const PANEL_TITLES: Record<EditorPanelId, { title: string; description: string }
 export function NailEditor({ projectId, detail }: Props) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const userId = useCurrentUserId()
+  const { data: user } = useCurrentUser()
+  const userId = user?.id ?? null
+  const logout = useLogout()
   const store = useDesignStoreApi()
   const [activePanel, setActivePanel] = useState<EditorPanelId>('paint')
   const [rightPanel, setRightPanel] = useState<'canvas' | 'history'>('canvas')
@@ -104,6 +107,19 @@ export function NailEditor({ projectId, detail }: Props) {
   const [isReloading, setIsReloading] = useState(false)
   const [conflictActionError, setConflictActionError] = useState<string | null>(null)
   const latestVersion = saveBaseVersion
+  const versionSummary = draftSourceVersion === null
+    ? `เวอร์ชัน ${latestVersion}`
+    : `ฉบับร่างจากเวอร์ชัน ${draftSourceVersion} · ฐานบันทึกเวอร์ชัน ${latestVersion}`
+  const autosaveLabel = autosave.status !== 'idle'
+    ? AUTOSAVE_LABELS[autosave.status]
+    : detail.draft
+      ? 'เปิดจากงานค้างล่าสุด'
+      : 'บันทึกแล้ว'
+  const autosaveTone = autosave.status === 'error'
+    ? 'error'
+    : autosave.status === 'saving' || autosave.status === 'pending'
+      ? 'busy'
+      : 'saved'
   const explicitSaveUi = useRef(createExplicitSaveUiController({
     setBaseVersion: setSaveBaseVersion,
     clearDraftSource: () => setDraftSourceVersion(null),
@@ -167,24 +183,46 @@ export function NailEditor({ projectId, detail }: Props) {
     )
   }
 
+  const handleLogout = () => {
+    logout.mutate(undefined, { onSuccess: () => navigate('/login', { replace: true }) })
+  }
+
   return (
     <section className="editor">
-      <header className="editor-head">
-        <div>
-          <h1>{detail.project.name}</h1>
-          <p className="muted">
-            {draftSourceVersion === null
-              ? `เวอร์ชัน ${latestVersion}`
-              : `ฉบับร่างจากเวอร์ชัน ${draftSourceVersion} · ฐานบันทึกเวอร์ชัน ${latestVersion}`}
-            {autosave.status !== 'idle' ? ` · ${AUTOSAVE_LABELS[autosave.status]}` : ''}
-            {detail.draft && autosave.status === 'idle' ? ' · เปิดจากงานค้างล่าสุด' : ''}
-          </p>
-        </div>
-        <div className="editor-actions">
-          <HistoryControls />
+      <header className="editor-topbar">
+        <div className="editor-topbar-left">
           <button
             type="button"
-            className="btn btn-ghost"
+            className="editor-topbar-icon-button editor-topbar-back"
+            aria-label="กลับไปงานของฉัน"
+            title="กลับไปงานของฉัน"
+            onClick={() => navigate('/projects')}
+          >
+            <span aria-hidden="true">←</span>
+          </button>
+          <div className="editor-topbar-brand" aria-label="Nail Studio">
+            <span className="editor-topbar-logo" aria-hidden="true">NS</span>
+            <span className="editor-topbar-brand-name">Nail Studio</span>
+          </div>
+          <span className="editor-topbar-divider" aria-hidden="true" />
+          <div className="editor-topbar-project">
+            <strong title={detail.project.name}>{detail.project.name}</strong>
+            <span>{versionSummary}</span>
+          </div>
+        </div>
+
+        <div className="editor-topbar-status" role="status" aria-live="polite">
+          <span className={`editor-save-dot editor-save-dot-${autosaveTone}`} aria-hidden="true" />
+          <span>{autosaveLabel}</span>
+        </div>
+
+        <div className="editor-topbar-actions">
+          <HistoryControls />
+          <span className="editor-topbar-divider" aria-hidden="true" />
+          <button
+            type="button"
+            className="editor-topbar-action"
+            title="ดาวน์โหลดภาพ PNG"
             onClick={() => {
               void (async () => {
                 try {
@@ -198,11 +236,13 @@ export function NailEditor({ projectId, detail }: Props) {
               })()
             }}
           >
-            ดาวน์โหลด PNG
+            <span className="editor-topbar-action-icon" aria-hidden="true">↓</span>
+            <span className="editor-topbar-action-label">PNG</span>
           </button>
           <button
             type="button"
-            className="btn btn-ghost"
+            className="editor-topbar-action"
+            title="ดาวน์โหลดไฟล์งาน JSON"
             onClick={() => {
               try {
                 const json = exportProjectJson(store.getState().document)
@@ -213,20 +253,38 @@ export function NailEditor({ projectId, detail }: Props) {
               }
             }}
           >
-            ดาวน์โหลด JSON
+            <span className="editor-topbar-action-icon" aria-hidden="true">⇩</span>
+            <span className="editor-topbar-action-label">JSON</span>
           </button>
-          {autosave.message && <span className="error" role="alert">{autosave.message}</span>}
-          {saveVersion.error && !conflict && (
-            <span className="error" role="alert">
-              {localizedTaskError(
-                saveVersion.error,
-                'บันทึกเวอร์ชันไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
-              )}
-            </span>
-          )}
+          <div className="editor-topbar-nav" aria-label="ทางลัด">
+            <button type="button" className="editor-topbar-link" onClick={() => navigate('/community')}>ชุมชน</button>
+            <button type="button" className="editor-topbar-link" onClick={() => navigate('/appointments')}>นัดหมาย</button>
+            <NotificationBell />
+          </div>
           <button
             type="button"
-            className="btn btn-primary"
+            className="editor-topbar-user"
+            disabled={logout.isPending}
+            title={user ? `ออกจากระบบ (${user.displayName})` : 'ออกจากระบบ'}
+            aria-label={user ? `ออกจากระบบ (${user.displayName})` : 'ออกจากระบบ'}
+            onClick={handleLogout}
+          >
+            {user?.displayName?.trim().slice(0, 1).toUpperCase() ?? 'U'}
+          </button>
+          <div className="editor-topbar-feedback" aria-live="polite">
+            {autosave.message && <span className="error" role="alert">{autosave.message}</span>}
+            {saveVersion.error && !conflict && (
+              <span className="error" role="alert">
+                {localizedTaskError(
+                  saveVersion.error,
+                  'บันทึกเวอร์ชันไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
+                )}
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            className="editor-topbar-primary"
             disabled={saveVersion.isPending || autosave.isVersionSavePending}
             onClick={() => {
               void autosave.runVersionSave(async ({ document }, lifecycle) => {
@@ -245,7 +303,8 @@ export function NailEditor({ projectId, detail }: Props) {
               })
             }}
           >
-            {saveVersion.isPending || autosave.isVersionSavePending ? 'กำลังบันทึก…' : 'บันทึกเป็นเวอร์ชัน'}
+            <span aria-hidden="true">✓</span>
+            <span>{saveVersion.isPending || autosave.isVersionSavePending ? 'กำลังบันทึก…' : 'บันทึก'}</span>
           </button>
         </div>
       </header>
