@@ -62,6 +62,22 @@ export class Client {
     return { status: response.status, body: response.body }
   }
 
+  /** ส่ง body เป็นไบต์ดิบ (ไม่ JSON-encode) — สำหรับ endpoint ที่รับไฟล์ตรงๆ เช่น thumbnail */
+  async sendRaw(
+    method: HttpMethod,
+    path: string,
+    body: Buffer,
+    contentType: string,
+  ): Promise<HttpResponse> {
+    let call = request(this.getApp())[method](`/api/v1${path}`).set('Content-Type', contentType)
+    const cookieHeader = this.header()
+    if (cookieHeader) call = call.set('Cookie', cookieHeader)
+    if (method !== 'get') call = call.set('x-csrf-token', this.csrf())
+    const response = await call.send(body)
+    this.absorb(response.headers['set-cookie'] as string[] | undefined)
+    return { status: response.status, body: response.body }
+  }
+
   /** ยิงคำขอโดยจงใจไม่ใส่ header CSRF */
   async sendWithoutCsrf(path: string, body: unknown): Promise<HttpResponse> {
     let call = request(this.getApp()).post(`/api/v1${path}`)

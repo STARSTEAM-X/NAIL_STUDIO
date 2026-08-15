@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import express, { Router } from 'express'
 import {
   createProjectSchema,
   createVersionSchema,
@@ -11,6 +11,7 @@ import {
 } from '@nail-studio/contracts'
 import { z } from 'zod'
 import { currentUser, requireUser } from '../middleware/requireUser.ts'
+import { AppError } from '../errors/AppError.ts'
 import * as service from './service.ts'
 
 const idParamSchema = z.object({ id: z.string().uuid('รหัสงานไม่ถูกต้อง') })
@@ -56,6 +57,28 @@ projectsRouter.post('/:id/duplicate', async (request, response) => {
   const input = duplicateProjectSchema.parse(request.body)
   const duplicate = await service.duplicateProject(currentUser(request).id, id, input)
   response.status(201).json({ success: true, data: duplicate })
+})
+
+// จำกัดขนาด raw body เฉพาะ content-type นี้ — express.json({limit:'4mb'}) ใน app.ts
+// ไม่ครอบคลุม content-type อื่น
+const rawWebp = express.raw({ type: 'image/webp', limit: '2mb' })
+
+projectsRouter.post('/:id/thumbnail', rawWebp, async (request, response) => {
+  const { id } = idParamSchema.parse(request.params)
+  if (!Buffer.isBuffer(request.body) || request.body.length === 0) {
+    throw AppError.validation('ต้องแนบไฟล์ภาพ WebP')
+  }
+  await service.saveThumbnail(currentUser(request).id, id, request.body)
+  response.status(204).send()
+})
+
+projectsRouter.get('/:id/thumbnail', async (request, response) => {
+  const { id } = idParamSchema.parse(request.params)
+  const result = await service.loadThumbnail(currentUser(request).id, id)
+  if (!result) throw AppError.notFound('งานนี้ยังไม่มีภาพตัวอย่าง')
+  response.setHeader('Content-Type', result.mimeType)
+  response.setHeader('Cache-Control', 'private, max-age=60')
+  response.send(result.data)
 })
 
 projectsRouter.get('/:id', async (request, response) => {

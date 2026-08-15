@@ -69,6 +69,7 @@ export const projectSummarySchema = z.object({
   name: z.string(),
   status: z.enum(PROJECT_STATUSES),
   versionCount: z.number().int(),
+  hasThumbnail: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
 })

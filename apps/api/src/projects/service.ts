@@ -1,3 +1,4 @@
+import { createHash, randomUUID } from 'node:crypto'
 import {
   createEmptyDocument,
   designDocumentSchema,
@@ -11,6 +12,8 @@ import {
   type VersionSummary,
 } from '@nail-studio/contracts'
 import { AppError } from '../errors/AppError.ts'
+import { sniffThumbnailMime, MAX_THUMBNAIL_BYTES } from '../storage/mimeSniff.ts'
+import { storage } from '../storage/index.ts'
 import * as repository from './repository.ts'
 
 interface ProjectRow {
@@ -23,6 +26,7 @@ interface ProjectRow {
   draftDocument?: unknown
   draftUpdatedAt?: Date | null
   draftBaseVersion?: number | null
+  thumbnailAssetId?: string | null
 }
 
 function toSummary(row: ProjectRow): ProjectSummary {
@@ -31,6 +35,7 @@ function toSummary(row: ProjectRow): ProjectSummary {
     name: row.name,
     status: row.status,
     versionCount: row.versionCount,
+    hasThumbnail: (row.thumbnailAssetId ?? null) !== null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   }
@@ -269,4 +274,54 @@ export async function saveVersion(
     throw AppError.conflict('งานนี้ถูกบันทึกจากที่อื่นไปแล้ว กรุณาโหลดเวอร์ชันล่าสุด')
   }
   return { versionNumber: version.versionNumber }
+}
+
+export async function saveThumbnail(
+  userId: string,
+  projectId: string,
+  data: Buffer,
+): Promise<void> {
+  await mustOwn(userId, projectId)
+  if (data.byteLength > MAX_THUMBNAIL_BYTES) {
+    throw AppError.validation(`ไฟล์ใหญ่เกิน ${MAX_THUMBNAIL_BYTES / 1024 / 1024}MB`)
+  }
+
+  let mimeType: string
+  try {
+    mimeType = await sniffThumbnailMime(data)
+  } catch {
+    throw AppError.validation('ไฟล์ไม่ใช่ WebP ที่ถูกต้อง')
+  }
+
+  const key = `thumbnails/${new Date().getUTCFullYear()}/${randomUUID()}.webp`
+  await storage.put(key, data, { contentType: mimeType })
+  const checksum = Uint8Array.from(createHash('sha256').update(data).digest())
+
+  const previous = await repository.replaceThumbnail(userId, projectId, {
+    ownerId: userId,
+    kind: 'thumbnail',
+    storageKey: key,
+    mimeType,
+    sizeBytes: BigInt(data.byteLength),
+    checksumSha256: checksum,
+  })
+  // ลบไฟล์เก่าออกจาก storage หลังอัปเดต DB สำเร็จเท่านั้น — ถ้าลบก่อนแล้ว DB update
+  // ล้มเหลว จะเหลือ thumbnail_asset_id ชี้ไปยัง asset ที่ไฟล์หายไปแล้ว
+  if (previous) {
+    await storage.delete(previous.storageKey).catch(() => {
+      // ไฟล์เก่าลบไม่สำเร็จไม่ใช่ความล้มเหลวที่ผู้ใช้ต้องรู้ — asset ใหม่ใช้งานได้ปกติแล้ว
+    })
+  }
+}
+
+export async function loadThumbnail(
+  userId: string,
+  projectId: string,
+): Promise<{ data: Buffer; mimeType: string } | null> {
+  const project = await mustOwn(userId, projectId)
+  if (!project.thumbnailAssetId) return null
+  const asset = await repository.findAsset(project.thumbnailAssetId)
+  if (!asset) return null
+  const data = await storage.get(asset.storageKey)
+  return { data, mimeType: asset.mimeType }
 }

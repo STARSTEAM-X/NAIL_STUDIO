@@ -198,3 +198,50 @@ export function saveDraft(
     data: { draftDocument: document, draftUpdatedAt: new Date(), draftBaseVersion: baseVersion },
   })
 }
+
+export interface NewAsset {
+  ownerId: string
+  kind: string
+  storageKey: string
+  mimeType: string
+  sizeBytes: bigint
+  checksumSha256: Uint8Array<ArrayBuffer>
+}
+
+/**
+ * สร้าง asset ใหม่ + ผูกเข้า project ในทรานแซกชันเดียว คืน asset เก่า (ถ้ามี) ให้ service
+ * ไปลบไฟล์ต่อ — ลบแถว asset เก่าออกจาก DB ในทรานแซกชันเดียวกันนี้เลย ไม่งั้นตาราง assets
+ * โตไม่จำกัดจากแค่ thumbnail ที่ถูกเขียนทับซ้ำๆ ทุกครั้งที่บันทึกเวอร์ชัน
+ */
+export async function replaceThumbnail(
+  userId: string,
+  projectId: string,
+  input: NewAsset,
+): Promise<{ storageKey: string } | null> {
+  return prisma.$transaction(async (tx) => {
+    const project = await tx.project.findFirst({
+      where: { id: projectId, userId, deletedAt: null },
+      select: { thumbnailAssetId: true },
+    })
+    const previous = project?.thumbnailAssetId
+      ? await tx.asset.findUnique({
+          where: { id: project.thumbnailAssetId },
+          select: { storageKey: true },
+        })
+      : null
+
+    const asset = await tx.asset.create({ data: input })
+    await tx.project.updateMany({
+      where: { id: projectId, userId, deletedAt: null },
+      data: { thumbnailAssetId: asset.id },
+    })
+    if (project?.thumbnailAssetId) {
+      await tx.asset.delete({ where: { id: project.thumbnailAssetId } })
+    }
+    return previous
+  })
+}
+
+export function findAsset(id: string) {
+  return prisma.asset.findUnique({ where: { id } })
+}
