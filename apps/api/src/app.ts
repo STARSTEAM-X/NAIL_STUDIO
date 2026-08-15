@@ -8,6 +8,7 @@ import { csrfProtection, ensureCsrfCookie } from './middleware/csrf.ts'
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.ts'
 import { authRouter } from './auth/routes.ts'
 import { projectsRouter } from './projects/routes.ts'
+import { templatesRouter } from './templates/routes.ts'
 
 export function createApp(): Express {
   const app = express()
@@ -40,6 +41,7 @@ export function createApp(): Express {
 
   app.use('/api/v1/auth', authRouter)
   app.use('/api/v1/projects', projectsRouter)
+  app.use('/api/v1/templates', templatesRouter)
 
   app.use(notFoundHandler)
   app.use(errorHandler)

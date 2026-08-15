@@ -3,6 +3,7 @@ import { useCurrentUser } from '@/features/auth/useAuth.ts'
 import { LoginPage } from '@/pages/LoginPage.tsx'
 import { RegisterPage } from '@/pages/RegisterPage.tsx'
 import { ProjectsPage } from '@/pages/ProjectsPage.tsx'
+import { CommunityPage } from '@/pages/CommunityPage.tsx'
 import { EditorPage } from '@/pages/EditorPage.tsx'
 import { AppShell } from '@/components/AppShell.tsx'
 
@@ -28,6 +29,10 @@ export function AppRouter() {
       <Route
         path="/projects"
         element={<Protected><AppShell><ProjectsPage /></AppShell></Protected>}
+      />
+      <Route
+        path="/community"
+        element={<Protected><AppShell><CommunityPage /></AppShell></Protected>}
       />
       <Route
         path="/editor/:projectId"

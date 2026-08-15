@@ -32,6 +32,11 @@ interface RequestOptions {
   signal?: AbortSignal
 }
 
+export interface ApiPage<T> {
+  data: T
+  nextCursor: string | null
+}
+
 /** แนบโทเคน CSRF ให้ request ที่เปลี่ยนแปลงข้อมูล — ใช้ร่วมกันระหว่าง apiFetch และ apiUploadBinary */
 function csrfHeaders(method: string): Record<string, string> {
   if (method === 'GET') return {}
@@ -49,7 +54,7 @@ function csrfHeaders(method: string): Record<string, string> {
  *
  * ถ้าปล่อยให้แต่ละหน้าเรียก fetch เอง ทั้งสามข้อจะถูกลืมเป็นบางที่เสมอ
  */
-export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
+async function requestApi<T>(path: string, options: RequestOptions = {}) {
   const method = options.method ?? 'GET'
   const headers: Record<string, string> = {
     ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
@@ -82,7 +87,17 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     )
   }
 
+  return payload
+}
+
+export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const payload = await requestApi<T>(path, options)
   return payload.data
+}
+
+export async function apiFetchPage<T>(path: string, options: RequestOptions = {}): Promise<ApiPage<T>> {
+  const payload = await requestApi<T>(path, options)
+  return { data: payload.data, nextCursor: payload.meta?.nextCursor ?? null }
 }
 
 /** อัปโหลดไฟล์ไบนารีตรงๆ (ไม่ JSON-encode) — ปลายทางเดียวที่ใช้ตอนนี้คือ thumbnail */

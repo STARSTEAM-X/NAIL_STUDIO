@@ -368,7 +368,8 @@ Sprint 0, งานทำคลัง asset จริง, เวลา hardening
    constraints/indexes, seed แบบ idempotent และ validation ที่ตรวจ hex/reference สีและ archetype key
 3. [x] `nail_templates` + `template_likes/shares/remixes/comments` + `content_reports` — เพิ่ม migration
    พร้อม enum, FK, composite/unique constraints, counter checks และ partial indexes สำหรับ feed/moderation
-4. ฟีดล่าสุด/ยอดนิยม (keyset) + ตัวกรอง category/color + หน้า `/community`
+4. [x] ฟีดล่าสุด/ยอดนิยม (keyset) + ตัวกรอง category/color + หน้า `/community` — เพิ่ม public
+   `GET /templates` พร้อม cursor ที่แยก latest/popular และหน้า Community ที่โหลดเพิ่มได้
 5. ไลก์ **idempotent** ด้วย composite PK; counter อัปเดตใน transaction เดียว
 6. Remix → สร้างโปรเจกต์ใหม่ + บันทึก `source_template_id`
 7. Moderation: รายงาน → ซ่อนอัตโนมัติที่ 5 → คิว admin
