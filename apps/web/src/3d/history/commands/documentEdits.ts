@@ -1,4 +1,4 @@
-import type { DesignDocument, Layer, Nail, NailKey } from '@nail-studio/contracts'
+import type { DesignDocument, HandSettings, Layer, Nail, NailKey } from '@nail-studio/contracts'
 import type { CommandResult } from '../Command.ts'
 
 /**
@@ -27,6 +27,17 @@ export function replaceNail(
   const next = update(current)
   if (next === current) return result(document, key, false)
   return result({ ...document, nails: { ...document.nails, [key]: next } }, key, true)
+}
+
+/** แทนที่การตั้งค่ามือ (สัดส่วน/สีผิว) — ไม่กระทบ affects เพราะไม่ทำให้เท็กซ์เจอร์เล็บนิ้วไหน dirty */
+export function replaceHand(
+  document: DesignDocument,
+  update: (hand: HandSettings) => HandSettings,
+): CommandResult {
+  const current = document.hand
+  const next = update(current)
+  if (next === current) return { document, affects: NO_AFFECTS }
+  return { document: { ...document, hand: next }, affects: NO_AFFECTS }
 }
 
 /** แทนที่เลเยอร์หนึ่งชั้นในเล็บ — หาไม่เจอถือว่าไม่เปลี่ยนอะไร ไม่ใช่ข้อผิดพลาด */
