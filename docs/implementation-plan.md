@@ -317,7 +317,30 @@ Sprint 0, งานทำคลัง asset จริง, เวลา hardening
      สัดส่วนมือ (พิสูจน์ `refreshSkinnedBounds` แก้ raycast ได้จริง ไม่ใช่แค่ไม่ throw) · Ctrl+Z
      ย้อนการลากสไลเดอร์ 1 ครั้งกลับเป็น 1 ขั้นตอนพอดี (ทดสอบแบบ set ค่าตรงจุดเดียวเพื่อตัดปัจจัย
      event ซ้อนจากเมาส์ในเครื่องมืออัตโนมัติออก) · Ctrl+Z ย้อนสีผิวได้ถูกต้อง
-6. Thumbnail: capture จาก canvas → WebP → `StorageProvider`
+6. [x] Thumbnail: capture จาก canvas → WebP → `StorageProvider`
+   - เพิ่ม `StorageProvider`/`LocalDiskProvider`, `mimeSniff` (magic-byte, ไม่เชื่อ header จาก
+     client), ตาราง `assets` + `projects.thumbnail_asset_id` (migration), `POST`/
+     `GET /projects/:id/thumbnail`, `hasThumbnail` บน `ProjectSummary`, และฝั่ง frontend
+     `ThumbnailCapture` (capture จากมุมกล้อง "ดูทั้งมือ") ที่ capture+upload อัตโนมัติหลังกด
+     "บันทึกเป็นเวอร์ชัน" ตาม `docs/superpowers/plans/2026-08-15-thumbnail.md` และ
+     `docs/superpowers/specs/2026-08-15-thumbnail-design.md`
+   - **S3Provider ยังไม่ทำ** (D-35 — รอ Slice 8 ตอน deploy จริง) ใช้ `LocalDiskProvider`
+     เท่านั้นในรอบนี้
+   - **ปัญหาโครงสร้างพื้นฐานที่เจอระหว่างทำและแก้แล้ว**: DB role dev (`nailstudio`) ไม่มีสิทธิ์
+     `CREATEDB` จึงรัน `prisma migrate dev --create-only` (ต้องใช้ shadow database) และ
+     `npm run db:verify` (สร้าง scratch database) ไม่ได้ — เขียน migration SQL ด้วยมือแทนตาม
+     schema ที่ต้องการเป๊ะ แล้ว apply ด้วย `prisma migrate deploy` (ไม่ต้องใช้ shadow db) ยืนยัน
+     โครงสร้างจริงด้วย `psql \d` แทน `db:verify` — ยังไม่ได้แก้สิทธิ์ role ถาวร ถ้าจะรัน
+     `db:verify`/`migrate dev` ปกติในอนาคตต้องให้ superuser เพิ่ม `CREATEDB` ให้ role นี้ก่อน
+   - พบและแก้ `.gitignore` ที่มี pattern `storage/` แบบไม่ anchor ซึ่งบัง
+     `apps/api/src/storage/` (โค้ดจริง) โดยไม่ตั้งใจ — เปลี่ยนเป็น `/storage/` (root) และเพิ่ม
+     `apps/api/storage/` (runtime upload dir ของ `STORAGE_ROOT` default) แยกต่างหาก
+   - **ยืนยันบนเบราว์เซอร์จริงแล้ว**: เปิด `npm run dev:api` + `npm run dev:web` จริง เปิดโปรเจกต์
+     เดิมที่มีอยู่ (ไม่มี thumbnail) → กด "บันทึกเป็นเวอร์ชัน" → thumbnail อัปเดตอัตโนมัติเป็นภาพมือ
+     จริงที่หน้ารายการ (ไม่ใช่ placeholder) เฟรมเป็น "ดูทั้งมือ" ตามที่ออกแบบ · ยิง
+     `GET /projects/:id/thumbnail` ด้วย id ที่ไม่มีอยู่จริงตรงๆ ผ่าน URL bar → ได้ 404
+     `NOT_FOUND` ไม่ใช่รูปหรือ 403 · integration test ยืนยันเพิ่มเติมว่าอีกผู้ใช้เปิด/อัปโหลด
+     thumbnail ของโปรเจกต์คนอื่นไม่ได้ (404) และไฟล์ที่ไม่ใช่ WebP จริงถูกปฏิเสธ (400)
 7. Exporters: `.nail.json` · PNG · GLB (ถ้าประเมินแล้วเหมาะสม)
 
 **DoD**: เปลี่ยนสัดส่วนมือ/ความยาวเล็บ → **ของตกแต่งยังติดผิวเหมือนเดิม** (พิสูจน์ D-10) ·
