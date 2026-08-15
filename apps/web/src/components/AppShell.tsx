@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useCurrentUser, useLogout } from '@/features/auth/useAuth.ts'
+import { EditorProfileDropdown } from '@/features/design/EditorProfileDropdown.tsx'
 import { NotificationBell } from './NotificationBell.tsx'
 import { Icon } from './Icon.tsx'
 
@@ -14,6 +15,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
   const location = useLocation()
   const isEditor = location.pathname === '/editor' || location.pathname.startsWith('/editor/')
+
+  const handleLogout = () => {
+    logout.mutate(undefined, { onSuccess: () => navigate('/login', { replace: true }) })
+  }
 
   return (
     <div className={`shell ${isEditor ? 'shell-editor' : ''}`}>
@@ -29,23 +34,11 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Link to="/appointments" className="navbar-link"><Icon name="calendar" size={16} />การนัดหมาย</Link>
             </div>
             <NotificationBell />
-            {user && (
-              <span className="user-pill">
-                <span className="user-avatar" aria-hidden="true">{user.displayName.trim().slice(0, 1).toUpperCase()}</span>
-                <span className="user-name">{user.displayName}</span>
-              </span>
-            )}
-            <button
-              type="button"
-              className="navbar-logout"
-              disabled={logout.isPending}
-              onClick={() => {
-                logout.mutate(undefined, { onSuccess: () => navigate('/login', { replace: true }) })
-              }}
-            >
-              <Icon name="logout" size={16} />
-              <span>ออกจากระบบ</span>
-            </button>
+            <EditorProfileDropdown
+              user={user}
+              isLoggingOut={logout.isPending}
+              onLogout={handleLogout}
+            />
           </div>
         </nav>
       )}
