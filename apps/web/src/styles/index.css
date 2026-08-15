@@ -556,3 +556,165 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+/* ---------- editor workspace ---------- */
+
+:root {
+  --paper: #fffdf9;
+  --soft: #f4e7df;
+}
+
+.editor-head {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  background: color-mix(in srgb, var(--ground) 94%, white);
+  box-shadow: 0 1px 0 rgb(80 45 30 / 6%);
+}
+
+.editor-body {
+  gap: 0;
+  background: #211916;
+}
+
+.editor-sidebar {
+  display: flex;
+  flex: 0 0 360px;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--rule);
+}
+
+.editor-tool-rail {
+  display: flex;
+  flex: 0 0 70px;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.8rem 0.45rem;
+  background: #30201f;
+  color: #f9eee8;
+}
+
+.editor-tool-rail-brand {
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border: 1px solid rgb(255 255 255 / 25%);
+  border-radius: 0.65rem;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.editor-tool-rail-items {
+  display: flex;
+  flex: 1;
+  width: 100%;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.editor-tool-button {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.55rem 0.25rem;
+  border: 1px solid transparent;
+  border-radius: 0.6rem;
+  background: transparent;
+  color: rgb(255 255 255 / 68%);
+  font: inherit;
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+
+.editor-tool-button:hover { background: rgb(255 255 255 / 10%); color: #fff; }
+.editor-tool-button:focus-visible { outline: 2px solid #f6c4c9; outline-offset: 2px; }
+.editor-tool-button-active { border-color: rgb(255 255 255 / 24%); background: var(--accent); color: #fff; box-shadow: 0 5px 14px rgb(0 0 0 / 18%); }
+.editor-tool-icon { font-size: 1.25rem; line-height: 1; }
+.editor-tool-label { white-space: nowrap; }
+.editor-tool-rail-footer { margin: 0; color: rgb(255 255 255 / 38%); font-size: 0.55rem; letter-spacing: 0.14em; }
+
+.editor-inspector {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  background: var(--surface);
+}
+
+.editor-inspector-head {
+  flex: 0 0 auto;
+  padding: 1rem 1rem 0.85rem;
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
+}
+
+.editor-inspector-head h2 { margin: 0.1rem 0 0.1rem; color: var(--deep); font-size: 1.05rem; }
+.editor-inspector-head .muted { font-size: 0.78rem; }
+.editor-inspector-kicker { margin: 0; color: var(--accent); font-size: 0.65rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+.editor-inspector-scroll { min-height: 0; flex: 1; overflow-y: auto; }
+.editor-inspector-scroll > .toolbar { min-height: 100%; }
+.editor-inspector-scroll .toolbar { width: auto; border-right: 0; }
+.editor-inspector-scroll .ai-assistant-panel { width: auto; border-left: 0; background: transparent; }
+
+.toolbar-paint { padding: 0.9rem; gap: 0.8rem; }
+.toolbar-section { display: flex; flex-direction: column; gap: 0.65rem; padding-bottom: 0.85rem; border-bottom: 1px solid color-mix(in srgb, var(--rule) 75%, transparent); }
+.toolbar-section:last-of-type { border-bottom: 0; }
+.toolbar-section-title { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; color: var(--deep); font-size: 0.82rem; font-weight: 800; }
+.toolbar-section-kicker { color: var(--muted); font-size: 0.68rem; font-weight: 500; }
+.tool-choice { flex: 1; min-width: 0; padding: 0.45rem 0.55rem; border: 1px solid var(--rule); border-radius: 0.45rem; background: var(--surface); color: var(--ink); font: inherit; font-size: 0.8rem; cursor: pointer; }
+.tool-choice:hover { border-color: var(--accent); }
+.tool-choice-active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); color: var(--deep); box-shadow: inset 0 0 0 1px var(--accent); }
+.toolbar-paint .field { gap: 0.25rem; }
+.toolbar-paint .field output { align-self: flex-end; margin-top: -1.25rem; color: var(--deep); font-size: 0.75rem; }
+.toolbar-paint .tool-actions { margin-top: 0; }
+
+.editor-right-panel {
+  display: flex;
+  flex: 0 0 292px;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--surface);
+  border-left: 1px solid var(--rule);
+}
+
+.editor-panel-tabs { display: flex; flex: 0 0 auto; gap: 0.2rem; padding: 0.55rem; border-bottom: 1px solid var(--rule); background: var(--surface); }
+.editor-panel-tab { flex: 1; padding: 0.45rem 0.35rem; border: 0; border-radius: 0.4rem; background: transparent; color: var(--muted); font: inherit; font-size: 0.78rem; cursor: pointer; }
+.editor-panel-tab:hover { background: var(--chip); color: var(--deep); }
+.editor-panel-tab-active { background: var(--chip); color: var(--deep); font-weight: 700; }
+.editor-panel-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.editor-right-panel-scroll { min-height: 0; flex: 1; overflow-y: auto; }
+.editor-right-panel-scroll .canvas2d-panel, .editor-right-panel-scroll .version-panel { width: auto; min-height: 100%; border: 0; }
+.editor-right-panel-scroll .canvas2d { width: 100%; }
+.editor-panel-loading { padding: 1rem; }
+
+.nail-strip { position: sticky; bottom: 0; z-index: 5; box-shadow: 0 -4px 16px rgb(80 45 30 / 8%); }
+.nail-strip .chip { min-width: 2.8rem; }
+
+@media (max-width: 1080px) {
+  .editor-body { flex-wrap: wrap; overflow-y: auto; }
+  .editor-sidebar { flex: 0 0 100%; max-height: 390px; }
+  .editor-tool-rail { flex: 0 0 74px; }
+  .viewport { min-height: 520px; }
+  .editor-right-panel { flex: 1 1 300px; min-height: 360px; }
+}
+
+@media (max-width: 720px) {
+  .editor-sidebar { flex-direction: column; max-height: none; }
+  .editor-tool-rail { flex: 0 0 auto; flex-direction: row; align-items: stretch; padding: 0.45rem 0.65rem; }
+  .editor-tool-rail-brand, .editor-tool-rail-footer { display: none; }
+  .editor-tool-rail-items { flex-direction: row; }
+  .editor-tool-button { padding: 0.45rem 0.2rem; }
+  .editor-inspector { max-height: 38vh; }
+  .editor-right-panel { flex: 0 0 auto; width: 100%; min-height: 320px; }
+  .viewport { min-height: 42vh; }
+}

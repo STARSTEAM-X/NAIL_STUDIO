@@ -35,6 +35,7 @@ import { DecorationPanel } from './DecorationPanel.tsx'
 import { HandPanel } from './HandPanel.tsx'
 import { HistoryControls } from './HistoryControls.tsx'
 import { VersionHistoryPanel } from './VersionHistoryPanel.tsx'
+import { EditorToolRail, type EditorPanelId } from './EditorToolRail.tsx'
 import { useAutosave, type AutosaveStatus } from './useAutosave.ts'
 import { useOfflineDraft } from './useOfflineDraft.ts'
 import { downloadBlob, sanitizeFilename } from '@/utils/downloadBlob.ts'
@@ -53,14 +54,28 @@ const AUTOSAVE_LABELS: Record<AutosaveStatus, string> = {
   error: 'บันทึกอัตโนมัติไม่สำเร็จ',
 }
 
+const PANEL_TITLES: Record<EditorPanelId, { title: string; description: string }> = {
+  paint: { title: 'วาด', description: 'สี แปรง และรูปทรงเล็บ' },
+  decorate: { title: 'ตกแต่ง', description: 'เพิ่มและจัดวางของตกแต่ง' },
+  hand: { title: 'มือ', description: 'ปรับสีผิวและสัดส่วนมือ' },
+  ai: { title: 'ผู้ช่วย AI', description: 'สร้างไอเดียและแก้ไขด้วยคำสั่ง' },
+}
+
 export function NailEditor({ projectId, detail }: Props) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const userId = useCurrentUserId()
   const store = useDesignStoreApi()
+  const [activePanel, setActivePanel] = useState<EditorPanelId>('paint')
+  const [rightPanel, setRightPanel] = useState<'canvas' | 'history'>('canvas')
   const handScale = useDesign((state) => state.document.hand.proportions.handScale)
   const notice = useDesign((state) => state.notice)
   const dismissNotice = useDesign((state) => state.dismissNotice)
+
+  const openPanel = (panel: EditorPanelId) => {
+    setActivePanel(panel)
+    store.getState().setMode(panel === 'decorate' ? 'decorate' : 'paint')
+  }
 
   // ชิ้นส่วนมือและชุดเท็กซ์เจอร์ถูกถือไว้ที่ระดับนี้ เพราะทั้งฉาก 3 มิติและแผงวาด
   // แบบแบนต้องใช้ชุดเดียวกัน — มีสองชุดเมื่อไร วาดในโหมดหนึ่งแล้วอีกโหมดจะไม่เห็น
@@ -250,10 +265,24 @@ export function NailEditor({ projectId, detail }: Props) {
       )}
 
       <div className="editor-body">
-        <PaintToolbar />
-        <DecorationPanel />
-        <HandPanel />
-        <AiAssistantPanel />
+        <aside className="editor-sidebar">
+          <EditorToolRail activePanel={activePanel} onChange={openPanel} />
+          <div className="editor-inspector">
+            <header className="editor-inspector-head">
+              <div>
+                <p className="editor-inspector-kicker">เครื่องมือ</p>
+                <h2>{PANEL_TITLES[activePanel].title}</h2>
+                <p className="muted">{PANEL_TITLES[activePanel].description}</p>
+              </div>
+            </header>
+            <div className="editor-inspector-scroll">
+              {activePanel === 'paint' && <PaintToolbar />}
+              {activePanel === 'decorate' && <DecorationPanel />}
+              {activePanel === 'hand' && <HandPanel />}
+              {activePanel === 'ai' && <AiAssistantPanel />}
+            </div>
+          </div>
+        </aside>
         <div className="viewport">
           <WebGlGuard>
             <NailScene fallback={null}>
@@ -268,13 +297,43 @@ export function NailEditor({ projectId, detail }: Props) {
             </NailScene>
           </WebGlGuard>
         </div>
-        {parts && textures && <NailCanvas2D parts={parts} textures={textures} />}
-        <VersionHistoryPanel
-          projectId={projectId}
-          projectName={detail.project.name}
-          latestVersion={latestVersion}
-          onLoadedVersion={setDraftSourceVersion}
-        />
+        <aside className="editor-right-panel">
+          <div className="editor-panel-tabs" role="tablist" aria-label="แผงด้านขวา">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={rightPanel === 'canvas'}
+              className={`editor-panel-tab ${rightPanel === 'canvas' ? 'editor-panel-tab-active' : ''}`}
+              onClick={() => setRightPanel('canvas')}
+            >
+              <span aria-hidden="true">▧</span> แคนวาส
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={rightPanel === 'history'}
+              className={`editor-panel-tab ${rightPanel === 'history' ? 'editor-panel-tab-active' : ''}`}
+              onClick={() => setRightPanel('history')}
+            >
+              <span aria-hidden="true">↺</span> ประวัติ
+            </button>
+          </div>
+          <div className="editor-right-panel-scroll">
+            {rightPanel === 'canvas' && (
+              parts && textures
+                ? <NailCanvas2D parts={parts} textures={textures} />
+                : <p className="muted editor-panel-loading">กำลังเตรียมแคนวาส…</p>
+            )}
+            {rightPanel === 'history' && (
+              <VersionHistoryPanel
+                projectId={projectId}
+                projectName={detail.project.name}
+                latestVersion={latestVersion}
+                onLoadedVersion={setDraftSourceVersion}
+              />
+            )}
+          </div>
+        </aside>
       </div>
 
       <NailStrip />
