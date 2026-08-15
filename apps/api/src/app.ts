@@ -16,6 +16,18 @@ import { appointmentsRouter } from './appointments/routes.ts'
 import { apiLimiter } from './middleware/rateLimit.ts'
 import { isProduction } from './config/env.ts'
 
+const localDevelopmentOrigin = /^https?:\/\/(?:localhost|127\.0\.0\.1):\d+$/
+
+function allowsCorsOrigin(origin: string | undefined): boolean {
+  if (!origin || origin === env.WEB_ORIGIN) {
+    return true
+  }
+
+  // Vite may move to the next free port when the configured port is occupied.
+  // Keep this fallback limited to loopback origins and non-production environments.
+  return !isProduction && localDevelopmentOrigin.test(origin)
+}
+
 export function createApp(): Express {
   const app = express()
 
@@ -46,7 +58,9 @@ export function createApp(): Express {
   app.use(
     cors({
       // allowlist เท่านั้น ห้าม '*' เพราะเราส่ง cookie ข้าม origin
-      origin: env.WEB_ORIGIN,
+      origin: (requestOrigin, callback) => {
+        callback(null, allowsCorsOrigin(requestOrigin))
+      },
       credentials: true,
       allowedHeaders: ['Content-Type', 'x-csrf-token'],
     }),
