@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import { useCurrentUserId } from '@/features/auth/useAuth.ts'
 import { NailScene } from '@/3d/scene/NailScene.tsx'
 import { ThumbnailCapture, type ThumbnailCaptureHandle } from '@/3d/scene/ThumbnailCapture.tsx'
+import { SnapshotCapture, type SnapshotCaptureHandle } from '@/3d/scene/SnapshotCapture.tsx'
+import { exportProjectJson } from '@/3d/scene/exporters/exportProjectJson.ts'
 import { DesignScene } from '@/3d/scene/DesignScene.tsx'
 import { WebGlGuard } from '@/3d/scene/WebGlGuard.tsx'
 import type { HandParts } from '@/3d/models/HandModel.tsx'
@@ -35,6 +37,7 @@ import { HistoryControls } from './HistoryControls.tsx'
 import { VersionHistoryPanel } from './VersionHistoryPanel.tsx'
 import { useAutosave, type AutosaveStatus } from './useAutosave.ts'
 import { useOfflineDraft } from './useOfflineDraft.ts'
+import { downloadBlob, sanitizeFilename } from '@/utils/downloadBlob.ts'
 
 interface Props {
   projectId: string
@@ -62,6 +65,7 @@ export function NailEditor({ projectId, detail }: Props) {
   // แบบแบนต้องใช้ชุดเดียวกัน — มีสองชุดเมื่อไร วาดในโหมดหนึ่งแล้วอีกโหมดจะไม่เห็น
   const [parts, setParts] = useState<HandParts | null>(null)
   const thumbnailRef = useRef<ThumbnailCaptureHandle>(null)
+  const snapshotRef = useRef<SnapshotCaptureHandle>(null)
   const textures = useNailTextures(parts)
   // identity ต้องคงที่ — HandModel เรียก onReady จาก effect ที่มี onReady ใน deps
   const handleReady = useCallback((next: HandParts) => setParts(next), [])
@@ -162,6 +166,39 @@ export function NailEditor({ projectId, detail }: Props) {
         </div>
         <div className="editor-actions">
           <HistoryControls />
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => {
+              void (async () => {
+                try {
+                  if (!snapshotRef.current) throw new Error('canvas ยังไม่พร้อม')
+                  const blob = await snapshotRef.current.capture()
+                  downloadBlob(blob, `${sanitizeFilename(detail.project.name)}.png`)
+                } catch (error) {
+                  store.setState({ notice: 'ดาวน์โหลดภาพไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' })
+                  console.error('[export] PNG capture failed', error)
+                }
+              })()
+            }}
+          >
+            ดาวน์โหลด PNG
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => {
+              try {
+                const json = exportProjectJson(store.getState().document)
+                downloadBlob(new Blob([json], { type: 'application/json' }), `${sanitizeFilename(detail.project.name)}.nail.json`)
+              } catch (error) {
+                store.setState({ notice: 'ดาวน์โหลดไฟล์งานไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' })
+                console.error('[export] JSON export failed', error)
+              }
+            }}
+          >
+            ดาวน์โหลด JSON
+          </button>
           {autosave.message && <span className="error" role="alert">{autosave.message}</span>}
           {saveVersion.error && !conflict && (
             <span className="error" role="alert">
@@ -225,6 +262,7 @@ export function NailEditor({ projectId, detail }: Props) {
                 onReady={handleReady}
               />
               <ThumbnailCapture ref={thumbnailRef} />
+              <SnapshotCapture ref={snapshotRef} />
             </NailScene>
           </WebGlGuard>
         </div>

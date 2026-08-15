@@ -341,7 +341,15 @@ Sprint 0, งานทำคลัง asset จริง, เวลา hardening
      `GET /projects/:id/thumbnail` ด้วย id ที่ไม่มีอยู่จริงตรงๆ ผ่าน URL bar → ได้ 404
      `NOT_FOUND` ไม่ใช่รูปหรือ 403 · integration test ยืนยันเพิ่มเติมว่าอีกผู้ใช้เปิด/อัปโหลด
      thumbnail ของโปรเจกต์คนอื่นไม่ได้ (404) และไฟล์ที่ไม่ใช่ WebP จริงถูกปฏิเสธ (400)
-7. Exporters: `.nail.json` · PNG · GLB (ถ้าประเมินแล้วเหมาะสม)
+7. [x] Exporters: `.nail.json` · PNG
+   - เพิ่ม `SnapshotCapture` สำหรับจับภาพ PNG จากมุมกล้องปัจจุบัน, `exportProjectJson` ที่ตรวจด้วย
+     `designDocumentSchema`, และ helper ดาวน์โหลดไฟล์พร้อม sanitize ชื่อโปรเจกต์ ตาม
+     `docs/superpowers/specs/2026-08-15-exporters-design.md` — ปุ่มทั้งสองอยู่ใน `editor-actions`
+     และแจ้ง notice เมื่อ export ล้มเหลว
+   - ยืนยันบนเบราว์เซอร์จริงแล้ว: เปิดโปรเจกต์ `Export: ทดลอง/ดีไซน์`, เห็นปุ่มทั้งสอง,
+     กด PNG และ JSON สำเร็จโดยไม่มี notice/error ในหน้า และภาพ editor แสดงมือพร้อมใช้งาน
+     (in-app browser ไม่ส่ง download event กลับมาให้เครื่องมือ จึงตรวจผลการคลิกผ่านหน้าและ console)
+   - GLB ยังไม่ทำตาม D-39 เพื่อรอประเมิน `InstancedMesh`/`CanvasTexture` round-trip
 
 **DoD**: เปลี่ยนสัดส่วนมือ/ความยาวเล็บ → **ของตกแต่งยังติดผิวเหมือนเดิม** (พิสูจน์ D-10) ·
 ของตกแต่งไม่จมไม่ลอย · ย้าย/หมุน/ย่อขยายได้ทั้งเมาส์และแผงตัวเลข ·
