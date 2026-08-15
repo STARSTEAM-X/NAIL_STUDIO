@@ -52,11 +52,14 @@ export function NailCanvas2D({ parts, textures }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
   const activeKey: NailKey = primaryOf(selection)
+  const activeNail = useDesign((state) => state.document.nails[activeKey])
 
   const flat = useMemo(() => {
     const mesh = parts.nails.get(activeKey)
     return mesh ? flattenNail(mesh, VIEW, TEX_SIZE) : null
-  }, [parts, activeKey])
+    // shape/length มีผลต่อ morphTargetInfluences ของ mesh ตัวเดียวกัน — ต้องคำนวณ
+    // ใหม่ทุกครั้งที่มันเปลี่ยน ไม่งั้นแผงจะค้างรูปทรงเดิมจนกว่าจะสลับนิ้ว
+  }, [parts, activeKey, activeNail.shape, activeNail.length])
 
   // เก็บไว้ใน ref ให้ตัวจัดการ pointer อ่านค่าล่าสุดได้ โดยไม่ต้องผูก listener ใหม่
   // ทุกครั้งที่เปลี่ยนนิ้ว ซึ่งจะตัดเส้นที่กำลังลากค้างอยู่ทิ้ง

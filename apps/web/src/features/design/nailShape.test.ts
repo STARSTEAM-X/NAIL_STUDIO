@@ -42,4 +42,23 @@ describe('setShape / setLength', () => {
     store.getState().setShape('round')
     expect(store.getState().revision).toBe(revisionBefore)
   })
+
+  it('เปลี่ยนทรง/ความยาวได้ object เล็บใหม่ — แผงวาดแบบแบนใช้ identity นี้เป็นตัวกระตุ้นคำนวณใหม่', () => {
+    // NailCanvas2D คำนวณ flat panel ใหม่โดยผูกกับ document.nails[activeKey].shape/length
+    // ผ่าน selector ตัวนี้เป๊ะ ๆ — ถ้าเปลี่ยนทรง/ความยาวแล้ว object เดิมไม่ถูกแทนที่
+    // แผงจะค้างรูปทรงเก่าไว้จนกว่าจะสลับนิ้ว (ดู final-review-fix-brief.md ข้อ 1)
+    const store = createDesignStore()
+    store.getState().selectNail('right.index')
+    const before = store.getState().document.nails['right.index']
+
+    store.getState().setShape('square')
+    const afterShape = store.getState().document.nails['right.index']
+    expect(afterShape).not.toBe(before)
+    expect(afterShape.shape).toBe('square')
+
+    store.getState().setLength('extra')
+    const afterLength = store.getState().document.nails['right.index']
+    expect(afterLength).not.toBe(afterShape)
+    expect(afterLength.length).toBe('extra')
+  })
 })

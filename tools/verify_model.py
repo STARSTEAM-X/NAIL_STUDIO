@@ -277,6 +277,14 @@ def check_morphs(gltf, names, check):
             tuple(target_names) == TARGET_NAMES,
             '%s มี morph target ครบ 7 อัน เรียงลำดับถูก (พบ: %s)' % (wanted, target_names),
         )
+        # targetNames เป็นแค่ metadata — ตรวจแยกว่า primitive.targets จริงมีครบตามจำนวน
+        # ไม่งั้น GLB ที่ targetNames ถูกแต่ POSITION target หายไปบางอัน จะผ่านด่านนี้ไปได้
+        # ทั้งที่ check_base_still ใช้ zip(target_names, targets) ซึ่งตัดปลายให้เงียบ ๆ
+        targets = primitive.get('targets', [])
+        check(
+            len(targets) == len(TARGET_NAMES),
+            '%s มี target จริง %d ชุด' % (wanted, len(TARGET_NAMES)),
+        )
 
 
 def check_base_still(buffer, gltf, binary_offset, names, check):
