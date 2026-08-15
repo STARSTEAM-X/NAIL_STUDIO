@@ -106,6 +106,34 @@ enum NotificationKind {
   @@map("notification_kind")
 }
 
+enum AppointmentStatus {
+  pending
+  counter_offered
+  confirmed
+  declined
+  cancelled
+  completed
+  no_show
+
+  @@map("appointment_status")
+}
+
+enum ProposalActor {
+  customer
+  shop
+
+  @@map("proposal_actor")
+}
+
+enum ProposalStatus {
+  pending
+  accepted
+  rejected
+  superseded
+
+  @@map("proposal_status")
+}
+
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
@@ -115,16 +143,20 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  sessions         Session[]
-  projects         Project[]
-  assets           Asset[]
-  templates        NailTemplate[]
-  templateLikes    TemplateLike[]
-  templateShares   TemplateShare[]
-  templateRemixes  TemplateRemix[]
-  templateComments TemplateComment[]
-  contentReports   ContentReport[]
-  notifications    Notification[]
+  sessions                Session[]
+  projects                Project[]
+  assets                  Asset[]
+  templates               NailTemplate[]
+  templateLikes           TemplateLike[]
+  templateShares          TemplateShare[]
+  templateRemixes         TemplateRemix[]
+  templateComments        TemplateComment[]
+  contentReports          ContentReport[]
+  notifications           Notification[]
+  shopProfile             ShopProfile?
+  customerAppointments    Appointment[]        @relation("AppointmentCustomer")
+  authoredReviews         ShopReview[]         @relation("ReviewAuthor")
+  sentAppointmentMessages AppointmentMessage[] @relation("AppointmentMessageSender")
 
   @@map("users")
 }
@@ -210,8 +242,9 @@ model DesignVersion {
   label         String?
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  project   Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  templates NailTemplate[]
+  project      Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  templates    NailTemplate[]
+  appointments Appointment[]
 
   // บังคับไม่ให้เลขเวอร์ชันซ้ำ — เป็นรากฐานของ optimistic concurrency
   @@unique([projectId, versionNumber])
@@ -386,4 +419,144 @@ model Notification {
 
   @@index([userId, createdAt(sort: Desc)])
   @@map("notifications")
+}
+
+model ShopProfile {
+  userId       String   @id @map("user_id") @db.Uuid
+  shopName     String   @map("shop_name") @db.Text
+  description  String?  @db.Text
+  locationText String?  @map("location_text") @db.Text
+  phoneNumbers String[] @default([]) @map("phone_numbers")
+  openingHours Json?    @map("opening_hours") @db.JsonB
+  isVerified   Boolean  @default(false) @map("is_verified")
+  ratingAvg    Decimal  @default(0) @map("rating_avg") @db.Decimal(3, 2)
+  ratingCount  Int      @default(0) @map("rating_count")
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  services     ShopService[]
+  appointments Appointment[] @relation("AppointmentShop")
+  reviews      ShopReview[]  @relation("ReviewShop")
+
+  @@index([isVerified, ratingAvg(sort: Desc), ratingCount(sort: Desc)], map: "shop_profiles_recommendation_idx")
+  @@map("shop_profiles")
+}
+
+model ShopService {
+  id              String  @id @default(uuid()) @db.Uuid
+  shopId          String  @map("shop_id") @db.Uuid
+  name            String  @db.Text
+  description     String? @db.Text
+  priceThb        Decimal @map("price_thb") @db.Decimal(10, 2)
+  durationMinutes Int     @map("duration_minutes")
+  isActive        Boolean @default(true) @map("is_active")
+  sortOrder       Int     @default(0) @map("sort_order")
+
+  shop         ShopProfile   @relation(fields: [shopId], references: [userId], onDelete: Cascade)
+  appointments Appointment[]
+
+  @@index([shopId, sortOrder], map: "shop_services_active_idx")
+  @@map("shop_services")
+}
+
+model Appointment {
+  id              String            @id @default(uuid()) @db.Uuid
+  customerId      String            @map("customer_id") @db.Uuid
+  shopId          String            @map("shop_id") @db.Uuid
+  serviceId       String?           @map("service_id") @db.Uuid
+  designVersionId String?           @map("design_version_id") @db.Uuid
+  status          AppointmentStatus @default(pending)
+  agreedStartAt   DateTime?         @map("agreed_start_at") @db.Timestamptz
+  durationMinutes Int               @map("duration_minutes")
+  priceQuotedThb  Decimal?          @map("price_quoted_thb") @db.Decimal(10, 2)
+  customerNote    String?           @map("customer_note") @db.Text
+  shopNote        String?           @map("shop_note") @db.Text
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+
+  customer      User                  @relation("AppointmentCustomer", fields: [customerId], references: [id], onDelete: Cascade)
+  shop          ShopProfile           @relation("AppointmentShop", fields: [shopId], references: [userId], onDelete: Cascade)
+  service       ShopService?          @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  designVersion DesignVersion?        @relation(fields: [designVersionId], references: [id], onDelete: SetNull)
+  proposals     AppointmentProposal[]
+  messages      AppointmentMessage[]
+  review        ShopReview?
+
+  @@index([customerId, createdAt(sort: Desc)], map: "appointments_customer_created_idx")
+  @@index([shopId, status, createdAt(sort: Desc)], map: "appointments_shop_status_created_idx")
+  @@map("appointments")
+}
+
+model AppointmentProposal {
+  id              String         @id @default(uuid()) @db.Uuid
+  appointmentId   String         @map("appointment_id") @db.Uuid
+  proposedBy      ProposalActor  @map("proposed_by")
+  proposedStartAt DateTime       @map("proposed_start_at") @db.Timestamptz
+  durationMinutes Int            @map("duration_minutes")
+  message         String?        @db.Text
+  status          ProposalStatus @default(pending)
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@index([appointmentId, createdAt(sort: Desc)], map: "appointment_proposals_timeline_idx")
+  @@map("appointment_proposals")
+}
+
+model ShopReview {
+  id            String    @id @default(uuid()) @db.Uuid
+  appointmentId String    @unique(map: "shop_reviews_appointment_key") @map("appointment_id") @db.Uuid
+  shopId        String    @map("shop_id") @db.Uuid
+  authorId      String    @map("author_id") @db.Uuid
+  rating        Int       @db.SmallInt
+  comment       String?   @db.Text
+  shopReply     String?   @map("shop_reply") @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  shop        ShopProfile @relation("ReviewShop", fields: [shopId], references: [userId], onDelete: Cascade)
+  author      User        @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([shopId, createdAt(sort: Desc)], map: "shop_reviews_shop_created_idx")
+  @@map("shop_reviews")
+}
+
+model AppointmentMessage {
+  id            String    @id @default(uuid()) @db.Uuid
+  appointmentId String    @map("appointment_id") @db.Uuid
+  senderId      String?   @map("sender_id") @db.Uuid
+  content       String    @db.Text
+  readAt        DateTime? @map("read_at") @db.Timestamptz
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  sender      User?       @relation("AppointmentMessageSender", fields: [senderId], references: [id], onDelete: SetNull)
+
+  @@index([appointmentId, createdAt(sort: Desc)], map: "appointment_messages_thread_idx")
+  @@index([appointmentId, readAt], map: "appointment_messages_unread_idx")
+  @@map("appointment_messages")
+}
+
+model KnowledgeEntry {
+  id         String   @id @default(uuid()) @db.Uuid
+  question   String   @db.Text
+  answer     String   @db.Text
+  sourceType String?  @map("source_type") @db.Text
+  sourceId   String?  @map("source_id") @db.Uuid
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([isActive, createdAt(sort: Desc)], map: "knowledge_entries_active_idx")
+  @@map("knowledge_entries")
+}
+
+model AiChatMessage {
+  id        String   @id @default(uuid()) @db.Uuid
+  sessionId String   @map("session_id") @db.Uuid
+  role      String   @db.Text
+  content   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([sessionId, createdAt], map: "ai_chat_messages_session_idx")
+  @@map("ai_chat_messages")
 }

@@ -18,6 +18,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Link to="/projects" className="brand">Nail Studio <span>3D</span></Link>
         <div className="navbar-right">
           <Link to="/community" className="navbar-link">ชุมชน</Link>
+          <Link to="/appointments" className="navbar-link">การนัดหมาย</Link>
           <NotificationBell />
           {user && <span className="user-name">{user.displayName}</span>}
           <button

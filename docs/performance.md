@@ -1,5 +1,28 @@
 # Performance Measurements — NAIL STUDIO 3D
 
+## Slice 8 · repeatable web bundle baseline
+
+`npm run profile:web` builds the production web bundle and records the total
+emitted bytes plus the ten largest assets. This is intentionally separate from
+GPU profiling: BVH, proxy meshes, LOD, texture adaptation, and instancing are
+only changed after Chrome Performance, `renderer.info`, React Profiler, and a
+heap snapshot are captured on the same browser/device. The script reports the
+asset baseline without inventing FPS or heap numbers when a browser session is
+not available.
+
+### 2026-08-15 · initial-route code split
+
+| Measurement | Before split | After split | Environment |
+|---|---:|---:|---|
+| initial JS entry | 1,501,274 B | 233,212 B | Node v24.19.0, Vite production build |
+| emitted files | 5 | 15 | same workspace/build command |
+| total emitted bytes | 14,129,962 B | 14,132,156 B | includes `hand.glb` |
+
+The editor's `useNailTextures` chunk remains 1,069,244 B and is loaded only
+when the editor route is opened. GPU FPS, renderer draw calls, and heap remain
+unmeasured in this run, so no BVH/LOD/texture-quality claim is made from this
+bundle measurement.
+
 เอกสารบันทึกผลการวัดประสิทธิภาพทั้งหมดของโครงงาน
 
 **กฎของเอกสารนี้**

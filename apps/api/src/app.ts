@@ -11,6 +11,10 @@ import { projectsRouter } from './projects/routes.ts'
 import { templatesRouter } from './templates/routes.ts'
 import { notificationsRouter } from './notifications/routes.ts'
 import { aiRouter } from './ai/routes.ts'
+import { reviewsRouter, shopsRouter } from './shops/routes.ts'
+import { appointmentsRouter } from './appointments/routes.ts'
+import { apiLimiter } from './middleware/rateLimit.ts'
+import { isProduction } from './config/env.ts'
 
 export function createApp(): Express {
   const app = express()
@@ -21,7 +25,24 @@ export function createApp(): Express {
   app.disable('x-powered-by')
 
   app.use(requestId)
-  app.use(helmet())
+  app.use(helmet({
+    // Vite's development client needs its own headers; production gets an explicit allowlist.
+    contentSecurityPolicy: isProduction
+      ? {
+          directives: {
+            defaultSrc: ["'self'"],
+            baseUri: ["'self'"],
+            objectSrc: ["'none'"],
+            frameAncestors: ["'none'"],
+            imgSrc: ["'self'", 'data:', 'blob:'],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            scriptSrc: ["'self'"],
+            connectSrc: ["'self'", env.WEB_ORIGIN],
+          },
+        }
+      : false,
+    strictTransportSecurity: isProduction ? { maxAge: 31_536_000, includeSubDomains: true, preload: true } : false,
+  }))
   app.use(
     cors({
       // allowlist เท่านั้น ห้าม '*' เพราะเราส่ง cookie ข้าม origin
@@ -36,6 +57,7 @@ export function createApp(): Express {
   // ต้องออกโทเคนก่อนตรวจเสมอ ไม่งั้นผู้ใช้ใหม่จะสมัครสมาชิกไม่ได้เลย
   app.use(ensureCsrfCookie)
   app.use(csrfProtection)
+  app.use('/api/v1', apiLimiter)
 
   app.get('/api/v1/health', (_request, response) => {
     response.json({ success: true, data: { status: 'ok' } })
@@ -46,6 +68,9 @@ export function createApp(): Express {
   app.use('/api/v1/templates', templatesRouter)
   app.use('/api/v1/notifications', notificationsRouter)
   app.use('/api/v1/ai', aiRouter)
+  app.use('/api/v1/shops', shopsRouter)
+  app.use('/api/v1/reviews', reviewsRouter)
+  app.use('/api/v1/appointments', appointmentsRouter)
 
   app.use(notFoundHandler)
   app.use(errorHandler)

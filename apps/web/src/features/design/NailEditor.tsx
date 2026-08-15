@@ -38,6 +38,7 @@ import { VersionHistoryPanel } from './VersionHistoryPanel.tsx'
 import { useAutosave, type AutosaveStatus } from './useAutosave.ts'
 import { useOfflineDraft } from './useOfflineDraft.ts'
 import { downloadBlob, sanitizeFilename } from '@/utils/downloadBlob.ts'
+import { AiAssistantPanel } from '@/features/ai/AiAssistantPanel.tsx'
 
 interface Props {
   projectId: string
@@ -252,6 +253,7 @@ export function NailEditor({ projectId, detail }: Props) {
         <PaintToolbar />
         <DecorationPanel />
         <HandPanel />
+        <AiAssistantPanel />
         <div className="viewport">
           <WebGlGuard>
             <NailScene fallback={null}>

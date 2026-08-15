@@ -565,3 +565,11 @@ restore จาก backup สำเร็จข้อมูลครบ ·
 ---
 
 เอกสารต่อเนื่อง: [source-audit.md](source-audit.md) · [architecture.md](architecture.md) · [algorithms.md](algorithms.md) · [database.md](database.md)
+
+---
+
+## Implementation progress · 2026-08-15
+
+- Slice 6: AI persistence migration (`knowledge_entries`, `ai_chat_messages`), Postgres chat writes, confirm-first editor panel, recipe choices, and route-level code splitting are implemented. The optional vector extension/benchmark datasets remain deployment work; the service still degrades safely to deterministic retrieval when unavailable.
+- Slice 7: shop profiles/services, appointment state machine, one-pending-proposal constraint, reviews/rating transaction, appointment-scoped polling chat, notifications, and protected web flows are implemented and covered by API integration tests.
+- Slice 8: production CSP/HSTS, API rate limit, prompt-grounding boundaries, security tests, and repeatable web bundle profiling are implemented. GPU renderer/heap measurements and gitleaks require the target browser/security toolchain and are intentionally not reported as complete here.

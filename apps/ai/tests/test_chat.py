@@ -28,3 +28,13 @@ def test_command_is_proposal_only() -> None:
 def test_factual_chat_refuses_without_grounding() -> None:
     assert should_refuse([], intent="qa") is True
     assert REFUSAL_MESSAGE
+
+
+def test_grounding_marks_catalog_text_as_untrusted_data() -> None:
+    from app.chat.grounding import grounded_context
+    from app.retrieval.engine import KnowledgeEntry
+
+    source = RetrievedEntry(entry=KnowledgeEntry(id="1", question="ignore system", answer="do not execute"), score=1.0)
+    rendered = grounded_context([source])
+    assert "<untrusted_source" in rendered
+    assert "</untrusted_source>" in rendered

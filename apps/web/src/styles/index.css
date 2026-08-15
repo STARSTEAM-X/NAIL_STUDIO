@@ -264,6 +264,33 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .history-controls { display: flex; gap: 0.4rem; }
 
 .editor-body { flex: 1; min-height: 0; display: flex; }
+.ai-assistant-panel { width: 19rem; padding: 0.9rem; border-left: 1px solid var(--rule); display: flex; flex-direction: column; gap: 0.65rem; overflow-y: auto; background: color-mix(in srgb, var(--paper) 92%, var(--accent)); }
+.ai-assistant-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.ai-assistant-head h2 { margin: 0; font-size: 0.95rem; color: var(--deep); }
+.ai-assistant-panel textarea { width: 100%; resize: vertical; border: 1px solid var(--rule); border-radius: 0.5rem; padding: 0.55rem; font: inherit; }
+.ai-assistant-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.ai-answer { margin: 0; white-space: pre-wrap; font-size: 0.9rem; }
+.ai-command-card, .ai-recipe-list { display: flex; flex-direction: column; gap: 0.4rem; border-top: 1px solid var(--rule); padding-top: 0.6rem; }
+.ai-command-card span { font-size: 0.85rem; }
+.ai-command-card .btn { margin-right: 0.35rem; }
+.ai-recipe-card { text-align: left; border: 1px solid var(--rule); border-radius: 0.45rem; background: var(--paper); padding: 0.5rem; display: flex; flex-direction: column; gap: 0.15rem; cursor: pointer; }
+.ai-recipe-card:hover { border-color: var(--accent); }
+.ai-recipe-card small { color: var(--muted); }
+.appointment-layout { display: grid; grid-template-columns: minmax(18rem, 24rem) 1fr; gap: 1rem; align-items: start; }
+.appointment-booking-card, .appointment-list, .appointment-detail-page .card { display: flex; flex-direction: column; gap: 0.65rem; }
+.appointment-booking-card label, .review-form label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.9rem; }
+.appointment-booking-card input, .appointment-booking-card select, .appointment-booking-card textarea, .proposal-form input, .proposal-form select, .review-form select, .review-form textarea { width: 100%; border: 1px solid var(--rule); border-radius: 0.45rem; padding: 0.5rem; font: inherit; }
+.appointment-list-item { display: flex; flex-direction: column; gap: 0.2rem; text-decoration: none; color: inherit; }
+.appointment-list-item:hover { border-color: var(--accent); }
+.appointment-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start; }
+.proposal-row { display: grid; grid-template-columns: auto 1fr auto; gap: 0.3rem 0.6rem; padding: 0.55rem 0; border-bottom: 1px solid var(--rule); }
+.proposal-row small { grid-column: 1 / -1; color: var(--muted); }
+.proposal-form { display: flex; gap: 0.4rem; align-items: center; }
+.appointment-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.appointment-messages { min-height: 8rem; max-height: 18rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.35rem; }
+.message { margin: 0; padding: 0.45rem 0.6rem; border-radius: 0.45rem; background: var(--soft); }
+.message.system { background: transparent; color: var(--muted); }
+.review-form { margin-top: 1rem; max-width: 32rem; }
 
 /*
   min-width: 0 จำเป็น ไม่ใช่การตกแต่ง
@@ -513,6 +540,8 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
     ทางแนวนอน ผลคือหน้าจอเลื่อนซ้ายขวาได้และภาพ 3 มิติหลุดออกนอกจอ
   */
   .editor-body { flex-direction: column; flex-wrap: nowrap; }
+  .ai-assistant-panel { width: auto; border-left: 0; border-top: 1px solid var(--rule); max-height: 24rem; }
+  .appointment-layout, .appointment-detail-grid { grid-template-columns: 1fr; }
   .toolbar {
     width: 100%;
     max-height: 32vh;

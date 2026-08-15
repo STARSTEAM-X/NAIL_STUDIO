@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Protocol
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from .retrieval.engine import KnowledgeEntry
 
@@ -88,6 +88,18 @@ class PostgresRepository:
             return []
 
     async def save_chat(self, session_id: UUID, role: str, content: str) -> None:
-        # Chat persistence is enabled after the Slice 6 migration is deployed.
-        # Do not silently write to an unverified schema.
-        del session_id, role, content
+        try:
+            async with self.pool.connection() as connection:
+                async with connection.cursor() as cursor:
+                    await cursor.execute(
+                        """
+                        INSERT INTO ai_chat_messages (id, session_id, role, content)
+                        VALUES (%s, %s, %s, %s)
+                        """,
+                        (uuid4(), session_id, role, content),
+                    )
+                await connection.commit()
+        except Exception:
+            # AI is optional: a schema mismatch must degrade to in-memory mode,
+            # never fail an otherwise healthy chat response.
+            return

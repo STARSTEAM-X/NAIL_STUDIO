@@ -10,7 +10,7 @@ def grounded_context(results: Sequence[RetrievedEntry], max_sources: int = 5) ->
     if not results:
         return ""
     return "\n\n".join(
-        f"[แหล่งข้อมูล {index}]\nคำถาม: {result.entry.question}\nคำตอบ: {result.entry.answer}"
+        f"<untrusted_source index=\"{index}\">\nคำถาม: {result.entry.question}\nคำตอบ: {result.entry.answer}\n</untrusted_source>"
         for index, result in enumerate(results[:max_sources], start=1)
     )
 
