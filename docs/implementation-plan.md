@@ -277,11 +277,18 @@ Sprint 0, งานทำคลัง asset จริง, เวลา hardening
 1. `geometry/surfaceProjection.ts` (A-11) + `pointInHull.ts` (A-21) + unit test ครบ edge case
 2. `NailDecoration` + `DecorationInstances` (InstancedMesh สำหรับชิ้นซ้ำเยอะ)
 3. `TransformController` — ย้าย (ลากบนผิว) · หมุน (รอบ normal) · ย่อขยาย
-4. **ทรงเล็บ + ความยาว** — ยกวิธี PCA + morph target จาก [Spike S2](spikes/S2-nail-shapes.md)
+4. [x] **ทรงเล็บ + ความยาว** — ยกวิธี PCA + morph target จาก [Spike S2](spikes/S2-nail-shapes.md) (D-27)
    - เขียน `tools/build_shapes.py` ใหม่พร้อมเทส (spike เป็นโค้ดทิ้ง)
    - **ปรับค่าเชิงศิลป์ของ square/squoval** ซึ่ง spike พบว่าจางเกินไป (S2 §6)
-   - เพิ่มความละเอียดของ `Nail_index` (81 verts อาจไม่พอสำหรับมุมคม)
-   - เพิ่มด่านตรวจใน `verify_model.py`: morph ครบ 4 ต่อเล็บ + **โคนเล็บขยับ = 0**
+   - เพิ่มความละเอียดของ `Nail_index` (81 verts อาจไม่พอสำหรับมุมคม) — subdivide แล้วได้ 1,089 verts
+   - เพิ่มด่านตรวจใน `verify_model.py`: morph ครบ 7 ต่อเล็บ (4 ทรง + 3 ความยาว) + **โคนเล็บขยับ = 0**
+   - **งาน UV re-unwrap ที่ค้างจาก Slice 2** (D-25: "รอยหัวแปรงยังเป็นวงรี 1.4:1") ทำแล้วในรอบนี้ —
+     กาง UV ใหม่แบบรักษาสัดส่วน (`project_to_uv`, เว้นขอบ `UV_PADDING = 0.06`) แทนการยืดเต็มจัตุรัสแบบเดิม
+     ค่าความบิด UV ที่วัดได้จริงหลังแก้ (เทียบกับเกณฑ์ตั้งไว้ล่วงหน้า `MAX_UV_DISTORTION = 1.15`):
+     thumb 25.525 (เกินเกณฑ์มาก, ยังเป็นข้อจำกัดที่รู้ตัว), index 1.792, middle 3.262, ring 1.544,
+     little 5.428 — ตำแหน่ง/รูปเส้นบนแผงวาด 2 มิติถูกต้องแล้ว (ยืนยันบนเบราว์เซอร์จริง: เลือกทรง
+     `stiletto` แล้วแผง 2 มิติแสดงรูปทรงแหลมตรงกับโมเดล ไม่ใช่วงรีทรงมนแบบเดิม) เหลือเฉพาะรอยหัวแปรง
+     ที่ยังบิดสำหรับเล็บที่มีความบิด UV สูง — ดู D-27 สำหรับรายละเอียด
 5. สัดส่วนมือ + สีผิว (`handProportions` + `refreshSkinnedBounds`)
 6. Thumbnail: capture จาก canvas → WebP → `StorageProvider`
 7. Exporters: `.nail.json` · PNG · GLB (ถ้าประเมินแล้วเหมาะสม)
