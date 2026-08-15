@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useCurrentUser, useLogout } from '@/features/auth/useAuth.ts'
 import { NotificationBell } from './NotificationBell.tsx'
+import { Icon } from './Icon.tsx'
 
 /**
  * โครงหน้าเว็บที่ใช้ร่วมกันทุกหน้าที่ล็อกอินแล้ว
@@ -18,21 +19,32 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className={`shell ${isEditor ? 'shell-editor' : ''}`}>
       {!isEditor && (
         <nav className="navbar">
-          <Link to="/projects" className="brand">Nail Studio <span>3D</span></Link>
+          <Link to="/projects" className="brand">
+            <span className="brand-mark"><Icon name="sparkle" size={16} strokeWidth={1.7} /></span>
+            <span>Nail Studio <em>3D</em></span>
+          </Link>
           <div className="navbar-right">
-            <Link to="/community" className="navbar-link">ชุมชน</Link>
-            <Link to="/appointments" className="navbar-link">การนัดหมาย</Link>
+            <div className="navbar-links" aria-label="เมนูหลัก">
+              <Link to="/community" className="navbar-link"><Icon name="users" size={16} />ชุมชน</Link>
+              <Link to="/appointments" className="navbar-link"><Icon name="calendar" size={16} />การนัดหมาย</Link>
+            </div>
             <NotificationBell />
-            {user && <span className="user-name">{user.displayName}</span>}
+            {user && (
+              <span className="user-pill">
+                <span className="user-avatar" aria-hidden="true">{user.displayName.trim().slice(0, 1).toUpperCase()}</span>
+                <span className="user-name">{user.displayName}</span>
+              </span>
+            )}
             <button
               type="button"
-              className="btn btn-ghost"
+              className="navbar-logout"
               disabled={logout.isPending}
               onClick={() => {
                 logout.mutate(undefined, { onSuccess: () => navigate('/login', { replace: true }) })
               }}
             >
-              ออกจากระบบ
+              <Icon name="logout" size={16} />
+              <span>ออกจากระบบ</span>
             </button>
           </div>
         </nav>

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications } from '@/features/notifications/useNotifications.ts'
+import { Icon } from './Icon.tsx'
 
 export function NotificationBell() {
   const navigate = useNavigate()
@@ -19,7 +20,7 @@ export function NotificationBell() {
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
       >
-        <span aria-hidden="true">♢</span>
+        <Icon name="bell" size={17} />
         {unreadCount > 0 && <span className="notification-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>}
       </button>
 
