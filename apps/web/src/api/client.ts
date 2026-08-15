@@ -32,6 +32,13 @@ interface RequestOptions {
   signal?: AbortSignal
 }
 
+/** แนบโทเคน CSRF ให้ request ที่เปลี่ยนแปลงข้อมูล — ใช้ร่วมกันระหว่าง apiFetch และ apiUploadBinary */
+function csrfHeaders(method: string): Record<string, string> {
+  if (method === 'GET') return {}
+  const csrf = readCookie(CSRF_COOKIE)
+  return csrf ? { [CSRF_HEADER]: csrf } : {}
+}
+
 /**
  * ตัวเรียก API ตัวเดียวของทั้งแอป
  *
@@ -44,13 +51,9 @@ interface RequestOptions {
  */
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? 'GET'
-  const headers: Record<string, string> = {}
-
-  if (options.body !== undefined) headers['Content-Type'] = 'application/json'
-
-  if (method !== 'GET') {
-    const csrf = readCookie(CSRF_COOKIE)
-    if (csrf) headers[CSRF_HEADER] = csrf
+  const headers: Record<string, string> = {
+    ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+    ...csrfHeaders(method),
   }
 
   const response = await fetch(`${BASE_URL}/api/v1${path}`, {
@@ -80,4 +83,28 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   }
 
   return payload.data
+}
+
+/** อัปโหลดไฟล์ไบนารีตรงๆ (ไม่ JSON-encode) — ปลายทางเดียวที่ใช้ตอนนี้คือ thumbnail */
+export async function apiUploadBinary(path: string, blob: Blob, contentType: string): Promise<void> {
+  const response = await fetch(`${BASE_URL}/api/v1${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': contentType, ...csrfHeaders('POST') },
+    credentials: 'include',
+    body: blob,
+  })
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as ApiError | null
+    throw new ApiRequestError(
+      response.status,
+      payload ?? {
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'อัปโหลดภาพตัวอย่างไม่สำเร็จ',
+          requestId: response.headers.get('x-request-id') ?? 'unknown',
+        },
+      },
+    )
+  }
 }

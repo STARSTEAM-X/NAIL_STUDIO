@@ -3,11 +3,13 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { useCurrentUserId } from '@/features/auth/useAuth.ts'
 import { NailScene } from '@/3d/scene/NailScene.tsx'
+import { ThumbnailCapture, type ThumbnailCaptureHandle } from '@/3d/scene/ThumbnailCapture.tsx'
 import { DesignScene } from '@/3d/scene/DesignScene.tsx'
 import { WebGlGuard } from '@/3d/scene/WebGlGuard.tsx'
 import type { HandParts } from '@/3d/models/HandModel.tsx'
 import { useNailTextures } from '@/3d/painting/useNailTextures.ts'
 import {
+  captureAndUploadThumbnail,
   fetchProjectDetail,
   openingDocument,
   projectKeys,
@@ -59,6 +61,7 @@ export function NailEditor({ projectId, detail }: Props) {
   // ชิ้นส่วนมือและชุดเท็กซ์เจอร์ถูกถือไว้ที่ระดับนี้ เพราะทั้งฉาก 3 มิติและแผงวาด
   // แบบแบนต้องใช้ชุดเดียวกัน — มีสองชุดเมื่อไร วาดในโหมดหนึ่งแล้วอีกโหมดจะไม่เห็น
   const [parts, setParts] = useState<HandParts | null>(null)
+  const thumbnailRef = useRef<ThumbnailCaptureHandle>(null)
   const textures = useNailTextures(parts)
   // identity ต้องคงที่ — HandModel เรียก onReady จาก effect ที่มี onReady ใน deps
   const handleReady = useCallback((next: HandParts) => setParts(next), [])
@@ -180,6 +183,9 @@ export function NailEditor({ projectId, detail }: Props) {
                   expectedVersion: latestVersion,
                 })
                 if (lifecycle.isActive()) explicitSaveUi.current.success(result.versionNumber)
+                void captureAndUploadThumbnail(projectId, thumbnailRef, queryClient).catch((error) => {
+                  console.warn('[thumbnail] อัปโหลดภาพตัวอย่างไม่สำเร็จ ไม่กระทบการบันทึกเวอร์ชัน', error)
+                })
                 return result
               }).catch((error: unknown) => {
                 explicitSaveUi.current.failure(error)
@@ -218,6 +224,7 @@ export function NailEditor({ projectId, detail }: Props) {
                 textures={textures}
                 onReady={handleReady}
               />
+              <ThumbnailCapture ref={thumbnailRef} />
             </NailScene>
           </WebGlGuard>
         </div>

@@ -1,11 +1,14 @@
+import type { RefObject } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { QueryClient } from '@tanstack/react-query'
 import type {
   DesignDocument,
   DuplicateProjectInput,
   ProjectSummary,
   VersionSummary,
 } from '@nail-studio/contracts'
-import { apiFetch } from '@/api/client.ts'
+import { apiFetch, apiUploadBinary } from '@/api/client.ts'
+import type { ThumbnailCaptureHandle } from '@/3d/scene/ThumbnailCapture.tsx'
 
 export const projectKeys = {
   all: ['projects'] as const,
@@ -189,4 +192,21 @@ export function useSaveVersion() {
       })
     },
   })
+}
+
+/**
+ * Capture + อัปโหลด thumbnail หลังบันทึกเวอร์ชันสำเร็จ — เรียกแบบไม่บล็อก UI การบันทึก
+ *
+ * จงใจไม่ catch เองในนี้ — ผู้เรียก (NailEditor.tsx) ต้องเป็นคนตัดสินใจว่าจะทำอะไร
+ * กับความล้มเหลว (ตอนนี้คือ log อย่างเดียว) เพื่อไม่ให้ error หายไปเงียบๆ จนเทสไม่เห็น
+ */
+export async function captureAndUploadThumbnail(
+  projectId: string,
+  ref: RefObject<ThumbnailCaptureHandle | null>,
+  queryClient: QueryClient,
+): Promise<void> {
+  if (!ref.current) return // canvas ยังไม่พร้อม (WebGL ล้ม/ยังโหลดไม่เสร็จ) — ข้ามเงียบๆ
+  const blob = await ref.current.capture()
+  await apiUploadBinary(`/projects/${projectId}/thumbnail`, blob, 'image/webp')
+  void queryClient.invalidateQueries({ queryKey: projectKeys.list() })
 }

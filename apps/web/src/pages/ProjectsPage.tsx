@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { ApiRequestError } from '@/api/client.ts'
 import { useCreateProject, useDeleteProject, useProjects } from '@/features/projects/useProjects.ts'
 
+const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000'
+
 export function ProjectsPage() {
   const projects = useProjects()
   const createProject = useCreateProject()
@@ -59,6 +61,17 @@ export function ProjectsPage() {
         {projects.data?.map((project) => (
           <li key={project.id} className="card project-card">
             <Link to={`/editor/${project.id}`} className="project-link">
+              {project.hasThumbnail ? (
+                <img
+                  src={`${API_BASE}/api/v1/projects/${project.id}/thumbnail`}
+                  crossOrigin="use-credentials"
+                  alt={`ภาพตัวอย่างของ ${project.name}`}
+                  loading="lazy"
+                  className="project-thumbnail"
+                />
+              ) : (
+                <div className="project-thumbnail-placeholder" aria-hidden="true" />
+              )}
               <span className="project-name">{project.name}</span>
               <span className="muted">
                 {project.versionCount} เวอร์ชัน · แก้ไขล่าสุด{' '}
