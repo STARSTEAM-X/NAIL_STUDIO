@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import type { CreateTemplateInput } from '@nail-studio/contracts'
@@ -12,6 +12,7 @@ import { exportProjectJson } from '@/3d/scene/exporters/exportProjectJson.ts'
 import { DesignScene } from '@/3d/scene/DesignScene.tsx'
 import { WebGlGuard } from '@/3d/scene/WebGlGuard.tsx'
 import type { HandParts } from '@/3d/models/HandModel.tsx'
+import { computeNailHulls } from '@/3d/geometry/nailHulls.ts'
 import { useNailTextures } from '@/3d/painting/useNailTextures.ts'
 import {
   captureAndUploadThumbnail,
@@ -91,6 +92,7 @@ export function NailEditor({ projectId, detail }: Props) {
   // ชิ้นส่วนมือและชุดเท็กซ์เจอร์ถูกถือไว้ที่ระดับนี้ เพราะทั้งฉาก 3 มิติและแผงวาด
   // แบบแบนต้องใช้ชุดเดียวกัน — มีสองชุดเมื่อไร วาดในโหมดหนึ่งแล้วอีกโหมดจะไม่เห็น
   const [parts, setParts] = useState<HandParts | null>(null)
+  const hulls = useMemo(() => parts ? computeNailHulls(parts) : new Map(), [parts])
   const thumbnailRef = useRef<ThumbnailCaptureHandle>(null)
   const snapshotRef = useRef<SnapshotCaptureHandle>(null)
   const textures = useNailTextures(parts)
@@ -477,7 +479,7 @@ export function NailEditor({ projectId, detail }: Props) {
               {activePanel === 'paint' && <PaintToolbar />}
               {activePanel === 'decorate' && <DecorationPanel />}
               {activePanel === 'hand' && <HandPanel />}
-              {activePanel === 'ai' && <AiAssistantPanel />}
+              {activePanel === 'ai' && <AiAssistantPanel hulls={hulls} />}
             </div>
           </div>
         </aside>

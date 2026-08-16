@@ -3,12 +3,18 @@ import { FINISHES, NAIL_LENGTHS, NAIL_SHAPES, type NailKey } from '@nail-studio/
 import { generateAiRecipes, streamAiChat, type AiChatMeta, type AiRecipe, type AiRecipeResponse } from './aiClient.ts'
 import { useDesign, useDesignStoreApi } from '@/features/design/DesignStoreProvider.tsx'
 import { primaryOf } from '@/features/design/designStore.ts'
+import type { Pt2 } from '@/3d/geometry/hull.ts'
+import { composeFromRecipe, seedFromRecipe } from '@/3d/generation/composer.ts'
 
 function validOption<T extends readonly string[]>(value: string, options: T): value is T[number] {
   return (options as readonly string[]).includes(value)
 }
 
-export function AiAssistantPanel() {
+interface Props {
+  hulls: ReadonlyMap<NailKey, Pt2[]>
+}
+
+export function AiAssistantPanel({ hulls }: Props) {
   const store = useDesignStoreApi()
   const selection = useDesign((state) => state.selection)
   const document = useDesign((state) => state.document)
@@ -81,11 +87,15 @@ export function AiAssistantPanel() {
   }
 
   const applyRecipe = (recipe: AiRecipe) => {
+    if (!/^#[0-9a-f]{6}$/i.test(recipe.baseColor)
+      || !validOption(recipe.finish, FINISHES)
+      || !validOption(recipe.shape, NAIL_SHAPES)
+      || !validOption(recipe.length, NAIL_LENGTHS)) {
+      setError('Recipe จาก AI มีค่าที่ไม่รองรับ')
+      return
+    }
     const actions = store.getState()
-    if (/^#[0-9a-f]{6}$/i.test(recipe.baseColor)) actions.setBaseColor(recipe.baseColor)
-    if (validOption(recipe.finish, FINISHES)) actions.setFinish(recipe.finish)
-    if (validOption(recipe.shape, NAIL_SHAPES)) actions.setShape(recipe.shape)
-    if (validOption(recipe.length, NAIL_LENGTHS)) actions.setLength(recipe.length)
+    actions.applyComposedRecipe(composeFromRecipe(recipe, hulls, seedFromRecipe(recipe)))
   }
 
   return (
@@ -129,7 +139,7 @@ export function AiAssistantPanel() {
             <button type="button" className="ai-recipe-card" key={`${recipe.archetype}-${index}`} onClick={() => applyRecipe(recipe)}>
               <span>{recipe.archetype} · {recipe.paletteId}</span>
               <span>{recipe.baseColor} · {recipe.finish} · {recipe.shape} · {recipe.length}</span>
-              <small>กดเพื่อใช้กับเล็บที่เลือก (ย้อนกลับได้ด้วย Ctrl+Z)</small>
+              <small>กดเพื่อใช้กับเล็บมือขวาทั้งหมด (ย้อนกลับได้ด้วย Ctrl+Z)</small>
             </button>
           ))}
         </div>

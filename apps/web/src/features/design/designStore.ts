@@ -44,6 +44,7 @@ import {
 } from '@/3d/history/commands/decorationCommands.ts'
 import { SetProportionsCommand, SetSkinToneCommand } from '@/3d/history/commands/handCommands.ts'
 import { DEFAULT_PAINT_SETTINGS, type PaintSettings } from '@/3d/painting/paintSettings.ts'
+import type { ComposedNailChange } from '@/3d/generation/composer.ts'
 
 export const EDITABLE_HAND: Hand = 'right'
 export const EDITABLE_NAILS: NailKey[] = nailKeysOfHand(EDITABLE_HAND)
@@ -84,6 +85,7 @@ export interface DesignActions {
   setShape: (shape: Nail['shape'], mergeKey?: string) => void
   setLength: (length: Nail['length'], mergeKey?: string) => void
   setBaseColor: (color: string, mergeKey?: string) => void
+  applyComposedRecipe: (changes: ReadonlyMap<NailKey, ComposedNailChange>) => void
   setSkinTone: (hex: string) => void
   setProportions: (partial: Partial<HandSettings['proportions']>, mergeKey?: string) => void
   setMode: (mode: 'paint' | 'decorate') => void
@@ -335,6 +337,25 @@ export function createDesignStore(options: CreateDesignStoreOptions = {}): Desig
         const commands = editableSelection(state.selection)
           .map((key) => new SetBaseColorCommand(key, state.document.nails[key].baseColor, color, mergeKey))
         if (commands.length > 0) execute(commandFor('เปลี่ยนสีเล็บ', commands, mergeKey))
+      },
+
+      applyComposedRecipe: (changes) => {
+        const state = get()
+        const commands: Command[] = []
+        for (const [key, change] of changes) {
+          if (!isEditable(key)) continue
+          const nail = state.document.nails[key]
+          commands.push(new SetBaseColorCommand(key, nail.baseColor, change.baseColor))
+          commands.push(new SetFinishCommand(key, nail.finish, change.finish))
+          commands.push(new SetShapeCommand(key, nail.shape, change.shape))
+          commands.push(new SetLengthCommand(key, nail.length, change.length))
+
+          const available = Math.max(0, MAX_DECORATIONS_PER_NAIL - nail.decorations.length)
+          for (const [index, decoration] of change.decorations.slice(0, available).entries()) {
+            commands.push(new AddDecorationCommand(key, decoration, nail.decorations.length + index))
+          }
+        }
+        if (commands.length > 0) execute(new CompositeCommand('ใช้ Recipe จาก AI', commands))
       },
 
       setSkinTone: (hex) => {

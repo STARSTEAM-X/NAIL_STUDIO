@@ -5,7 +5,8 @@ import type { NailKey } from '@nail-studio/contracts'
 import { useDesignStoreApi } from '@/features/design/DesignStoreProvider.tsx'
 import type { HandParts } from '@/3d/models/HandModel.tsx'
 import { pickNail, pointerToNdc, type Hit } from '@/3d/painting/picking.ts'
-import { computeHull, type Pt2 } from '@/3d/geometry/hull.ts'
+import type { Pt2 } from '@/3d/geometry/hull.ts'
+import { computeNailHulls } from '@/3d/geometry/nailHulls.ts'
 import { isPointInHull } from '@/3d/geometry/pointInHull.ts'
 import { nearestDecoration } from '@/3d/decorations/decorationPicking.ts'
 
@@ -37,17 +38,7 @@ export function TransformController({ parts }: Props) {
   const hullsRef = useRef<Map<NailKey, Pt2[]>>(new Map())
 
   useEffect(() => {
-    const hulls = new Map<NailKey, Pt2[]>()
-    for (const [key, mesh] of parts.nails) {
-      const uv = mesh.geometry.getAttribute('uv')
-      if (!uv) continue
-      const points: Pt2[] = []
-      for (let index = 0; index < uv.count; index += 1) {
-        points.push({ x: uv.getX(index), y: uv.getY(index) })
-      }
-      hulls.set(key, computeHull(points))
-    }
-    hullsRef.current = hulls
+    hullsRef.current = computeNailHulls(parts)
   }, [parts])
 
   useEffect(() => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { NailKey } from '@nail-studio/contracts'
+import type { ComposedNailChange } from '@/3d/generation/composer.ts'
 import { createDesignStore } from './designStore.ts'
 
 const RIGHT_INDEX: NailKey = 'right.index'
@@ -65,5 +66,27 @@ describe('decoration store actions', () => {
     const before = store.getState().document
     store.getState().addDecoration('left.thumb' as NailKey, deco('a'))
     expect(store.getState().document).toBe(before)
+  })
+
+  it('applies a composed recipe as one undoable history entry', () => {
+    const store = createDesignStore()
+    const change: ComposedNailChange = {
+      baseColor: '#b3122e',
+      finish: 'matte',
+      shape: 'square',
+      length: 'long',
+      decorations: [deco('recipe-decoration', 0.25, 0.75)],
+    }
+    store.getState().applyComposedRecipe(new Map([['right.index', change]]))
+    expect(store.getState().document.nails[RIGHT_INDEX]).toMatchObject({
+      baseColor: '#b3122e', finish: 'matte', shape: 'square', length: 'long',
+    })
+    expect(store.getState().document.nails[RIGHT_INDEX].decorations).toHaveLength(1)
+    store.getState().undo()
+    expect(store.getState().document.nails[RIGHT_INDEX]).toMatchObject({
+      baseColor: '#ffffff', finish: 'glossy', shape: 'round', length: 'medium',
+    })
+    expect(store.getState().document.nails[RIGHT_INDEX].decorations).toHaveLength(0)
+    expect(store.getState().history.state().canUndo).toBe(false)
   })
 })
