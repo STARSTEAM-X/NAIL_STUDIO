@@ -5,7 +5,6 @@ import { usePageTitle } from '@/lib/usePageTitle.ts'
 import { useCurrentUser } from '@/features/auth/useAuth.ts'
 import { Avatar } from '@/components/ui/Avatar.tsx'
 import { CommunityComposer } from '@/features/community/components/CommunityComposer.tsx'
-import { CommunityNav } from '@/features/community/components/CommunityNav.tsx'
 import { CommunityRail } from '@/features/community/components/CommunityRail.tsx'
 import { CommunityToolbar } from '@/features/community/components/CommunityToolbar.tsx'
 import { EmptyState, ErrorState, FeedSkeletonList } from '@/components/ui/States.tsx'
@@ -74,8 +73,6 @@ export function CommunityPage() {
   return (
     <div className="nc-page">
       <div className="nc-layout">
-        <CommunityNav state={state} buildHref={buildHref} currentUserId={currentUser?.id} />
-
         <main className="nc-main" id="community-feed">
           <header className="nc-header">
             <div className="nc-header-copy">

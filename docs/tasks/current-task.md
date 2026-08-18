@@ -1,156 +1,91 @@
-# Task: จบ merge `claude/community-ui-redesign-us06jq` เข้า main (เก็บเฉพาะ loading ที่ยังมีค่า)
-
-## สถานะปัจจุบัน
-
-อยู่กลาง merge บน branch `merge/community-redesign` (merge-base = `f983750`)
-conflict ทั้ง 9 ไฟล์ **resolve เชิงกลไปแล้ว** โดยเอาเวอร์ชันของ branch ทั้งหมด
-และรับการลบ `apps/web/src/pages/ProfilePage.tsx` แล้ว — ตอนนี้ไม่มี conflict marker เหลือ
-แต่ **ยังไม่ commit** เพราะยังต้องเอาของจาก main กลับมา 4 อย่าง
-
-`git stash` / `git checkout` ทับไฟล์เหล่านี้ไม่ได้ — ระวังทำ merge state พัง
+# Task: เอาแถบนำทางซ้ายของหน้า /community ออก
 
 ## บริบท
 
-branch นี้ redesign frontend ทั้งระบบ (66 ไฟล์) และ**มีระบบ skeleton ของตัวเองอยู่แล้ว**
-คือ `apps/web/src/components/ui/States.tsx` (`FeedSkeletonList`, `ListSkeleton`,
-`PostCardSkeleton`, `TemplateCardSkeleton`) ใช้คลาส `.nc-skel*` ใน `community.css`
-ถูกเรียกใช้ 13 จุดใน 10 หน้า
+หน้า `/community` ตอนนี้เป็น grid 3 คอลัมน์ `15.5rem | 1fr | 19rem`
 
-ดังนั้น `SkeletonGrid` / `SkeletonCard` / `Skeleton` / `SkeletonText` ใน
-`apps/web/src/components/Loading.tsx` **ถูกแทนที่แล้ว ต้องลบทิ้ง** — งาน parity ที่เคยวัดไว้
-อิงกับ `.template-card` / `.project-card` ซึ่ง branch ลบไปแล้ว จึงเป็นโมฆะ
+- ซ้าย `<nav class="nc-nav">` — `CommunityNav`
+- กลาง `<main class="nc-main">` — ฟีด
+- ขวา `<aside class="nc-rail">` — `CommunityRail`
 
-ของจาก main ที่ยัง**ไม่ซ้ำกับ branch** และต้องเก็บไว้:
+ผู้ใช้ขอให้เอา**ฝั่งซ้ายออก** เหลือฟีด + rail ขวา
 
-| ของ | สถานะ |
-| --- | --- |
-| boot splash (`index.html` + `main.tsx`) | รอดอยู่แล้ว branch ไม่เคยแตะ — **ห้ามแตะ** |
-| `TopProgressBar.tsx` | ไฟล์ยังอยู่ แต่ AppShell ของ branch ไม่ได้เรียก → ต้องเติมกลับ |
-| `LoadingScreen` / `Spinner` / `InlineLoading` | ยังใช้อยู่ใน EditorPage, NotificationBell, VersionHistoryPanel (auto-merge ผ่านแล้ว) |
-| loading CSS | หายไปกับ `index.css` ของ branch → ต้องพอร์ตกลับบางส่วน |
+ตรวจแล้วว่าปลอดภัย: `CommunityToolbar` มีปุ่มซ้ำกับ nav ซ้ายครบทุกตัว — sort
+(`ล่าสุด`/`ยอดนิยม`), view (`feed`/`grid`) และ chip หมวดหมู่ทั้งหมด — **ฟังก์ชันกรองจึงไม่หาย**
 
----
+สิ่งที่หายจริงคือทางลัด 3 ลิงก์ (ผลงานของฉัน / โปรไฟล์สาธารณะ / การนัดหมาย) ซึ่งมีใน
+navbar หลักอยู่แล้ว และปุ่ม "แชร์ผลงานใหม่" ซึ่งบนมือถือถูก `display: none` อยู่แล้ว
+และมี `CommunityComposer` อยู่ในฟีดทำหน้าที่เดียวกัน — ยอมรับได้ ไม่ต้องหาที่ใหม่ให้
 
-## งานที่ต้องทำ 4 ข้อ
+## ไฟล์ที่แตะ
 
-### 1. `apps/web/src/app/router.tsx`
+### 1. `apps/web/src/pages/CommunityPage.tsx`
 
-ตอนนี้เป็นเวอร์ชันของ branch มี `<div className="center">กำลังตรวจสอบสิทธิ์…</div>`
-อยู่ **3 จุด** ในฟังก์ชัน `Protected`, `GuestOnly`, `RoleOnly`
+- ลบบรรทัด 8: `import { CommunityNav } from '@/features/community/components/CommunityNav.tsx'`
+- ลบบรรทัด 77: `<CommunityNav state={state} buildHref={buildHref} currentUserId={currentUser?.id} />`
 
-เปลี่ยนทั้งสามจุดเป็น:
+`buildHref` และ `currentUser` **ยังใช้ต่อ** ที่ `<CommunityRail>` บรรทัด 209 และที่
+`nc-header-me` / `CommunityComposer` — ห้ามลบตัวแปรพวกนี้ทิ้ง
 
-```tsx
-<LoadingScreen label="กำลังตรวจสอบสิทธิ์…" brand={false} />
-```
+### 2. ลบไฟล์ `apps/web/src/features/community/components/CommunityNav.tsx`
 
-เพิ่ม `import { LoadingScreen } from '@/components/Loading.tsx'`
+`grep -rn "CommunityNav" apps/web/src` ต้องไม่เหลือผลลัพธ์เลยหลังแก้
 
-**ห้ามแตะ Suspense fallback** — `<div className="page"><ListSkeleton count={2} lines={4} /></div>`
-ของ branch ถูกแล้ว ให้คงไว้
+### 3. `apps/web/src/styles/community.css`
 
-### 2. `apps/web/src/components/AppShell.tsx`
-
-เอาเวอร์ชันของ branch ไว้ทั้งหมด เพิ่มแค่ `<TopProgressBar />` เป็น**ลูกตัวแรก**ของ
-`<div className={\`shell ...\`}>` (ก่อน `{!isEditor && (...)}`) พร้อม import
-
-ต้องอยู่นอกเงื่อนไข `!isEditor` เพื่อให้แถบทำงานในหน้า editor ด้วย
-
-### 3. `apps/web/src/components/Loading.tsx`
-
-ลบ `Skeleton`, `SkeletonProps`, `SkeletonText`, `SkeletonCard`, `SkeletonGrid` ออกให้หมด
-เหลือเฉพาะ `Spinner`, `LoadingScreen`, `InlineLoading`
-
-ตรวจด้วย `grep -rn "SkeletonGrid\|SkeletonCard\|SkeletonText" apps/web/src` ว่าไม่มีที่ไหน
-เรียกอีกแล้ว (ต้องไม่เจอ — หน้าที่เคยเรียกถูกแทนด้วยเวอร์ชัน branch หมดแล้ว)
-
-### 4. `apps/web/src/styles/index.css` — งานหลัก
-
-ตอนนี้เป็นเวอร์ชันของ branch: `@import` 5 ไฟล์ (`tokens`, `ui`, `appointments`,
-`shops`, `community`) ตามด้วย base + editor styles
-
-**4.1 แก้วงเล็บพัง (บั๊กของ branch ไม่เกี่ยวกับ merge)**
-
-ราวบรรทัด 810-812 ปัจจุบันเป็น:
+**3.1** `.nc-layout` (บรรทัด ~31)
 
 ```css
-  .conflict-actions, .recovery-actions { grid-template-columns: 1fr; }}}}}}
-
-@media (prefers-reduced-motion: reduce) {{{{{
-  * { animation: none !important; transition: none !important; }}}}}}
+grid-template-columns: 15.5rem minmax(0, 1fr) 19rem;
+```
+→
+```css
+grid-template-columns: minmax(0, 1fr) 19rem;
 ```
 
-ยืนยันแล้วด้วย `new CSSStyleSheet().replaceSync()` ในเบราว์เซอร์จริง: parser **ทิ้งบล็อก
-reduced-motion ทั้งบล็อก** (parse ได้ 3 rules ไม่มีบล็อกนี้) แปลว่าตอนนี้บน branch
-`prefers-reduced-motion` ระดับ global ไม่ทำงานเลย
-
-แก้เป็นวงเล็บที่ถูกต้อง — ปิด media query ก่อนหน้าด้วย `}` เดียว และบล็อก reduced-motion
-เปิด `{` เดียว ปิด `}` เดียว หลังแก้ให้ตรวจว่าจำนวน `{` กับ `}` ทั้งไฟล์เท่ากัน
-
-อย่าไปแตะบล็อก reduced-motion ใน `ui.css` (บรรทัด ~228) และ `community.css` (~647) —
-สองอันนั้นเขียนถูกอยู่แล้ว
-
-**4.2 พอร์ต loading CSS กลับมา**
-
-ดูของเดิมได้จาก `git show main:apps/web/src/styles/index.css` (หมวด
-`/* ---------- loading ---------- */` ท้ายไฟล์)
-
-**เอามา:**
-- `@keyframes ns-spin`, `ns-dot`, `ns-progress`, `ns-appear`
-- `.spinner`
-- `.loading-screen`, `.loading-wordmark`, `.loading-label`
-- `.inline-loading`, `.inline-loading-dots` (+ `:nth-child` ทั้งสอง),
-  `.notification-popover .inline-loading`
-- `.top-progress`, `.top-progress span`
-- กฎ fade-in รวม: `opacity: 0; animation: ns-appear .18s ease .22s forwards;`
-  บน `.loading-screen`, `.inline-loading`, `.top-progress` (ตัด `.skeleton-grid` ออกจาก
-  selector list)
-
-**ไม่เอา:**
-- `@keyframes ns-shimmer`
-- `.skeleton`, `.skeleton::after`, `.skeleton-grid`, `.skeleton-card*`,
-  `.skeleton-text*`, `.project-grid .skeleton-card-media`,
-  `.community-grid .skeleton-card-media`
-- `.community-load-more`, `.community-load-more-spinner` — ปุ่มโหลดเพิ่มของ branch
-  เขียนใหม่แล้ว **แต่ต้องเช็คก่อน** ด้วย `grep -rn "community-load-more" apps/web/src`
-  ถ้ายังมีคนใช้อยู่ให้เอากลับมาด้วย
-
-**4.3 เติม override ใน reduced-motion ที่เพิ่งซ่อม**
-
-พอวงเล็บถูก บล็อก `* { animation: none !important }` จะกลับมาทำงานจริงเป็นครั้งแรก
-ซึ่งจะทำให้ loader ที่ใช้ `animation: … forwards` เพื่อ fade เข้า **ค้างที่ `opacity: 0`
-มองไม่เห็นถาวร** ต้องเพิ่มในบล็อกเดียวกัน:
+**3.2** บล็อก `@media (max-width: 1200px)` (บรรทัด ~769-773)
 
 ```css
-.loading-screen, .inline-loading, .top-progress, .spinner { opacity: 1 !important; }
-.spinner { border-top-color: var(--accent); }
-.top-progress span { width: 40% !important; }
+.nc-layout { grid-template-columns: 14.5rem minmax(0, 1fr); }
+```
+→
+```css
+.nc-layout { grid-template-columns: minmax(0, 1fr); }
 ```
 
-`!important` บน `.top-progress span` จำเป็น เพราะกฎฐาน `width: 8%` อยู่ท้ายไฟล์
-และ `@media` ไม่เพิ่ม specificity — ตัวหลังจะชนะถ้าไม่ใส่
+ถ้าไม่แก้ข้อนี้ ช่วงจอ 960-1200px จะเหลือคอลัมน์ซ้ายว่างเปล่ากว้าง 14.5rem
+เพราะ rail ถูกซ่อนไปแล้วแต่ grid ยังจองที่ให้ nav ที่ไม่มีอยู่จริง
 
-ใช้ CSS custom property เดิมทั้งหมด (`--accent`, `--rule`, `--muted`, `--deep`, `--chip`)
-ห้าม hardcode hex
+แก้คอมเมนต์ไทยเหนือบล็อกนี้ (`/* เดสก์ท็อปแคบ: ซ่อนแผงขวา แต่ยังคงเมนูซ้าย */`)
+ให้ตรงกับพฤติกรรมใหม่ด้วย
 
----
+**3.3** ลบกฎ `.nc-nav*` ที่ตายแล้วทั้งหมด
+
+- บล็อก base: บรรทัด ~49-95 รวมหัวข้อคอมเมนต์ `/* ---------- แถบนำทางซ้าย ---------- */`
+  ครอบคลุม `.nc-nav`, `.nc-nav-scroll`, `.nc-nav-group`, `.nc-nav-label`,
+  `.nc-nav-item` (+ `svg` / `:hover` / `:focus-visible`), `.nc-nav-on`,
+  `.nc-nav-item.active`, `.nc-nav-cta`
+- ในบล็อก `@media (max-width: 960px)`: บรรทัด ~778-794 ทุกกฎที่ขึ้นต้นด้วย `.nc-nav`
+  รวม `.nc-nav-scroll::-webkit-scrollbar`
+- แก้คอมเมนต์ `/* แท็บเล็ต: เมนูซ้ายกลายเป็นแถบแนวนอนเหนือฟีด */` ให้ตรงกับของจริง
+
+ระวังอย่าลบ `.nc-main`, `.nc-card`, `.nc-rail*` หรือกฎอื่นในช่วงบรรทัดเดียวกันโดยพลาด
 
 ## Acceptance criteria
 
-1. ไม่มี conflict marker เหลือในโปรเจกต์
-2. `grep -rn "SkeletonGrid\|SkeletonCard\|SkeletonText\|\.skeleton" apps/web/src` ไม่เจอของเก่า
-   (คลาส `.nc-skel*` ของ branch เป็นคนละตัว ไม่นับ)
-3. จำนวน `{` เท่ากับ `}` ใน `apps/web/src/styles/index.css`
-4. บล็อก `@media (prefers-reduced-motion: reduce)` ใน `index.css` parse ได้จริง
-5. `TopProgressBar` ถูก render ทั้งหน้าปกติและหน้า editor
-6. boot splash ใน `index.html` และโค้ดลบ splash ใน `main.tsx` **ไม่ถูกแตะเลย**
+1. `grep -rn "CommunityNav\|nc-nav" apps/web/src` ไม่เหลือผลลัพธ์
+2. จำนวน `{` เท่ากับ `}` ใน `apps/web/src/styles/community.css`
+3. หน้า `/community` บนจอกว้าง เหลือ 2 คอลัมน์: ฟีด + rail ขวา ไม่มีช่องว่างด้านซ้าย
+4. ช่วงจอ 960-1200px เหลือคอลัมน์เดียว ไม่มีช่องว่างค้าง
+5. จอ 375px ยังไม่ล้นแนวนอน
+6. sort / view / หมวดหมู่ ยังกรองได้ครบผ่าน `CommunityToolbar`
 7. `npm.cmd run typecheck --workspace apps/web` ผ่าน
 8. `npm.cmd run test --workspace apps/web` ผ่าน
 9. `npm.cmd run build --workspace apps/web` ผ่าน
 
 ## ห้ามทำ
 
-- ห้าม `git commit` — Claude จะรีวิวก่อน
-- ห้าม `git merge --abort` / `git reset` — จะทำ merge state พัง
+- ห้าม commit
+- ห้ามแตะ `CommunityRail`, `CommunityToolbar`, `CommunityComposer`
+- ห้ามย้ายทางลัด/ปุ่ม CTA ไปไว้ที่อื่น — ตกลงกันแล้วว่าตัดทิ้งได้
 - ห้ามติดตั้ง dependency ใหม่
-- ห้ามแก้ไฟล์อื่นนอกจาก 4 ไฟล์ข้างบน

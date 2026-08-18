@@ -28,7 +28,7 @@
 
 .nc-layout {
   display: grid;
-  grid-template-columns: 15.5rem minmax(0, 1fr) 19rem;
+  grid-template-columns: minmax(0, 1fr) 19rem;
   gap: clamp(0.85rem, 1.6vw, 1.5rem);
   align-items: start;
   max-width: 1500px;
@@ -45,54 +45,6 @@
   background: var(--surface);
   box-shadow: var(--nc-shadow);
 }
-
-/* ---------- แถบนำทางซ้าย ---------- */
-
-.nc-nav {
-  position: sticky;
-  top: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  max-height: calc(100vh - 6rem);
-}
-
-.nc-nav-scroll { display: flex; flex-direction: column; gap: 1.1rem; overflow-y: auto; padding-right: 0.15rem; }
-.nc-nav-group { display: flex; flex-direction: column; gap: 0.15rem; }
-.nc-nav-label {
-  margin: 0 0 0.3rem 0.7rem;
-  color: var(--muted);
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.nc-nav-item {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  padding: 0.55rem 0.7rem;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  color: var(--ink);
-  font-size: 0.88rem;
-  font-weight: 600;
-  text-decoration: none;
-  transition: background 140ms ease, color 140ms ease;
-}
-.nc-nav-item svg { flex: 0 0 auto; color: var(--muted); }
-.nc-nav-item:hover { background: var(--nc-soft); }
-.nc-nav-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.nc-nav-on,
-.nc-nav-item.active {
-  border-color: color-mix(in srgb, var(--accent) 22%, transparent);
-  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
-  color: var(--deep);
-}
-.nc-nav-on svg { color: var(--accent); }
-
-.nc-nav-cta { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; border-radius: 999px; }
 
 /* ---------- หัวหน้าฟีด ---------- */
 
@@ -765,33 +717,16 @@
 
 /* ---------- ตอบสนองต่อขนาดจอ ---------- */
 
-/* เดสก์ท็อปแคบ: ซ่อนแผงขวา แต่ยังคงเมนูซ้าย */
+/* เดสก์ท็อปแคบ: ซ่อนแผงขวาและใช้คอลัมน์เดียว */
 @media (max-width: 1200px) {
-  .nc-layout { grid-template-columns: 14.5rem minmax(0, 1fr); }
+  .nc-layout { grid-template-columns: minmax(0, 1fr); }
   .nc-rail { display: none; }
   .nc-detail-grid { grid-template-columns: minmax(0, 1fr) 18.5rem; }
 }
 
-/* แท็บเล็ต: เมนูซ้ายกลายเป็นแถบแนวนอนเหนือฟีด */
+/* แท็บเล็ต: คงเลย์เอาต์คอลัมน์เดียว */
 @media (max-width: 960px) {
   .nc-layout { grid-template-columns: minmax(0, 1fr); }
-  .nc-nav {
-    position: sticky;
-    top: 0;
-    z-index: 6;
-    max-height: none;
-    margin: -1.25rem calc(-1 * clamp(0.75rem, 2.5vw, 2rem)) 0;
-    padding: 0.5rem clamp(0.75rem, 2.5vw, 2rem);
-    border-bottom: 1px solid var(--nc-line);
-    background: color-mix(in srgb, var(--surface) 92%, var(--ground));
-    backdrop-filter: blur(8px);
-  }
-  .nc-nav-scroll { flex-direction: row; gap: 0.5rem; overflow-x: auto; padding-bottom: 0.15rem; scrollbar-width: none; }
-  .nc-nav-scroll::-webkit-scrollbar { display: none; }
-  .nc-nav-group { flex-direction: row; gap: 0.3rem; }
-  .nc-nav-label { display: none; }
-  .nc-nav-item { padding: 0.4rem 0.75rem; border: 1px solid var(--rule); border-radius: 999px; font-size: 0.8rem; white-space: nowrap; }
-  .nc-nav-cta { display: none; }
   .nc-detail-grid { grid-template-columns: minmax(0, 1fr); }
   .nc-detail-side { position: static; }
   .nc-detail-stage, .nc-detail-stage > div, .nc-detail-stage canvas { min-height: min(52vh, 460px); }
