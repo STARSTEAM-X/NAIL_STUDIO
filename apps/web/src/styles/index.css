@@ -861,8 +861,6 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 }
 
 .editor-topbar-icon-button,
-.editor-topbar-action,
-.editor-topbar-link,
 .editor-topbar-user,
 .editor-topbar-brand,
 .editor-profile-trigger {
@@ -885,12 +883,8 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 }
 
 .editor-topbar-icon-button:hover,
-.editor-topbar-action:hover,
-.editor-topbar-link:hover,
 .editor-topbar-brand:hover { background: #f7f1f2; color: var(--accent); }
 .editor-topbar-icon-button:focus-visible,
-.editor-topbar-action:focus-visible,
-.editor-topbar-link:focus-visible,
 .editor-topbar-user:focus-visible,
 .editor-topbar-brand:focus-visible,
 .editor-profile-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -1039,20 +1033,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .editor-topbar .history-controls .btn:hover:not(:disabled) { background: #f7f1f2; color: var(--accent); }
 .editor-topbar .history-controls .btn:disabled { opacity: 0.3; }
 
-.editor-topbar-action {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.35rem 0.45rem;
-  border-radius: 0.4rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-.editor-topbar-action-icon { font-size: 1rem; line-height: 1; }
-.editor-topbar-action-label { letter-spacing: 0.02em; }
-
 .editor-topbar-nav { gap: 0.1rem; margin-left: 0.15rem; }
-.editor-topbar-link { padding: 0.35rem 0.45rem; border-radius: 0.4rem; font-size: 0.72rem; }
 .editor-topbar .notification-trigger { width: 2rem; height: 2rem; border: 0; background: transparent; }
 .editor-topbar .notification-trigger:hover { border: 0; background: #f7f1f2; }
 
@@ -1177,6 +1158,62 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .editor-topbar-primary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .editor-topbar-primary:disabled { cursor: wait; opacity: 0.6; }
 
+/* ปุ่มบันทึกแบบ split — บันทึก + เมนูส่งออก */
+
+.editor-save-split { position: relative; display: inline-flex; flex: 0 0 auto; }
+
+.editor-save-main {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  box-shadow: none;
+}
+
+.editor-save-caret {
+  padding: 0.4rem 0.5rem;
+  border-left: 1px solid rgb(255 255 255 / 25%);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  box-shadow: none;
+}
+.editor-save-caret:disabled { cursor: not-allowed; }
+
+.editor-save-menu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  min-width: 13.5rem;
+  flex-direction: column;
+  padding: 0.3rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.6rem;
+  background: var(--surface);
+  box-shadow: 0 12px 28px rgb(44 30 31 / 16%);
+}
+
+.editor-save-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.6rem;
+  border: 0;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.editor-save-menu-item:hover:not(:disabled) { background: #f7f1f2; color: var(--accent); }
+.editor-save-menu-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.editor-save-menu-item:disabled { color: var(--muted); cursor: not-allowed; opacity: 0.55; }
+.editor-save-menu-icon { display: grid; flex: 0 0 auto; place-items: center; color: var(--muted); }
+.editor-save-menu-item:hover:not(:disabled) .editor-save-menu-icon { color: var(--accent); }
+.editor-save-menu-divider { height: 1px; margin: 0.25rem 0.35rem; background: var(--rule); }
+
 .editor-body {
   gap: 0;
   background: #211916;
@@ -1200,19 +1237,6 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   padding: 0.8rem 0.45rem;
   background: #30201f;
   color: #f9eee8;
-}
-
-.editor-tool-rail-brand {
-  display: grid;
-  place-items: center;
-  width: 2.1rem;
-  height: 2.1rem;
-  border: 1px solid rgb(255 255 255 / 25%);
-  border-radius: 0.65rem;
-  color: #fff;
-  font-size: 0.7rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
 }
 
 .editor-tool-rail-items {
@@ -1332,7 +1356,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 @media (max-width: 720px) {
   .editor-sidebar { flex-direction: column; max-height: none; }
   .editor-tool-rail { flex: 0 0 auto; flex-direction: row; align-items: stretch; padding: 0.45rem 0.65rem; }
-  .editor-tool-rail-brand, .editor-tool-rail-footer { display: none; }
+  .editor-tool-rail-footer { display: none; }
   .editor-tool-rail-items { flex-direction: row; }
   .editor-tool-button { padding: 0.45rem 0.2rem; }
   .editor-inspector { max-height: 38vh; }
@@ -1342,7 +1366,6 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 @media (max-width: 1080px) {
   .editor-topbar-brand-name,
-  .editor-topbar-nav .editor-topbar-link,
   .editor-profile-trigger-copy,
   .editor-profile-chevron { display: none; }
   .editor-topbar-project strong,
@@ -1372,11 +1395,12 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   }
   .editor-topbar-actions { gap: 0.05rem; }
   .editor-topbar-actions > .editor-topbar-divider,
-  .editor-topbar-feedback,
-  .editor-topbar-action-label { display: none; }
-  .editor-topbar-action { width: 2rem; height: 2rem; justify-content: center; padding: 0; }
-  .editor-topbar-primary { width: 2.1rem; justify-content: center; padding: 0.4rem; }
-  .editor-topbar-primary span:last-child { display: none; }
+  .editor-topbar-feedback { display: none; }
+  /* ปุ่มบันทึกเหลือแค่ไอคอน แต่ caret ต้องยังกดได้ จึงคุมทีละปุ่มแทนกฎรวม */
+  .editor-save-main { justify-content: center; padding: 0.4rem 0.5rem; }
+  .editor-save-main span { display: none; }
+  .editor-save-caret { padding: 0.4rem 0.35rem; }
+  .editor-save-menu { min-width: 12rem; }
   .share-template-fields-row { grid-template-columns: 1fr; }
   .share-template-actions { flex-direction: column-reverse; }
   .share-template-actions .btn { width: 100%; }

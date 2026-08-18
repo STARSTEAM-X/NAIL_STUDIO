@@ -6,16 +6,15 @@ interface EditorToolRailProps {
 }
 
 const ITEMS: Array<{ id: EditorPanelId; icon: string; label: string; hint: string }> = [
+  { id: 'hand', icon: '☝', label: 'มือ', hint: 'สีผิวและสัดส่วนมือ' },
   { id: 'paint', icon: '✎', label: 'วาด', hint: 'สี แปรง และรูปทรงเล็บ' },
   { id: 'decorate', icon: '✦', label: 'ตกแต่ง', hint: 'เพิ่มและปรับของตกแต่ง' },
-  { id: 'hand', icon: '☝', label: 'มือ', hint: 'สีผิวและสัดส่วนมือ' },
   { id: 'ai', icon: '✧', label: 'AI', hint: 'ผู้ช่วยออกแบบ' },
 ]
 
 export function EditorToolRail({ activePanel, onChange }: EditorToolRailProps) {
   return (
     <nav className="editor-tool-rail" aria-label="เครื่องมือแก้ไขงาน">
-      <div className="editor-tool-rail-brand" aria-hidden="true">NS</div>
       <div className="editor-tool-rail-items">
         {ITEMS.map((item) => (
           <button

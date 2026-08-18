@@ -42,6 +42,7 @@ import { DecorationPanel } from './DecorationPanel.tsx'
 import { HandPanel } from './HandPanel.tsx'
 import { HistoryControls } from './HistoryControls.tsx'
 import { EditorProfileDropdown } from './EditorProfileDropdown.tsx'
+import { EditorSaveMenu } from './EditorSaveMenu.tsx'
 import { ShareTemplateDialog } from './ShareTemplateDialog.tsx'
 import { VersionHistoryPanel } from './VersionHistoryPanel.tsx'
 import { EditorToolRail, type EditorPanelId } from './EditorToolRail.tsx'
@@ -258,6 +259,51 @@ export function NailEditor({ projectId, detail }: Props) {
     return result
   })
 
+  const exportPng = () => {
+    void (async () => {
+      try {
+        if (!snapshotRef.current) throw new Error('canvas ยังไม่พร้อม')
+        const blob = await snapshotRef.current.capture()
+        downloadBlob(blob, `${sanitizeFilename(projectName)}.png`)
+      } catch (error) {
+        store.setState({ notice: 'ดาวน์โหลดภาพไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' })
+        console.error('[export] PNG capture failed', error)
+      }
+    })()
+  }
+
+  const exportJson = () => {
+    try {
+      const json = exportProjectJson(store.getState().document)
+      downloadBlob(new Blob([json], { type: 'application/json' }), `${sanitizeFilename(projectName)}.nail.json`)
+    } catch (error) {
+      store.setState({ notice: 'ดาวน์โหลดไฟล์งานไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' })
+      console.error('[export] JSON export failed', error)
+    }
+  }
+
+  const openShareDialog = () => {
+    setShareError(null)
+    setShareDialogOpen(true)
+  }
+
+  const handleSaveVersion = () => {
+    void autosave.runVersionSave(async ({ document }, lifecycle) => {
+      const result = await saveVersion.mutateAsync({
+        projectId,
+        document,
+        expectedVersion: latestVersion,
+      })
+      if (lifecycle.isActive()) explicitSaveUi.current.success(result.versionNumber)
+      void captureAndUploadThumbnail(projectId, thumbnailRef, queryClient).catch((error) => {
+        console.warn('[thumbnail] อัปโหลดภาพตัวอย่างไม่สำเร็จ ไม่กระทบการบันทึกเวอร์ชัน', error)
+      })
+      return result
+    }).catch((error: unknown) => {
+      explicitSaveUi.current.failure(error)
+    })
+  }
+
   const handleShareTemplate = (input: Omit<CreateTemplateInput, 'projectId' | 'versionNumber'>) => {
     setShareError(null)
     void saveCurrentVersion().then((saved) => {
@@ -285,15 +331,6 @@ export function NailEditor({ projectId, detail }: Props) {
     <section className="editor">
       <header className="editor-topbar">
         <div className="editor-topbar-left">
-          <button
-            type="button"
-            className="editor-topbar-icon-button editor-topbar-back"
-            aria-label="กลับไปงานของฉัน"
-            title="กลับไปงานของฉัน"
-            onClick={() => navigate('/projects')}
-          >
-            <Icon name="arrow-left" size={15} />
-          </button>
           <button
             type="button"
             className="editor-topbar-brand"
@@ -348,60 +385,7 @@ export function NailEditor({ projectId, detail }: Props) {
 
         <div className="editor-topbar-actions">
           <HistoryControls />
-          <span className="editor-topbar-divider" aria-hidden="true" />
-          <button
-            type="button"
-            className="editor-topbar-action"
-            title="ดาวน์โหลดภาพ PNG"
-            onClick={() => {
-              void (async () => {
-                try {
-                  if (!snapshotRef.current) throw new Error('canvas ยังไม่พร้อม')
-                  const blob = await snapshotRef.current.capture()
-                  downloadBlob(blob, `${sanitizeFilename(projectName)}.png`)
-                } catch (error) {
-                  store.setState({ notice: 'ดาวน์โหลดภาพไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' })
-                  console.error('[export] PNG capture failed', error)
-                }
-              })()
-            }}
-          >
-            <span className="editor-topbar-action-icon" aria-hidden="true"><Icon name="share" size={15} /></span>
-            <span className="editor-topbar-action-label">PNG</span>
-          </button>
-          <button
-            type="button"
-            className="editor-topbar-action"
-            title="ดาวน์โหลดไฟล์งาน JSON"
-            onClick={() => {
-              try {
-                const json = exportProjectJson(store.getState().document)
-                downloadBlob(new Blob([json], { type: 'application/json' }), `${sanitizeFilename(projectName)}.nail.json`)
-              } catch (error) {
-                store.setState({ notice: 'ดาวน์โหลดไฟล์งานไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' })
-                console.error('[export] JSON export failed', error)
-              }
-            }}
-          >
-            <span className="editor-topbar-action-icon" aria-hidden="true"><Icon name="layers" size={15} /></span>
-            <span className="editor-topbar-action-label">JSON</span>
-          </button>
-          <button
-            type="button"
-            className="editor-topbar-action editor-topbar-share"
-            title="แชร์ผลงานลง Community"
-            disabled={saveVersion.isPending || autosave.isVersionSavePending || createTemplate.isPending}
-            onClick={() => {
-              setShareError(null)
-              setShareDialogOpen(true)
-            }}
-          >
-            <span className="editor-topbar-action-icon" aria-hidden="true"><Icon name="arrow-up-right" size={15} /></span>
-            <span className="editor-topbar-action-label">แชร์</span>
-          </button>
-          <div className="editor-topbar-nav" aria-label="ทางลัด">
-            <button type="button" className="editor-topbar-link" onClick={() => navigate('/community')}>ชุมชน</button>
-            <button type="button" className="editor-topbar-link" onClick={() => navigate('/appointments')}>นัดหมาย</button>
+          <div className="editor-topbar-nav">
             <NotificationBell />
           </div>
           <EditorProfileDropdown
@@ -426,30 +410,14 @@ export function NailEditor({ projectId, detail }: Props) {
               </span>
             )}
           </div>
-          <button
-            type="button"
-            className="editor-topbar-primary"
-            disabled={saveVersion.isPending || autosave.isVersionSavePending}
-            onClick={() => {
-              void autosave.runVersionSave(async ({ document }, lifecycle) => {
-                const result = await saveVersion.mutateAsync({
-                  projectId,
-                  document,
-                  expectedVersion: latestVersion,
-                })
-                if (lifecycle.isActive()) explicitSaveUi.current.success(result.versionNumber)
-                void captureAndUploadThumbnail(projectId, thumbnailRef, queryClient).catch((error) => {
-                  console.warn('[thumbnail] อัปโหลดภาพตัวอย่างไม่สำเร็จ ไม่กระทบการบันทึกเวอร์ชัน', error)
-                })
-                return result
-              }).catch((error: unknown) => {
-                explicitSaveUi.current.failure(error)
-              })
-            }}
-          >
-            <Icon name="check" size={15} />
-            <span>{saveVersion.isPending || autosave.isVersionSavePending ? 'กำลังบันทึก…' : 'บันทึก'}</span>
-          </button>
+          <EditorSaveMenu
+            saving={saveVersion.isPending || autosave.isVersionSavePending}
+            shareDisabled={saveVersion.isPending || autosave.isVersionSavePending || createTemplate.isPending}
+            onSave={handleSaveVersion}
+            onExportPng={exportPng}
+            onExportJson={exportJson}
+            onShare={openShareDialog}
+          />
         </div>
       </header>
 
