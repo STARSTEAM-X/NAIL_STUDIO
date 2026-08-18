@@ -26,6 +26,7 @@ describe('template contracts', () => {
       primaryColor: 'Pink',
       hasThumbnail: false,
       origin: 'original',
+      isLiked: false,
       likeCount: 2,
       shareCount: 1,
       remixCount: 0,

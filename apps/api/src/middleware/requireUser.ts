@@ -22,6 +22,23 @@ export const requireUser: RequestHandler = async (request, _response, next) => {
   next()
 }
 
+/** เติมผู้ใช้จาก session ถ้ามี แต่ปล่อย public route เดินหน้าต่อเสมอแม้ไม่มีหรือมี session ที่ใช้ไม่ได้ */
+export const optionalUser: RequestHandler = async (request, _response, next) => {
+  try {
+    const token = request.cookies?.[SESSION_COOKIE]
+    if (typeof token === 'string' && token.length > 0) {
+      const resolved = await resolveSession(token)
+      if (resolved) {
+        request.user = resolved.user
+        request.sessionId = resolved.sessionId
+      }
+    }
+  } catch {
+    // Public reads must remain public even if an optional session cannot be resolved.
+  }
+  next()
+}
+
 /** ต้องผ่าน requireUser ก่อน — คิว moderation เปิดให้ admin เท่านั้น */
 export const requireAdmin: RequestHandler = (request, _response, next) => {
   if (request.user?.role !== 'admin') {

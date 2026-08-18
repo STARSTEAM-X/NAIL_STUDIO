@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { TEMPLATE_CATEGORIES, TEMPLATE_PRIMARY_COLORS } from '@nail-studio/contracts'
 import { API_BASE, ApiRequestError } from '@/api/client.ts'
 import { useCurrentUser } from '@/features/auth/useAuth.ts'
+import { getInitials, ORIGIN_LABELS } from '@/features/community/initials.ts'
 import {
   type TemplateCategory,
   type TemplatePrimaryColor,
@@ -13,24 +14,12 @@ import {
   useTemplates,
 } from '@/features/community/useTemplates.ts'
 
-const ORIGIN_LABELS: Record<string, string> = {
-  original: 'ต้นฉบับ',
-  ai: 'AI',
-  remix: 'รีมิกซ์',
-}
-
 const PREVIEW_CLASSES: Record<string, string> = {
   Red: 'template-preview-red',
   Pink: 'template-preview-pink',
   Nude: 'template-preview-nude',
   Black: 'template-preview-black',
   White: 'template-preview-white',
-}
-
-function getInitials(displayName: string | undefined) {
-  const parts = displayName?.trim().split(/\s+/).filter(Boolean) ?? []
-  if (parts.length > 1) return `${parts[0]?.[0] ?? ''}${parts[1]?.[0] ?? ''}`.toUpperCase()
-  return parts[0]?.slice(0, 2).toUpperCase() || 'NS'
 }
 
 function formatPostDate(value: string) {
@@ -53,7 +42,6 @@ export function CommunityPage() {
   const [sort, setSort] = useState<TemplateSort>('latest')
   const [category, setCategory] = useState<TemplateCategory | ''>('')
   const [color, setColor] = useState<TemplatePrimaryColor | ''>('')
-  const [likedTemplateIds, setLikedTemplateIds] = useState<Set<string>>(() => new Set())
   const filters = useMemo(
     () => ({
       sort,
@@ -218,25 +206,12 @@ export function CommunityPage() {
               <div className="template-stats" aria-label="สถิติการมีส่วนร่วม">
                 <button
                   type="button"
-                  className={`template-like ${likedTemplateIds.has(template.id) ? 'template-like-on' : ''}`}
-                  aria-label={likedTemplateIds.has(template.id) ? 'เลิกไลก์ดีไซน์นี้' : 'ไลก์ดีไซน์นี้'}
-                  aria-pressed={likedTemplateIds.has(template.id)}
+                  className={`template-like ${template.isLiked ? 'template-like-on' : ''}`}
+                  aria-label={template.isLiked ? 'เลิกไลก์ดีไซน์นี้' : 'ไลก์ดีไซน์นี้'}
+                  aria-pressed={template.isLiked}
                   disabled={likeMutation.isPending && likeMutation.variables?.templateId === template.id}
                   onClick={() => {
-                    const liked = likedTemplateIds.has(template.id)
-                    likeMutation.mutate(
-                      { templateId: template.id, liked },
-                      {
-                        onSuccess: (result) => {
-                          setLikedTemplateIds((current) => {
-                            const next = new Set(current)
-                            if (result.liked) next.add(template.id)
-                            else next.delete(template.id)
-                            return next
-                          })
-                        },
-                      },
-                    )
+                    likeMutation.mutate({ templateId: template.id, liked: template.isLiked })
                   }}
                 >
                   <span aria-hidden="true">♥</span> {template.likeCount}

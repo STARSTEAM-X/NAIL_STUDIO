@@ -1,15 +1,25 @@
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ApiRequestError } from '@/api/client.ts'
 import { NailScene } from '@/3d/scene/NailScene.tsx'
 import { ReadOnlyDesignScene } from '@/3d/scene/ReadOnlyDesignScene.tsx'
 import { WebGlGuard } from '@/3d/scene/WebGlGuard.tsx'
-import { useCreateTemplateComment, useTemplate, useTemplateShare } from '@/features/community/useTemplates.ts'
+import { getInitials, ORIGIN_LABELS } from '@/features/community/initials.ts'
+import {
+  useCreateTemplateComment,
+  useTemplate,
+  useTemplateLike,
+  useTemplateRemix,
+  useTemplateShare,
+} from '@/features/community/useTemplates.ts'
 import { DesignStoreProvider } from '@/features/design/DesignStoreProvider.tsx'
 
 export function TemplatePreviewPage() {
   const { templateId } = useParams<{ templateId: string }>()
+  const navigate = useNavigate()
   const template = useTemplate(templateId)
+  const likeMutation = useTemplateLike()
+  const remixMutation = useTemplateRemix()
   const createComment = useCreateTemplateComment()
   const shareMutation = useTemplateShare()
   const [commentText, setCommentText] = useState('')
@@ -59,14 +69,42 @@ export function TemplatePreviewPage() {
           <div>
             <Link to="/community" className="back-link">← กลับไปชุมชน</Link>
             <p className="eyebrow">READ-ONLY 3D PREVIEW</p>
-            <h1>{detail.name}</h1>
-            <p className="muted">โดย <Link to={`/users/${detail.author.id}`}>{detail.author.displayName}</Link></p>
+            <div className="template-preview-title-row">
+              <h1>{detail.name}</h1>
+              {detail.origin !== 'original' && <span className="template-origin template-preview-origin">{ORIGIN_LABELS[detail.origin]}</span>}
+            </div>
+            <p className="template-preview-author">
+              <span className="template-preview-author-avatar" aria-hidden="true">{getInitials(detail.author.displayName)}</span>
+              <span>โดย <Link to={`/users/${detail.author.id}`}>{detail.author.displayName}</Link></span>
+            </p>
           </div>
           <div className="template-preview-stats" aria-label="สถิติการมีส่วนร่วม">
-            <span>♥ {detail.likeCount}</span>
+            <button
+              type="button"
+              className={`template-like ${detail.isLiked ? 'template-like-on' : ''}`}
+              aria-label={detail.isLiked ? 'เลิกไลก์ดีไซน์นี้' : 'ไลก์ดีไซน์นี้'}
+              aria-pressed={detail.isLiked}
+              disabled={likeMutation.isPending && likeMutation.variables?.templateId === templateId}
+              onClick={() => { likeMutation.mutate({ templateId, liked: detail.isLiked }) }}
+            >
+              <span aria-hidden="true">♥</span> {detail.likeCount}
+            </button>
             <span>↗ {detail.shareCount}</span>
             <span>↻ {detail.remixCount}</span>
             <span>💬 {detail.commentCount}</span>
+            <button
+              type="button"
+              className="template-remix"
+              disabled={remixMutation.isPending && remixMutation.variables?.templateId === templateId}
+              onClick={() => {
+                remixMutation.mutate(
+                  { templateId },
+                  { onSuccess: (result) => navigate(`/editor/${result.project.id}`) },
+                )
+              }}
+            >
+              {remixMutation.isPending && remixMutation.variables?.templateId === templateId ? 'กำลังสร้าง…' : 'รีมิกซ์'}
+            </button>
             <button
               type="button"
               className="template-preview-share"
@@ -115,10 +153,15 @@ export function TemplatePreviewPage() {
             </button>
           </form>
           <ul className="template-comment-list">
-            {detail.comments.map((comment) => (
+            {detail.comments.length === 0 ? (
+              <li className="template-comment-empty">ยังไม่มีความคิดเห็น เป็นคนแรกที่แสดงความเห็นสิ</li>
+            ) : detail.comments.map((comment) => (
               <li key={comment.id}>
+                <div className="template-comment-author">
+                  <span className="template-comment-avatar" aria-hidden="true">{getInitials(comment.author.displayName)}</span>
+                  <span className="muted">โดย {comment.author.displayName}</span>
+                </div>
                 <p>{comment.content}</p>
-                <span className="muted">โดย {comment.author.displayName}</span>
               </li>
             ))}
           </ul>

@@ -28,10 +28,10 @@ export interface TemplateFeedResult {
 export async function create(userId: string, input: CreateTemplateInput): Promise<TemplateCard> {
   const row = await repository.createTemplate(userId, input)
   if (!row) throw AppError.notFound('ไม่พบเวอร์ชันงานที่ต้องการแชร์')
-  return toCard(row)
+  return toCard(row, false)
 }
 
-function toCard(row: repository.TemplateListRow): TemplateCard {
+function toCard(row: repository.TemplateListRow, isLiked: boolean): TemplateCard {
   return {
     id: row.id,
     name: row.name,
@@ -40,6 +40,7 @@ function toCard(row: repository.TemplateListRow): TemplateCard {
     primaryColor: row.primaryColor,
     hasThumbnail: row.thumbnailAsset !== null || row.designVersion.project.thumbnailAssetId !== null,
     origin: row.origin,
+    isLiked,
     likeCount: row.likeCount,
     shareCount: row.shareCount,
     remixCount: row.remixCount,
@@ -50,7 +51,7 @@ function toCard(row: repository.TemplateListRow): TemplateCard {
   }
 }
 
-export async function list(input: ListTemplatesQuery): Promise<TemplateFeedResult> {
+export async function list(input: ListTemplatesQuery, viewerId: string | null): Promise<TemplateFeedResult> {
   const cursor = input.cursor ? decodeTemplateCursor(input.cursor, input.sort) : null
   const options: repository.ListTemplatesOptions = {
     sort: input.sort,
@@ -64,11 +65,12 @@ export async function list(input: ListTemplatesQuery): Promise<TemplateFeedResul
   const hasNext = rows.length > input.limit
   const items = rows.slice(0, input.limit)
   const last = items.at(-1)
+  const likedIds = viewerId ? await repository.findLikedTemplateIds(viewerId, items.map((row) => row.id)) : new Set<string>()
 
-  if (!hasNext || !last) return { items: items.map(toCard), nextCursor: null }
+  if (!hasNext || !last) return { items: items.map((row) => toCard(row, likedIds.has(row.id))), nextCursor: null }
 
   return {
-    items: items.map(toCard),
+    items: items.map((row) => toCard(row, likedIds.has(row.id))),
     nextCursor: encodeTemplateCursor(
       input.sort === 'latest'
         ? { sort: 'latest', createdAt: last.createdAt.toISOString(), id: last.id }
@@ -82,7 +84,7 @@ export async function list(input: ListTemplatesQuery): Promise<TemplateFeedResul
   }
 }
 
-export async function detail(templateId: string): Promise<TemplateDetail> {
+export async function detail(templateId: string, viewerId: string | null): Promise<TemplateDetail> {
   const row = await repository.findPublicTemplateDetail(templateId)
   if (!row) throw AppError.notFound('ไม่พบดีไซน์ที่ต้องการ')
 
@@ -90,8 +92,9 @@ export async function detail(templateId: string): Promise<TemplateDetail> {
   if (!document.success) {
     throw AppError.conflict('ดีไซน์นี้อยู่ในรูปแบบที่ระบบยังอ่านไม่ได้')
   }
+  const isLiked = viewerId ? await repository.isTemplateLikedBy(viewerId, row.id) : false
   return {
-    ...toCard(row),
+    ...toCard(row, isLiked),
     document: document.data,
     comments: row.comments.map((comment) => ({
       id: comment.id,

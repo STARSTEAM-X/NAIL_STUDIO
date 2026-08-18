@@ -764,11 +764,19 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .template-remix:disabled { cursor: wait; opacity: 0.65; }
 .community-load-more { display: block; margin: 1.25rem auto 0; }
 .template-preview-page { max-width: 1180px; }
-.template-preview-head { align-items: flex-end; }
+.template-preview-head { align-items: flex-end; margin-bottom: 1.5rem; padding: 1.2rem 1.4rem; border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--rule)); border-radius: 16px; background: linear-gradient(125deg, color-mix(in srgb, var(--accent) 8%, var(--surface)), var(--surface) 64%, #fff8f4); box-shadow: 0 10px 26px rgb(80 45 30 / 7%); }
+.template-preview-title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; }
 .template-preview-head h1 { margin: 0.25rem 0 0; }
+.template-preview-origin { padding: 0.2rem 0.55rem; border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--rule)); border-radius: 999px; background: color-mix(in srgb, var(--accent) 8%, var(--surface)); font-weight: 700; }
+.template-preview-author { display: flex; align-items: center; gap: 0.5rem; margin: 0.7rem 0 0; color: var(--muted); font-size: 0.82rem; }
+.template-preview-author a { color: var(--deep); font-weight: 700; text-decoration: none; }
+.template-preview-author a:hover { color: var(--accent); }
+.template-preview-author-avatar, .template-comment-avatar { display: grid; flex: 0 0 auto; place-items: center; border-radius: 50%; background: linear-gradient(145deg, #482d35, #d8898f 58%, #f4c9bc); color: #fff; font-weight: 800; }
+.template-preview-author-avatar { width: 2.2rem; height: 2.2rem; font-size: 0.7rem; }
 .back-link { color: var(--accent); font-size: 0.85rem; text-decoration: none; }
 .back-link:hover { text-decoration: underline; }
-.template-preview-stats { display: flex; flex-wrap: wrap; gap: 0.75rem; color: var(--muted); font-size: 0.85rem; }
+.template-preview-stats { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.7rem; padding: 0.55rem 0.7rem; border: 1px solid var(--rule); border-radius: 12px; background: rgb(255 253 249 / 72%); color: var(--muted); font-size: 0.85rem; }
+.template-preview-stats .template-remix { margin-left: 0; }
 .template-preview-share { padding: 0.2rem 0.55rem; border: 1px solid var(--rule); border-radius: 999px; background: var(--surface); color: var(--deep); font: inherit; font-size: 0.78rem; cursor: pointer; }
 .template-preview-share:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .template-preview-share:disabled { cursor: wait; opacity: 0.65; }
@@ -781,6 +789,9 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .template-comment-form textarea { flex: 1 1 420px; min-height: 4.5rem; resize: vertical; }
 .template-comment-list { display: flex; flex-direction: column; gap: 0.6rem; margin: 1rem 0 0; padding: 0; list-style: none; }
 .template-comment-list li { padding: 0.75rem 0.85rem; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); }
+.template-comment-author { display: flex; align-items: center; gap: 0.45rem; margin-bottom: 0.5rem; }
+.template-comment-avatar { width: 1.65rem; height: 1.65rem; font-size: 0.58rem; }
+.template-comment-empty { color: var(--muted); text-align: center; }
 .template-comment-list p { margin: 0 0 0.35rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 .template-comment-list .muted { font-size: 0.75rem; }
 

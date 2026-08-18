@@ -44,6 +44,7 @@ export const templateCardSchema = z.object({
   primaryColor: z.string().nullable(),
   hasThumbnail: z.boolean(),
   origin: z.enum(TEMPLATE_ORIGINS),
+  isLiked: z.boolean(),
   likeCount: z.number().int().nonnegative(),
   shareCount: z.number().int().nonnegative(),
   remixCount: z.number().int().nonnegative(),
