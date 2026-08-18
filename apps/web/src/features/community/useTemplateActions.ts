@@ -10,39 +10,24 @@ const SHARE_URL = (templateId: string) => `${window.location.origin}/community/t
  * ทั้งฟีด การ์ดในกริด และหน้ารายละเอียดต้องทำสามอย่างนี้เหมือนกันเป๊ะ
  * ถ้าปล่อยให้แต่ละหน้าเขียนเอง สถานะ pending/สำเร็จ/ผิดพลาด จะเพี้ยนกันเสมอ
  *
- * หมายเหตุ: API ยังไม่ส่งสถานะ "ผู้ใช้คนนี้ไลก์แล้วหรือยัง" มากับฟีด
- * จึงจำเฉพาะรายการที่กดในเซสชันนี้ (พฤติกรรมเดิมของหน้าเดิม) และให้ยอดจริงมาจากเซิร์ฟเวอร์
+ * สถานะไลก์มาจากเซิร์ฟเวอร์ (TemplateCard.isLiked) ไม่ใช่ความจำในหน้า
+ * ผู้เรียกจึงส่งสถานะปัจจุบันเข้ามา แล้ว mutation จะอัปเดต cache ทั้งฟีดและหน้ารายละเอียดให้เอง
  */
 export function useTemplateActions() {
   const navigate = useNavigate()
   const likeMutation = useTemplateLike()
   const shareMutation = useTemplateShare()
   const remixMutation = useTemplateRemix()
-  const [likedIds, setLikedIds] = useState<Set<string>>(() => new Set())
   const [sharedId, setSharedId] = useState<string | null>(null)
   const [shareError, setShareError] = useState<string | null>(null)
   const [remixError, setRemixError] = useState<string | null>(null)
 
-  const isLiked = useCallback((templateId: string) => likedIds.has(templateId), [likedIds])
-
+  /** `liked` คือสถานะปัจจุบันที่เซิร์ฟเวอร์ส่งมา — mutation จะสลับให้เป็นตรงข้าม */
   const toggleLike = useCallback(
-    (templateId: string) => {
-      const liked = likedIds.has(templateId)
-      likeMutation.mutate(
-        { templateId, liked },
-        {
-          onSuccess: (result) => {
-            setLikedIds((current) => {
-              const next = new Set(current)
-              if (result.liked) next.add(templateId)
-              else next.delete(templateId)
-              return next
-            })
-          },
-        },
-      )
+    (templateId: string, liked: boolean) => {
+      likeMutation.mutate({ templateId, liked })
     },
-    [likeMutation, likedIds],
+    [likeMutation],
   )
 
   const share = useCallback(
@@ -84,7 +69,6 @@ export function useTemplateActions() {
   )
 
   return {
-    isLiked,
     toggleLike,
     isLikePending: (templateId: string) =>
       likeMutation.isPending && likeMutation.variables?.templateId === templateId,

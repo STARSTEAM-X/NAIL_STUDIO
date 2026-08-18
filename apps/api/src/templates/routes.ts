@@ -8,7 +8,7 @@ import {
   templateReportSchema,
   templateShareSchema,
 } from '@nail-studio/contracts'
-import { currentUser, requireAdmin, requireUser } from '../middleware/requireUser.ts'
+import { currentUser, optionalUser, requireAdmin, requireUser } from '../middleware/requireUser.ts'
 import { AppError } from '../errors/AppError.ts'
 import * as service from './service.ts'
 
@@ -16,9 +16,9 @@ export const templatesRouter: Router = Router()
 const templateIdParamSchema = z.object({ id: z.string().uuid('รหัสดีไซน์ไม่ถูกต้อง') })
 
 // Public feed; write actions below require a session and CSRF token.
-templatesRouter.get('/', async (request, response) => {
+templatesRouter.get('/', optionalUser, async (request, response) => {
   const query = listTemplatesQuerySchema.parse(request.query)
-  const result = await service.list(query)
+  const result = await service.list(query, request.user?.id ?? null)
   response.json({ success: true, data: result.items, meta: { nextCursor: result.nextCursor } })
 })
 
@@ -37,9 +37,9 @@ templatesRouter.get('/:id/thumbnail', async (request, response) => {
   response.send(result.data)
 })
 
-templatesRouter.get('/:id', async (request, response) => {
+templatesRouter.get('/:id', optionalUser, async (request, response) => {
   const { id } = templateIdParamSchema.parse(request.params)
-  const result = await service.detail(id)
+  const result = await service.detail(id, request.user?.id ?? null)
   response.json({ success: true, data: result })
 })
 

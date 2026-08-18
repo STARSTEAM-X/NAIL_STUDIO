@@ -1,16 +1,12 @@
 import { API_BASE } from '@/api/client.ts'
+import { ORIGIN_LABELS as ORIGIN_SHORT_LABELS, getInitials } from './initials.ts'
 
-/** ป้ายภาษาไทยของที่มาของดีไซน์ (origin จาก contracts) */
+export { ORIGIN_SHORT_LABELS, getInitials }
+
+/** ป้ายแบบเต็มสำหรับหน้ารายละเอียด — แบบสั้น (ใช้บน badge) อยู่ใน initials.ts */
 export const ORIGIN_LABELS: Record<string, string> = {
   original: 'ต้นฉบับ',
   ai: 'สร้างด้วย AI',
-  remix: 'รีมิกซ์',
-}
-
-/** ป้ายสั้นสำหรับพื้นที่แคบ เช่น badge บนการ์ด */
-export const ORIGIN_SHORT_LABELS: Record<string, string> = {
-  original: 'ต้นฉบับ',
-  ai: 'AI',
   remix: 'รีมิกซ์',
 }
 
@@ -39,12 +35,6 @@ export function isLightPreview(primaryColor: string | null | undefined): boolean
 
 export function thumbnailUrl(templateId: string): string {
   return `${API_BASE}/api/v1/templates/${templateId}/thumbnail`
-}
-
-export function getInitials(displayName: string | undefined | null): string {
-  const parts = displayName?.trim().split(/\s+/).filter(Boolean) ?? []
-  if (parts.length > 1) return `${parts[0]?.[0] ?? ''}${parts[1]?.[0] ?? ''}`.toUpperCase()
-  return parts[0]?.slice(0, 2).toUpperCase() || 'NS'
 }
 
 /**

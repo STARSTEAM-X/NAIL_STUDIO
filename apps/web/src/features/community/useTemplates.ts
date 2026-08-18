@@ -1,4 +1,11 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query'
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+  type QueryClient,
+} from '@tanstack/react-query'
 import type {
   CreateTemplateInput,
   CreateTemplateCommentInput,
@@ -78,6 +85,39 @@ export interface TemplateLikeInput {
   liked: boolean
 }
 
+function patchTemplateFeedCaches(
+  queryClient: QueryClient,
+  templateId: string,
+  updateTemplate: (template: TemplateCard) => TemplateCard,
+) {
+  queryClient.setQueriesData<InfiniteData<ApiPage<TemplateCard[]>>>({
+    queryKey: templateKeys.all,
+    predicate: (query) => query.queryKey[1] === 'feed',
+  }, (current) => {
+    if (!current) return current
+    return {
+      ...current,
+      pages: current.pages.map((page) => ({
+        ...page,
+        data: page.data.map((template) =>
+          template.id === templateId ? updateTemplate(template) : template,
+        ),
+      })),
+    }
+  })
+}
+
+export function patchTemplateLikeCaches(queryClient: QueryClient, templateId: string, result: TemplateLikeResult) {
+  patchTemplateFeedCaches(queryClient, templateId, (template) => ({
+    ...template,
+    likeCount: result.likeCount,
+    isLiked: result.liked,
+  }))
+  queryClient.setQueryData<TemplateDetail>(templateKeys.detail(templateId), (current) =>
+    current ? { ...current, likeCount: result.likeCount, isLiked: result.liked } : current,
+  )
+}
+
 export function useTemplateLike() {
   const queryClient = useQueryClient()
 
@@ -87,24 +127,19 @@ export function useTemplateLike() {
         method: liked ? 'DELETE' : 'PUT',
       }),
     onSuccess: (result, { templateId }) => {
-      queryClient.setQueriesData<InfiniteData<ApiPage<TemplateCard[]>>>({ queryKey: templateKeys.all }, (current) => {
-        if (!current) return current
-        return {
-          ...current,
-          pages: current.pages.map((page) => ({
-            ...page,
-            data: page.data.map((template) =>
-              template.id === templateId ? { ...template, likeCount: result.likeCount } : template,
-            ),
-          })),
-        }
-      })
-      // หน้ารายละเอียดใช้ query คนละก้อนกับฟีด ถ้าไม่อัปเดตด้วยยอดจะค้างอยู่ค่าก่อนกด
-      queryClient.setQueryData<TemplateDetail>(templateKeys.detail(templateId), (current) =>
-        current ? { ...current, likeCount: result.likeCount } : current,
-      )
+      patchTemplateLikeCaches(queryClient, templateId, result)
     },
   })
+}
+
+export function patchTemplateShareCaches(queryClient: QueryClient, templateId: string, result: TemplateShareResult) {
+  patchTemplateFeedCaches(queryClient, templateId, (template) => ({
+    ...template,
+    shareCount: result.shareCount,
+  }))
+  queryClient.setQueryData<TemplateDetail>(templateKeys.detail(templateId), (current) =>
+    current ? { ...current, shareCount: result.shareCount } : current,
+  )
 }
 
 export interface TemplateShareRequest extends TemplateShareInput {
@@ -121,21 +156,7 @@ export function useTemplateShare() {
         body: { channel },
       }),
     onSuccess: (result, { templateId }) => {
-      queryClient.setQueriesData<InfiniteData<ApiPage<TemplateCard[]>>>({ queryKey: templateKeys.all }, (current) => {
-        if (!current) return current
-        return {
-          ...current,
-          pages: current.pages.map((page) => ({
-            ...page,
-            data: page.data.map((template) =>
-              template.id === templateId ? { ...template, shareCount: result.shareCount } : template,
-            ),
-          })),
-        }
-      })
-      queryClient.setQueryData<TemplateDetail>(templateKeys.detail(templateId), (current) =>
-        current ? { ...current, shareCount: result.shareCount } : current,
-      )
+      patchTemplateShareCaches(queryClient, templateId, result)
     },
   })
 }
@@ -143,6 +164,16 @@ export function useTemplateShare() {
 export interface TemplateRemixInput {
   templateId: string
   name?: string
+}
+
+export function patchTemplateRemixCaches(queryClient: QueryClient, templateId: string, result: TemplateRemixResult) {
+  patchTemplateFeedCaches(queryClient, templateId, (template) => ({
+    ...template,
+    remixCount: result.remixCount,
+  }))
+  queryClient.setQueryData<TemplateDetail>(templateKeys.detail(templateId), (current) =>
+    current ? { ...current, remixCount: result.remixCount } : current,
+  )
 }
 
 export function useTemplateRemix() {
@@ -156,21 +187,7 @@ export function useTemplateRemix() {
       }),
     onSuccess: (result, { templateId }) => {
       void queryClient.invalidateQueries({ queryKey: projectKeys.list(), exact: true })
-      queryClient.setQueriesData<InfiniteData<ApiPage<TemplateCard[]>>>({ queryKey: templateKeys.all }, (current) => {
-        if (!current) return current
-        return {
-          ...current,
-          pages: current.pages.map((page) => ({
-            ...page,
-            data: page.data.map((template) =>
-              template.id === templateId ? { ...template, remixCount: result.remixCount } : template,
-            ),
-          })),
-        }
-      })
-      queryClient.setQueryData<TemplateDetail>(templateKeys.detail(templateId), (current) =>
-        current ? { ...current, remixCount: result.remixCount } : current,
-      )
+      patchTemplateRemixCaches(queryClient, templateId, result)
     },
   })
 }

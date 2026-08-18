@@ -18,7 +18,7 @@ interface PostCardProps {
  * ทุกยอดที่แสดงมาจาก API จริง ไม่มีค่าจำลอง
  */
 export function PostCard({ template, actions }: PostCardProps) {
-  const liked = actions.isLiked(template.id)
+  const liked = template.isLiked
   const detailPath = `/community/templates/${template.id}`
   const shared = actions.sharedId === template.id
 
@@ -83,7 +83,7 @@ export function PostCard({ template, actions }: PostCardProps) {
           className={`nc-action ${liked ? 'nc-action-on' : ''}`}
           aria-pressed={liked}
           disabled={actions.isLikePending(template.id)}
-          onClick={() => actions.toggleLike(template.id)}
+          onClick={() => actions.toggleLike(template.id, liked)}
         >
           <Icon name="heart" size={17} />
           <span>{liked ? 'ถูกใจแล้ว' : 'ถูกใจ'}</span>

@@ -43,6 +43,7 @@ function toTemplateCard(row: repository.UserProfileTemplateRow): TemplateCard {
     primaryColor: row.primaryColor,
     hasThumbnail: row.thumbnailAsset !== null || row.designVersion.project.thumbnailAssetId !== null,
     origin: row.origin,
+    isLiked: false,
     likeCount: row.likeCount,
     shareCount: row.shareCount,
     remixCount: row.remixCount,

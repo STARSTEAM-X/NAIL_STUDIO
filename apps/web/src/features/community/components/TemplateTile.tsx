@@ -19,7 +19,7 @@ interface TemplateTileProps {
  */
 export function TemplateTile({ template, actions }: TemplateTileProps) {
   const detailPath = `/community/templates/${template.id}`
-  const liked = actions.isLiked(template.id)
+  const liked = template.isLiked
 
   return (
     <article className="nc-card nc-tile">
@@ -53,7 +53,7 @@ export function TemplateTile({ template, actions }: TemplateTileProps) {
             aria-pressed={liked}
             aria-label={liked ? `เลิกถูกใจ ${template.name}` : `ถูกใจ ${template.name}`}
             disabled={actions.isLikePending(template.id)}
-            onClick={() => actions.toggleLike(template.id)}
+            onClick={() => actions.toggleLike(template.id, liked)}
           >
             <Icon name="heart" size={14} /> {formatCount(template.likeCount)}
           </button>

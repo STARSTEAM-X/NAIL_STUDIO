@@ -62,6 +62,17 @@ appointmentsRouter.post('/:id/review', async (request, response) => {
   response.json({ success: true, data: await service.review(currentUser(request).id, id, input) })
 })
 
+appointmentsRouter.delete('/:id/review', async (request, response) => {
+  const { id } = idParam.parse(request.params)
+  await service.deleteReview(currentUser(request).id, id)
+  response.json({ success: true, data: { ok: true } })
+})
+
+appointmentsRouter.get('/:id/same-day', async (request, response) => {
+  const { id } = idParam.parse(request.params)
+  response.json({ success: true, data: await service.listSameDayConfirmed(currentUser(request).id, id) })
+})
+
 appointmentsRouter.get('/:id/messages', async (request, response) => {
   const { id } = idParam.parse(request.params)
   response.json({ success: true, data: await service.listMessages(currentUser(request).id, id) })

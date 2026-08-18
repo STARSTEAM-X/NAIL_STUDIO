@@ -59,7 +59,7 @@ export function TemplatePreviewPage() {
   }
 
   const detail = template.data
-  const liked = actions.isLiked(templateId)
+  const liked = detail?.isLiked ?? false
 
   return (
     <div className="nc-page nc-detail-page">
@@ -220,7 +220,7 @@ export function TemplatePreviewPage() {
                     className={`btn btn-ghost ${liked ? 'nc-detail-liked' : ''}`}
                     aria-pressed={liked}
                     disabled={actions.isLikePending(templateId)}
-                    onClick={() => actions.toggleLike(templateId)}
+                    onClick={() => actions.toggleLike(templateId, liked)}
                   >
                     <Icon name="heart" size={16} /> {liked ? 'ถูกใจแล้ว' : 'ถูกใจ'}
                   </button>

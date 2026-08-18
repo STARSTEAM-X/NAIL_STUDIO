@@ -192,6 +192,19 @@ export function findPublicTemplateDetail(templateId: string): Promise<TemplateDe
   })
 }
 
+export async function findLikedTemplateIds(userId: string, templateIds: string[]): Promise<Set<string>> {
+  const rows = await prisma.templateLike.findMany({
+    where: { userId, templateId: { in: templateIds } },
+    select: { templateId: true },
+  })
+  return new Set(rows.map((row) => row.templateId))
+}
+
+export async function isTemplateLikedBy(userId: string, templateId: string): Promise<boolean> {
+  const result = await prisma.templateLike.findUnique({ where: { templateId_userId: { templateId, userId } } })
+  return Boolean(result)
+}
+
 export function createTemplateComment(
   templateId: string,
   userId: string,

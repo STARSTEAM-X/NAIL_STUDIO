@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { createEmptyDocument } from '@nail-studio/contracts'
 import type { Express } from 'express'
 import { createApp } from '../app.ts'
 import { disconnectDb, prisma } from '../db.ts'
@@ -24,7 +25,7 @@ beforeAll(async () => {
   const project = await prisma.project.create({ data: { userId: author.id, name: 'Like fixture project' } })
   projectId = project.id
   const version = await prisma.designVersion.create({
-    data: { projectId, versionNumber: 1, document: {} },
+    data: { projectId, versionNumber: 1, document: createEmptyDocument() },
   })
   versionId = version.id
   const template = await prisma.nailTemplate.create({
@@ -80,12 +81,25 @@ describe('template like API', () => {
   it('requires authentication and validates the template id', async () => {
     const anonymous = new Client(() => app)
     await anonymous.send('get', '/health')
+    const anonymousDetail = await anonymous.send('get', `/templates/${templateId}`)
+    expect(anonymousDetail.status).toBe(200)
+    expect(anonymousDetail.body.data.isLiked).toBe(false)
+
+    const beforeLike = await clientA.send('get', `/templates/${templateId}`)
+    expect(beforeLike.status).toBe(200)
+    expect(beforeLike.body.data.isLiked).toBe(false)
+
     const unauthenticated = await anonymous.send('put', `/templates/${templateId}/like`)
     expect(unauthenticated.status).toBe(401)
 
     const invalid = await clientA.send('put', '/templates/not-a-uuid/like')
     expect(invalid.status).toBe(400)
     expect(invalid.body.error.code).toBe('VALIDATION_ERROR')
+
+    const liked = await clientA.send('put', `/templates/${templateId}/like`)
+    expect(liked.status).toBe(200)
+    expect((await clientA.send('get', `/templates/${templateId}`)).body.data.isLiked).toBe(true)
+    expect((await clientB.send('get', `/templates/${templateId}`)).body.data.isLiked).toBe(false)
   })
 
   it('keeps repeated PUT requests at one like and one counter increment', async () => {
