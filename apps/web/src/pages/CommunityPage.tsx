@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { TEMPLATE_CATEGORIES, TEMPLATE_PRIMARY_COLORS } from '@nail-studio/contracts'
 import { API_BASE, ApiRequestError } from '@/api/client.ts'
+import { CommentIcon, HeartIcon, RemixIcon, ShareIcon } from '@/components/icons/CommunityIcons.tsx'
 import { useCurrentUser } from '@/features/auth/useAuth.ts'
 import { getInitials, ORIGIN_LABELS } from '@/features/community/initials.ts'
 import {
@@ -214,7 +215,7 @@ export function CommunityPage() {
                     likeMutation.mutate({ templateId: template.id, liked: template.isLiked })
                   }}
                 >
-                  <span aria-hidden="true">♥</span> {template.likeCount}
+                  <HeartIcon filled={template.isLiked} />{' '}{template.likeCount}
                 </button>
                 <button
                   type="button"
@@ -222,10 +223,10 @@ export function CommunityPage() {
                   disabled={shareMutation.isPending && shareMutation.variables?.templateId === template.id}
                   onClick={() => { void shareTemplate(template.id, template.name) }}
                 >
-                  <span aria-hidden="true">↗</span> {sharedTemplateId === template.id ? 'แชร์แล้ว' : template.shareCount}
+                  <ShareIcon />{' '}{sharedTemplateId === template.id ? 'แชร์แล้ว' : template.shareCount}
                 </button>
-                <span>↻ {template.remixCount}</span>
-                <Link to={`/community/templates/${template.id}`} className="template-social-action">💬 {template.commentCount}</Link>
+                <span><RemixIcon />{' '}{template.remixCount}</span>
+                <Link to={`/community/templates/${template.id}`} className="template-social-action"><CommentIcon />{' '}{template.commentCount}</Link>
                 <button
                   type="button"
                   className="template-remix"
@@ -237,6 +238,7 @@ export function CommunityPage() {
                     )
                   }}
                 >
+                  <RemixIcon />{' '}
                   {remixMutation.isPending && remixMutation.variables?.templateId === template.id
                     ? 'กำลังสร้าง…'
                     : 'รีมิกซ์'}

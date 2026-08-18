@@ -4,6 +4,7 @@ import { ApiRequestError } from '@/api/client.ts'
 import { NailScene } from '@/3d/scene/NailScene.tsx'
 import { ReadOnlyDesignScene } from '@/3d/scene/ReadOnlyDesignScene.tsx'
 import { WebGlGuard } from '@/3d/scene/WebGlGuard.tsx'
+import { CommentIcon, HeartIcon, RemixIcon, ShareIcon } from '@/components/icons/CommunityIcons.tsx'
 import { getInitials, ORIGIN_LABELS } from '@/features/community/initials.ts'
 import {
   useCreateTemplateComment,
@@ -87,11 +88,11 @@ export function TemplatePreviewPage() {
               disabled={likeMutation.isPending && likeMutation.variables?.templateId === templateId}
               onClick={() => { likeMutation.mutate({ templateId, liked: detail.isLiked }) }}
             >
-              <span aria-hidden="true">♥</span> {detail.likeCount}
+              <HeartIcon filled={detail.isLiked} />{' '}{detail.likeCount}
             </button>
-            <span>↗ {detail.shareCount}</span>
-            <span>↻ {detail.remixCount}</span>
-            <span>💬 {detail.commentCount}</span>
+            <span><ShareIcon />{' '}{detail.shareCount}</span>
+            <span><RemixIcon />{' '}{detail.remixCount}</span>
+            <span><CommentIcon />{' '}{detail.commentCount}</span>
             <button
               type="button"
               className="template-remix"
@@ -103,6 +104,7 @@ export function TemplatePreviewPage() {
                 )
               }}
             >
+              <RemixIcon />{' '}
               {remixMutation.isPending && remixMutation.variables?.templateId === templateId ? 'กำลังสร้าง…' : 'รีมิกซ์'}
             </button>
             <button
@@ -111,6 +113,7 @@ export function TemplatePreviewPage() {
               disabled={shareMutation.isPending}
               onClick={() => { void shareTemplate(detail.name) }}
             >
+              <ShareIcon />{' '}
               {shareMutation.isPending ? 'กำลังแชร์…' : 'แชร์'}
             </button>
           </div>
