@@ -1,187 +1,275 @@
-# Task: Slice 6 — TemplateComposer (A-20 Poisson-disk + A-21 point-in-hull + A-22 ΔE)
+# Task: แก้ 3 ช่องโหว่ที่พบจากการตรวจ Slice 7 (Claude code review)
 
 ## บริบท / ทำไมต้องทำ
 
-`docs/implementation-plan.md` Slice 6 ข้อ 6 อธิบาย pipeline ที่ประกาศว่าทำแล้ว:
+ตรวจโค้ดจริงของ Slice 7 (ระบบร้าน · แชท) เทียบกับ DoD ใน `docs/implementation-plan.md`
+บรรทัด 425-450 ด้วยการอ่านโค้ดตรงๆ (ไม่ใช่แค่เชื่อ checklist [x]) พบ 3 จุดที่ไม่ตรงกับที่อ้างไว้:
 
-> LLM → Recipe 8 ฟิลด์ (D-22) → `TemplateComposer` (TS) → Poisson-disk (A-20) +
-> point-in-hull (A-21) + ΔE (A-22) → **3 ตัวเลือก**
+1. **Race condition ใน `accept()`** (`apps/api/src/appointments/service.ts:181-202`) — DoD บอกว่า
+   "สองฝ่ายกดพร้อมกัน → คนที่สองได้ 409" แต่โค้ดจริงเช็ค pending proposal นอก transaction
+   (`row.proposals.find(...)` จาก `findFirst` ที่อ่านมาก่อนหน้า) แล้วอัปเดตด้วย
+   `tx.appointmentProposal.update({ where: { id: proposal.id } })` โดยไม่มีเงื่อนไข `status: 'pending'`
+   กำกับหรือ optimistic lock ใดๆ — สอง request ที่กดยอมรับพร้อมกันจะผ่านการเช็คนอก transaction
+   ทั้งคู่แล้ว update สำเร็จทั้งคู่ (last-write-wins) แทนที่ตัวที่สองจะได้ 409 ตามที่เอกสารอ้าง
+   ผลคือลูกค้า/ร้านได้รับ notification "ยืนยันแล้ว" ซ้ำ
 
-ตรวจโค้ดจริงแล้วพบว่า **`TemplateComposer` ไม่มีอยู่เลย** — `apps/web/src/features/ai/AiAssistantPanel.tsx::applyRecipe`
-(บรรทัด 83-89) แค่ map `baseColor`/`finish`/`shape`/`length` ไปที่เล็บที่เลือกอยู่ตัวเดียวตรง ๆ
-ทิ้ง `accentNails` และ `decorations` ทั้งหมดโดยไม่ใช้เลย ไม่มี Poisson-disk sampling, ไม่มี ΔE
-color-distance ที่ไหนในโค้ดเลย — `apps/ai/app/schemas.py` docstring ของ `Recipe` เขียนไว้ชัดว่า
-`"The compact LLM output; TS owns full DesignDocument composition."` ยืนยันว่าฝั่ง TS ยังไม่ได้ทำส่วนนี้
+2. **ไม่มี endpoint ลบรีวิว** — DoD บอกว่า "ลบรีวิว → `rating_avg` ถูกต้อง" แต่ไม่มี route ลบรีวิว
+   อยู่เลยทั้งใน `appointments/routes.ts` และ `shops/routes.ts` เป็นฟีเจอร์ที่ยังไม่ได้ทำ
+   ไม่ใช่แค่ยืนยันไม่ได้ — ตรวจแล้วว่า schema มี `ShopReview.deletedAt` (soft-delete) อยู่แล้ว
+   และ `shops/service.ts` ก็ filter `deletedAt: null` ในการ list/detail และ `replyToReview` อยู่แล้ว
+   (บรรทัด 36, 147) แปลว่าโครงสร้าง DB เตรียมไว้แล้วแต่ service function ที่ลบจริงยังไม่มี
 
-สเปกอัลกอริทึมเต็มอยู่ที่ `docs/algorithms.md` A-20 (บรรทัด 1085-1124), A-21 (1128-1174, มีโค้ดอยู่แล้ว),
-A-22 (1178-1224) — **ต้องทำตามสเปกนี้เป๊ะ** ไม่ใช่คิดใหม่
+3. **ไม่มี "แสดงนัดวันเดียวกันตอนร้านกดยอมรับ"** — Slice 7 ข้อ 7 อ้างอิง **DECISION DB-07**
+   ใน `docs/database.md:708-717` ซึ่งระบุชัดว่าตั้งใจ**ไม่ทำ**การกันจองซ้อนที่ระดับ DB/business-logic
+   ("ระบบไม่ต้องรู้ว่าร้านว่างเมื่อไร ... ไม่ต้องกันการจองซ้อน") โดยสิ่งที่ต้องชดเชยคือ
+   **"แสดงนัดที่ยืนยันแล้วในวันเดียวกันให้ร้านเห็นตอนกดยอมรับ (งาน UI ไม่ใช่งาน DB)"** —
+   ดังนั้นนี่คืองาน**แจ้งข้อมูลประกอบการตัดสินใจ** ไม่ใช่งานปฏิเสธการจองซ้อน — ตรวจแล้วว่า
+   ไม่มีทั้ง endpoint และ UI ส่วนนี้อยู่เลยในปัจจุบัน
 
-## Recipe contract (สิ่งที่ TS ต้องรับมือ — มาจาก `apps/ai/app/schemas.py`)
+**ขอบเขตงานนี้จำกัดเฉพาะ 3 จุดข้างต้น** — ไม่แตะโค้ดอื่นที่ตรวจผ่านแล้วใน Slice 4-8
+(ดูหมายเหตุ "นอกขอบเขต" ท้ายเอกสาร สำหรับปัญหาที่พบแต่ไม่ทำในรอบนี้)
+
+---
+
+## 1. แก้ race condition ใน `accept()`
+
+### ปัญหาเชิงลึก
+
+`accept()` ปัจจุบัน:
+```ts
+const row = await findForParticipant(userId, appointmentId)          // อ่านนอก tx
+const proposal = row.proposals.find((item) => item.status === 'pending')  // เช็คนอก tx
+...
+await tx.appointmentProposal.update({ where: { id: proposal.id }, data: { status: 'accepted' } })
+```
+ระหว่างช่วงเวลาจากอ่าน `row` ถึง `tx` เริ่ม อีก request หนึ่งอาจ accept/supersede proposal เดียวกันไปแล้ว
+`update` ด้วย `where: { id }` (ไม่กรอง `status`) จะสำเร็จเสมอไม่ว่าสถานะปัจจุบันจะเป็นอะไร (Prisma
+`update` ที่ match `id` ไม่ throw ถ้าไม่ตรง `status` เพราะไม่ได้กรองด้วย field นั้น) — เป็น
+check-then-act แบบ TOCTOU ทั่วไป
+
+### แนวทางแก้ (Compare-And-Swap ผ่าน conditional `updateMany`)
+
+Postgres รับประกันว่า `UPDATE ... WHERE` หนึ่งคำสั่งเป็น atomic ระดับแถว จึงไม่ต้องใช้
+row-level lock (`SELECT FOR UPDATE`) เพิ่ม — เปลี่ยนทั้ง proposal-update และ appointment-update
+ให้เป็น conditional `updateMany` ที่กรองด้วยสถานะปัจจุบัน แล้วเช็ค `result.count`:
 
 ```ts
-interface AiRecipe {
-  archetype: string       // 1 ใน 7: french-tip · ombre · accent-nail · negative-space · marble · geometric · glitter-gradient
-  paletteId: string       // 1 ใน 8: pal-nude-rose · pal-berry-night · pal-sage-sky · pal-sunset-coral ·
-                           //          pal-lavender-milk · pal-mocha-gold · pal-monochrome-ink · pal-clear-gold
-  baseColor: string       // #RRGGBB
-  accentNails: number[]   // ดัชนี 0-4 ไม่ซ้ำกัน (5 นิ้วของมือขวา — ดู D-23 ทำไมมีแค่มือเดียว)
-  finish: string          // glossy · matte · chrome · glitter
-  shape: string           // round · oval · square · squoval · almond · coffin · stiletto
-  length: string          // short · medium · long
-  decorations: Array<{ catalogId: string; zone: string; density: number }>
-  // catalogId: 1 ใน 30 id ใน apps/web/src/3d/decorations/decorationCatalog.ts (Python enum คือ ground truth ที่แน่นอน)
-  // zone: nail-plate | free-edge | accent-nail | negative-space (มีแค่ 4 ค่านี้ — ตรวจใน Python แล้ว)
-  // density: 0..1
+export async function accept(userId: string, appointmentId: string): Promise<AppointmentDetail> {
+  const row = await findForParticipant(userId, appointmentId)
+  const actor = actorFor(row, userId)
+  const proposal = row.proposals.find((item) => item.status === 'pending')
+  if (!proposal) throw AppError.conflict('ไม่มีข้อเสนอเวลาที่รอการตอบรับ')
+  if (!allowedTransition(row.status, 'confirmed') || proposal.proposedBy === actor) {
+    throw AppError.conflict('คุณไม่สามารถตอบรับข้อเสนอนี้ได้ในสถานะปัจจุบัน')
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const proposalResult = await tx.appointmentProposal.updateMany({
+      where: { id: proposal.id, status: 'pending' },
+      data: { status: 'accepted' },
+    })
+    if (proposalResult.count === 0) throw AppError.conflict('ข้อเสนอนี้ถูกตอบรับหรือเปลี่ยนสถานะไปแล้ว')
+
+    const appointmentResult = await tx.appointment.updateMany({
+      where: { id: appointmentId, status: row.status },
+      data: { status: 'confirmed', agreedStartAt: proposal.proposedStartAt, durationMinutes: proposal.durationMinutes },
+    })
+    if (appointmentResult.count === 0) throw AppError.conflict('สถานะการนัดหมายถูกเปลี่ยนไปแล้วระหว่างทำรายการ')
+
+    await tx.appointmentProposal.updateMany({ where: { appointmentId, status: 'pending', id: { not: proposal.id } }, data: { status: 'superseded' } })
+    await createNotification(tx, { userId: actor === 'customer' ? row.shopId : row.customerId, kind: 'appointment_status', title: 'การนัดหมายได้รับการยืนยันแล้ว', sourceType: 'appointment', sourceId: appointmentId })
+    return tx.appointment.findUniqueOrThrow({ where: { id: appointmentId }, include: appointmentInclude })
+  })
+  return detailFromRow(updated)
 }
 ```
 
-ที่มาของ `AiRecipe` type ฝั่ง TS: `apps/web/src/features/ai/aiClient.ts:29-38` (มีอยู่แล้ว ไม่ต้องแก้)
+- `AppError.conflict` ที่ throw ข้างใน `$transaction` callback ต้อง**ไม่ถูก catch โดย Prisma**
+  (Prisma จะ rollback แล้ว re-throw error เดิมออกมา — ตรวจสอบว่า error handler กลาง
+  (`errorHandler.ts`) จับ `AppError` ที่โยนจากใน transaction ได้ปกติเหมือน error อื่น — ไม่ต้องแก้
+  ถ้า pattern เดิมของโค้ด (เช่น `propose()`/`review()` ที่มี `.catch` ครอบ `$transaction` อยู่แล้ว)
+  ทำงานถูกอยู่แล้วสำหรับ error ที่โยนจากนอก callback แต่ `accept()` โยนจาก**ใน**callback ซึ่งเป็นคนละ
+  เคส — ต้องทดสอบว่า error propagate ออกมาเป็น 409 จริงไม่ใช่ 500)
+- ผลลัพธ์: request ที่สองที่มาถึง transaction ทีหลังจะได้ `proposalResult.count === 0` (เพราะ
+  request แรก update สถานะเป็น `accepted` ไปแล้ว ทำให้เงื่อนไข `status: 'pending'` ไม่ match) →
+  409 ทันที ไม่มี double notification ไม่มี double state transition
 
-`NailKey` = `right.thumb|index|middle|ring|little` × `left.*` (10 ค่ารวม แต่ปัจจุบันแสดงผลแค่มือขวา
-ตาม D-23 — `accentNails` index 0-4 หมายถึงลำดับใน `FINGERS = ['thumb','index','middle','ring','little']`
-บนมือขวา ให้ map เป็น `right.${FINGERS[i]}`)
+### Edge case ที่ต้องคุม
+- สอง request ยิงพร้อมกันเป๊ะ — DB serialize คำสั่ง UPDATE ที่ชน row เดียวกันเองอยู่แล้ว (row lock
+  ระดับ engine) ดังนั้นแค่เปลี่ยนจาก unconditional `update` เป็น conditional `updateMany` +
+  เช็ค count ก็เพียงพอ ไม่ต้องเพิ่ม transaction isolation level
+- request คู่แข่งไม่ใช่ accept ซ้ำ แต่เป็น `cancel`/`decline`/`propose` ที่ทำระหว่างกลาง — เงื่อนไข
+  `status: row.status` บน `tx.appointment.updateMany` ครอบกรณีนี้ด้วย (ถ้าสถานะ appointment ถูก
+  เปลี่ยนไปแล้วจาก action อื่น ผลจะเป็น count 0 → 409 เหมือนกัน)
 
-## ขอบเขตงาน — ไฟล์ที่ต้องสร้าง/แก้
+---
 
-### 1. `apps/web/src/3d/generation/colorRules.ts` (ใหม่) — A-22
+## 2. เพิ่ม endpoint ลบรีวิว
 
-ทำตาม `docs/algorithms.md` A-22 เป๊ะ:
-- แปลง hex → sRGB → CIELAB (สูตรมาตรฐาน: linearize sRGB ด้วย gamma correction → XYZ (D65 illuminant)
-  → Lab)
-- `deltaE76(labA, labB): number` — ระยะยุคลิดใน Lab space
-- `hueHarmony(hexA, hexB): 'analogous'|'complementary'|'triadic'|'monochrome'|'clashing'` —
-  คำนวณ hue จาก HSL แล้วจัดกลุ่มตามเกณฑ์ในเอกสาร: analogous <40°, complementary 150–210°,
-  triadic 110–130°, monochrome = hue ต่างกัน <2° (ใช้ ΔE จาก lightness/chroma แทน)
-- กฎบังคับใช้ (ค่าคงที่ตั้งชื่อไว้ ห้าม magic number ลอย ๆ):
-  `PATTERN_CONTRAST_MIN_DE = 15`, `DECORATION_CONTRAST_MIN_DE = 10`
-- `evaluateColorHarmony(input: { base: string; pattern?: string; decoration?: string }): { patternOk: boolean; decorationOk: boolean; hue: ReturnType<typeof hueHarmony> | null }`
-- unit test คู่ (`colorRules.test.ts`): ทดสอบคู่สีที่รู้คำตอบล่วงหน้า (เช่น สีเดียวกัน ΔE=0, ขาว-ดำ ΔE สูงมาก)
-  และเคส hue ทั้ง 4 กลุ่ม + กรณี clashing
+### Service — `apps/api/src/appointments/service.ts`
 
-### 2. `apps/web/src/3d/generation/scatter.ts` (ใหม่) — A-20
-
-Bridson's Poisson-disk sampling ตามสเปก A-20 เป๊ะ (grid ขนาดเซลล์ = r/√2, seeded PRNG
-เพื่อให้ recipe เดียวกันได้ผลเดิมเสมอ — **ห้ามใช้ `Math.random()` ตรง ๆ** ใช้ mulberry32 หรือ PRNG
-seeded แบบง่ายที่ deterministic จาก seed string/number):
+เพิ่มฟังก์ชันใหม่ `deleteReview(userId, appointmentId)`:
+- เฉพาะ**เจ้าของรีวิว** (`review.authorId === userId`) เท่านั้นที่ลบได้ — ไม่ใช่ร้าน ไม่ใช่ admin
+  (ขอบเขตงานนี้ไม่รวม moderation flow)
+- ต้องมีรีวิวอยู่จริงและยังไม่ถูกลบ (`deletedAt: null`) — ไม่งั้น 404
+- ต้อง**คำนวณ `ratingAvg`/`ratingCount` ใหม่ด้วย `aggregate` บนแถวที่เหลือหลัง soft-delete**
+  ในธุรกรรมเดียวกัน (ไม่ใช้วิธีลบค่าเดิมออกจาก average เดิมแบบ back-out เพราะเสี่ยง floating drift
+  สะสมถ้ามีการลบ/สร้างสลับกันหลายรอบ — `aggregate` คำนวณจากข้อมูลจริงทุกครั้งแม่นยำกว่า)
+- ถ้าลบรีวิวสุดท้ายของร้าน (`count` เหลือ 0) → `ratingAvg` ต้องกลับเป็น `0` (ค่า default ของ
+  `ShopProfile.ratingAvg`) ไม่ใช่ `null`/`NaN`
 
 ```ts
-export function poissonDiskInHull(
-  hull: readonly Pt2[],
-  options: { radius: number; maxPoints: number; seed: number; vRange?: [number, number] },
-): Pt2[]
+export async function deleteReview(userId: string, appointmentId: string): Promise<void> {
+  const row = await findForParticipant(userId, appointmentId)
+  if (!row.review) throw AppError.notFound('ไม่พบรีวิวของการนัดหมายนี้')
+  if (row.review.authorId !== userId) throw AppError.forbidden('เฉพาะเจ้าของรีวิวเท่านั้นที่ลบได้')
+
+  await prisma.$transaction(async (tx) => {
+    const result = await tx.shopReview.updateMany({
+      where: { id: row.review!.id, deletedAt: null },
+      data: { deletedAt: new Date() },
+    })
+    if (result.count === 0) throw AppError.notFound('ไม่พบรีวิวของการนัดหมายนี้')
+
+    const aggregate = await tx.shopReview.aggregate({
+      where: { shopId: row.shopId, deletedAt: null },
+      _avg: { rating: true },
+      _count: true,
+    })
+    await tx.shopProfile.update({
+      where: { userId: row.shopId },
+      data: {
+        ratingCount: aggregate._count,
+        ratingAvg: aggregate._avg.rating?.toFixed(2) ?? '0',
+      },
+    })
+  })
+}
 ```
 
-- จำกัดการวางอยู่ใน `hull` ด้วย `isPointInHull` (`@/3d/geometry/pointInHull.ts`, มีอยู่แล้ว ห้ามเขียนใหม่)
-- `vRange` optional — ใช้กรอง candidate point ก่อนตรวจ hull สำหรับ zone ที่ต้องการแถบเฉพาะ
-  (เช่น free-edge = ปลายเล็บ) ดู mapping โซนในข้อ 3
-- คืนค่า ≤ `maxPoints` จุด ห่างกันอย่างน้อย `radius` ทุกคู่ (spatial grid ต้องมีจริง — ห้าม O(n²)
-  brute force เพราะเอกสารอ้าง Θ(n) ไว้ชัดเจน)
-- unit test (`scatter.test.ts`): seed เดียวกัน → ผลเหมือนเดิมทุกครั้ง (determinism) · ทุกคู่จุดห่างกัน
-  ≥ radius · ทุกจุดอยู่ใน hull จริง (สุ่ม hull รูปทรงต่าง ๆ แล้วตรวจด้วย brute-force เทียบ)
+หมายเหตุ: `findForParticipant` ปัจจุบัน include `review: true` อยู่แล้ว (ดู `appointmentInclude`
+บรรทัด 17) จึง `row.review` มีข้อมูลพร้อมใช้ ไม่ต้อง query เพิ่ม
 
-### 3. `apps/web/src/3d/generation/composer.ts` (ใหม่) — TemplateComposer
+### Route — `apps/api/src/appointments/routes.ts`
 
 ```ts
-export interface ComposedNailChange {
-  baseColor: string
-  finish: Nail['finish']
-  shape: Nail['shape']
-  length: Nail['length']
-  decorations: Decoration[]   // Decoration ชนิดเต็มจาก @nail-studio/contracts พร้อม id/u/v/rotation/scale
+appointmentsRouter.delete('/:id/review', async (request, response) => {
+  const { id } = idParam.parse(request.params)
+  await service.deleteReview(currentUser(request).id, id)
+  response.json({ success: true, data: { ok: true } })
+})
+```
+
+### Frontend — `apps/web/src/features/appointments/client.ts` + `AppointmentDetailPage.tsx`
+
+- เพิ่ม `deleteAppointmentReview(id: string): Promise<{ ok: true }>` เรียก
+  `apiFetch('/appointments/${id}/review', { method: 'DELETE' })` ตาม pattern เดียวกับ
+  `markAppointmentMessagesRead`
+- ใน `AppointmentDetailPage.tsx` ถ้า `review` ที่แสดงอยู่เป็นของ user ปัจจุบัน (ลูกค้าที่ล็อกอิน)
+  เพิ่มปุ่ม "ลบรีวิว" พร้อม confirm ก่อนยิง แล้ว refetch appointment detail ให้ UI อัปเดต
+
+---
+
+## 3. แสดงนัดวันเดียวกันตอนร้านกดยอมรับ (DB-07 compensating UI)
+
+**ย้ำ: นี่คือ feature แจ้งข้อมูล ไม่ใช่การปฏิเสธ/บล็อกการจอง** — ร้านยังคง accept ได้แม้มีนัดชนกัน
+ตาม DECISION DB-07 ที่ตั้งใจไม่ทำระบบกันชนที่ backend
+
+### Service — `apps/api/src/appointments/service.ts`
+
+เพิ่ม `listSameDayConfirmed(userId, appointmentId)`:
+- หา appointment ปัจจุบันผ่าน `findForParticipant` เหมือนเดิม, ต้องเป็น**ฝั่งร้าน**เท่านั้น
+  (`actorFor(row, userId) === 'shop'`) — ถ้าลูกค้าเรียกให้ 403 (ข้อมูลนี้ไม่มีประโยชน์กับลูกค้า
+  และเป็นรายการนัดของร้านคนอื่นที่ไม่เกี่ยวกับลูกค้ารายนี้)
+- หา pending proposal ของ appointment นี้ (เวลาที่กำลังจะ accept) ใช้ `proposedStartAt` เป็นฐาน
+  วันที่ (คำนวณเป็น UTC calendar day — โค้ดเบสนี้เก็บเวลาเป็น UTC timestamptz ทั้งหมดและยังไม่มี
+  timezone utility ใดๆ อยู่แล้ว ดู `docs/database.md` DB-07 ที่ระบุชัดว่า "ไม่ต้องจัดการ timezone
+  ของ business hours" จึงไม่เพิ่ม timezone library ใหม่ในงานนี้)
+- query `appointment` ที่ `shopId` เดียวกัน, `status: 'confirmed'`, `agreedStartAt` อยู่ในช่วง
+  `[startOfDay, endOfDay)` ของวันนั้น, **ไม่รวม appointment ปัจจุบัน** (`id: { not: appointmentId }`)
+
+```ts
+function utcDayRange(date: Date): { start: Date; end: Date } {
+  const start = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000)
+  return { start, end }
 }
 
-export function composeFromRecipe(
-  recipe: AiRecipe,
-  hulls: ReadonlyMap<NailKey, Pt2[]>,
-  seed: number,
-): Map<NailKey, ComposedNailChange>
+export async function listSameDayConfirmed(userId: string, appointmentId: string) {
+  const row = await findForParticipant(userId, appointmentId)
+  if (actorFor(row, userId) !== 'shop') throw AppError.forbidden('เฉพาะร้านเท่านั้นที่ดูรายการนี้ได้')
+  const pending = row.proposals.find((item) => item.status === 'pending')
+  if (!pending) return []
+
+  const { start, end } = utcDayRange(pending.proposedStartAt)
+  const rows = await prisma.appointment.findMany({
+    where: {
+      shopId: row.shopId,
+      status: 'confirmed',
+      id: { not: appointmentId },
+      agreedStartAt: { gte: start, lt: end },
+    },
+    select: { id: true, agreedStartAt: true, durationMinutes: true, customer: { select: { displayName: true } } },
+    orderBy: { agreedStartAt: 'asc' },
+  })
+  return rows.map((r) => ({ id: r.id, agreedStartAt: r.agreedStartAt!.toISOString(), durationMinutes: r.durationMinutes, customerName: r.customer.displayName }))
+}
 ```
 
-Logic:
-- palette lookup: hardcode ตาราง 8 `paletteId` → array ของสี hex (**คัดลอกค่าจริงจาก
-  `apps/api/src/designCatalog/seedData.ts`** อย่าเดาสีขึ้นใหม่ — เป็น source of truth เดียวกับที่ seed
-  ลง DB จริง). ไม่ต้องเรียก API เพราะยังไม่มี endpoint สำหรับ palette (พบว่าเป็น gap แยกต่างหาก
-  — ไม่ต้องแก้ในงานนี้ ดูหัวข้อ "นอกขอบเขต" ด้านล่าง)
-- นิ้วที่ไม่อยู่ใน `accentNails`: ใช้ `recipe.baseColor` ตรง ๆ, `finish`/`shape`/`length` ตาม recipe
-- นิ้วที่อยู่ใน `accentNails`: เลือกสีจาก palette ของ `paletteId` ที่ผ่าน `evaluateColorHarmony`
-  (ΔE ≥ `PATTERN_CONTRAST_MIN_DE` เทียบกับ baseColor + hue harmony ไม่ใช่ `clashing`) — วนหาตัวแรก
-  ที่ผ่าน ถ้าไม่มีตัวไหนผ่านเลยใน palette ให้ fallback เป็นการหมุน hue ของ baseColor 180°
-  (complementary แบบคำนวณเอง) แล้วบันทึกเหตุผลไว้ใน return value (เพิ่ม field `warnings: string[]`
-  ใน return ของ `composeFromRecipe` ถ้าจำเป็น)
-- decorations: สำหรับแต่ละ `RecipeDecoration` ในทุกนิ้ว (loop ทุกนิ้วที่มีเล็บแสดงอยู่ — มือขวาเท่านั้น
-  ตาม D-23) map `zone` → พื้นที่วาง:
-  - `nail-plate`: `poissonDiskInHull(hull, { radius, maxPoints, seed })` ทั้ง hull, ไม่จำกัด vRange
-  - `free-edge`: `vRange: [0.75, 1.0]` (ปลายเล็บ — เช็คทิศทาง UV จริงจาก `hull.test.ts`/โมเดลก่อน
-    เผื่อสลับด้าน — ถ้า UV กลับด้านให้ปรับเป็น `[0, 0.25]`)
-  - `accent-nail`: ไม่ใช้ Poisson-disk — วางชิ้นเดียวตรงกลาง hull (centroid) ขนาดใหญ่กว่าปกติ
-    (`scale` เพิ่มจาก `defaultScale` ตาม `density`) ไม่สนใจ `maxPoints` จาก density
-  - `negative-space`: `vRange: [0, 0.25]` (โคนเล็บ) ความหนาแน่นต่ำกว่าปกติ (`maxPoints` ลดสัดส่วน)
-  - `radius` และ `maxPoints` คำนวณจาก `density` (0..1): `maxPoints = Math.max(1, Math.round(density * MAX_DECORATIONS_PER_NAIL))`
-    (import `MAX_DECORATIONS_PER_NAIL` จาก `@nail-studio/contracts` มีอยู่แล้ว = 30, แต่ต้อง cap
-    ต่อ decoration entry ไม่ใช่ต่อเล็บทั้งหมด ถ้า recipe มีหลาย decoration ต่อเล็บต้องรวมกันไม่เกิน
-    `MAX_DECORATIONS_PER_NAIL`) `radius` เริ่มจากค่าคงที่แล้วลดถ้าจุดที่ขอเยอะเกินไปไม่พอที่ในพื้นที่
-    hull (Bridson จะคืนน้อยกว่า maxPoints เองถ้าที่ไม่พอ — ไม่ต้อง retry ด้วย radius ใหม่)
-  - ตรวจ `evaluateColorHarmony({ base: nailBaseColor, decoration: catalogEntry.defaultColor })
-    .decorationOk` — ถ้าไม่ผ่าน (ΔE < 10) ให้ข้ามการวางของตกแต่งชิ้นนั้น (ไม่ commit decoration
-    ที่จมกับพื้น) — เพิ่มเข้า `warnings`
-  - แต่ละ `Decoration` ที่สร้างต้อง `id` unique (`crypto.randomUUID()` หรือ deterministic จาก seed+index
-    เพื่อให้ผลซ้ำได้ — แนะนำ deterministic เพื่อให้ unit test เทียบผลได้ตรง ๆ)
-- seed: ใช้ `archetype+paletteId+baseColor` แฮชเป็นตัวเลข (recipe เดียวกัน = ผลเดียวกันเสมอ ตาม A-20
-  requirement) — อย่าใช้ `Date.now()`
+- Query ใช้ index ที่มีอยู่แล้ว `appointments_shop_status_created_idx` บางส่วน (`shopId, status`) —
+  ไม่ต้อง migration ใหม่ เพราะ `agreedStartAt` range scan บนผลลัพธ์ที่กรองด้วย `shopId+status`
+  ก่อนแล้วมีขนาดเล็ก (นัดของร้านเดียวที่ confirmed) ไม่จำเป็นต้องมี index composite เพิ่มสำหรับ
+  ขนาดข้อมูลระดับนี้
 
-unit test (`composer.test.ts`) ด้วย hull fixture ง่าย ๆ (สี่เหลี่ยม/ห้าเหลี่ยมสมมุติ ไม่ต้องพึ่ง 3D):
-- recipe เดียวกัน → ผลเดียวกันทุกครั้ง (determinism end-to-end)
-- ของตกแต่งทุกชิ้นที่ออกมาอยู่ใน hull จริง (`isPointInHull`)
-- accent nail สีผ่าน ΔE ≥ 15 กับ base เสมอ (หรือมี warning ถ้า fallback)
-- decoration สีที่ผ่านเกณฑ์ ΔE ≥ 10 เท่านั้นที่ถูกวาง (ทดสอบด้วย catalog entry สีใกล้ base มาก ๆ ว่าถูกข้าม)
-- จำนวน decoration ต่อนิ้วไม่เกิน `MAX_DECORATIONS_PER_NAIL`
+### Route — `apps/api/src/appointments/routes.ts`
 
-### 4. Wiring เข้า UI — `apps/web/src/features/ai/AiAssistantPanel.tsx` + store
+```ts
+appointmentsRouter.get('/:id/same-day', async (request, response) => {
+  const { id } = idParam.parse(request.params)
+  response.json({ success: true, data: await service.listSameDayConfirmed(currentUser(request).id, id) })
+})
+```
 
-ปัญหา: `AiAssistantPanel` ปัจจุบันไม่มี hull ของแต่ละเล็บ (hull คำนวณอยู่ใน
-`TransformController.tsx` จาก mesh UV ของ `parts: HandParts` เท่านั้น) และ store actions
-(`setBaseColor`/`setFinish`/`setShape`/`setLength`) แก้แค่เล็บที่ `selection` อยู่ ไม่รับ `NailKey`
-ตรง ๆ — ต้องแก้ 3 จุด:
+### Frontend — `apps/web/src/pages/AppointmentDetailPage.tsx` + `client.ts`
 
-a. Extract การคำนวณ hull ออกจาก `TransformController.tsx` (บรรทัด 39-51) เป็นฟังก์ชัน pure ที่ใช้ร่วมกันได้
-   เช่น `apps/web/src/3d/geometry/nailHulls.ts::computeNailHulls(parts: HandParts): Map<NailKey, Pt2[]>`
-   แล้วให้ `TransformController` เรียกใช้แทนโค้ดเดิม (ต้องยังผ่านเทส/พฤติกรรมเดิมทุกอย่าง — นี่คือ
-   refactor ล้วน ๆ ห้ามเปลี่ยน behavior)
+- เพิ่ม `fetchSameDayConfirmed(id): Promise<SameDayAppointment[]>`
+- เมื่อหน้าแสดงปุ่ม "ยอมรับข้อเสนอปัจจุบัน" (บรรทัด 62 ปัจจุบัน) **และ user ปัจจุบันคือฝั่งร้าน**
+  ให้ fetch รายการนี้คู่กันแล้วแสดงเป็นกล่องแจ้งเตือนเล็กๆ เหนือปุ่ม เช่น "ร้านมีนัดที่ยืนยันแล้ว
+  วันเดียวกันอีก N รายการ: 10:00 (ลูกค้า A), 14:00 (ลูกค้า B)" — ไม่บล็อกปุ่ม ไม่ใช่ modal บังคับ
+  confirm เพิ่ม (ตามเจตนา DB-07 ที่ให้ร้านตัดสินใจเอง)
+- ถ้า `listSameDayConfirmed` คืน array ว่าง ไม่ต้องแสดงกล่องอะไรเลย (ไม่ใช่ "ไม่มีนัดชน" ที่โชว์เปล่าๆ)
 
-b. เพิ่ม store action ใหม่ `applyComposedRecipe(changes: Map<NailKey, ComposedNailChange>): void` ใน
-   `apps/web/src/features/design/designStore.ts` — สร้าง Command ต่อเล็บ (reuse
-   `SetBaseColorCommand`/`SetFinishCommand`/`SetShapeCommand`/`SetLengthCommand`/`AddDecorationCommand`
-   ที่มีอยู่แล้วใน `@/3d/history/commands/*`) ห่อรวมด้วย `CompositeCommand` เดียว (pattern เดียวกับ
-   "ใช้กับทุกเล็บ" ที่มีอยู่แล้วใน Slice 3) แล้ว `execute()` ครั้งเดียว — กด Ctrl+Z ครั้งเดียวต้องย้อน
-   ทั้ง recipe กลับหมด ไม่ใช่ย้อนทีละนิ้ว
-
-c. ใน `AiAssistantPanel.tsx` ต้องมี `parts: HandParts` เข้าถึงได้ (เช็คว่า component นี้ mount
-   อยู่นอก `<Canvas>` หรือในนั้น — ถ้าอยู่นอก ให้ hull ถูกคำนวณใน component ที่อยู่ใน Canvas แล้วเก็บ
-   ผลไว้ใน store หรือ context แทนที่จะ prop-drill ข้าม Canvas boundary — เลือกวิธีที่ตรงกับโครงสร้าง
-   จริงของ `apps/web/src/app` ตอนนี้ ไม่ต้อง refactor โครงสร้างใหญ่เกินความจำเป็น) แล้วแก้
-   `applyRecipe` (บรรทัด 83-89) ให้เรียก `composeFromRecipe(recipe, hulls, seedFromRecipe(recipe))`
-   แล้วส่งผลเข้า `store.getState().applyComposedRecipe(...)` แทนโค้ดเดิมทั้งหมด
+---
 
 ## Acceptance criteria (DoD)
 
-- [ ] กด "สร้าง 3 แบบ" แล้วเลือก recipe หนึ่งอัน → **ทุกฟิลด์ของ recipe ถูกใช้จริง**: baseColor,
-      finish, shape, length, accentNails (สีต่างจากนิ้วอื่นและผ่าน ΔE≥15), decorations (ปรากฏบนเล็บ
-      จริง อยู่ในขอบเขตรูปเล็บ ไม่ลอยออกนอก, ตำแหน่งกระจายแบบ Poisson-disk ไม่ใช่สุ่มติดกันเป็นก้อน)
-- [ ] Ctrl+Z ครั้งเดียวย้อน recipe ทั้งก้อนกลับเป็นสถานะก่อนกด (ไม่ใช่ย้อนทีละนิ้ว/ทีละของตกแต่ง)
-- [ ] recipe เดียวกัน กดใช้ซ้ำ (บน state เดิม) → ได้ตำแหน่งของตกแต่งเดิมทุกครั้ง (deterministic seed)
-- [ ] ของตกแต่งที่สีจมกับพื้น (ΔE < 10) ถูกข้ามไปเงียบ ๆ ไม่ crash ไม่ error ที่ผู้ใช้เห็น
-- [ ] unit test ผ่านครบสำหรับ `colorRules.ts`, `scatter.ts`, `composer.ts` ตามที่ระบุในแต่ละหัวข้อ
-- [ ] `TransformController.tsx` behavior เดิมไม่เปลี่ยน (hull extraction เป็น refactor ล้วน ๆ)
-- [ ] typecheck + lint ผ่านทั้ง workspace `apps/web`
-- [ ] ยืนยันบนเบราว์เซอร์จริง (`npm run dev:web` + `npm run dev:ai`): พิมพ์ prompt → "สร้าง 3 แบบ" →
-      กด 1 การ์ด → เห็นของตกแต่งปรากฏบนเล็บจริงกระจายตัวเป็นธรรมชาติ ไม่ใช่แค่เปลี่ยนสี
+- [ ] ยิง `POST /appointments/:id/accept` สองครั้งพร้อมกัน (concurrent, proposal เดิม) →
+      ครั้งหนึ่งได้ 200 (`status: confirmed`) อีกครั้งได้ **409** ไม่ใช่ 200 ทั้งคู่ ไม่มี
+      notification ซ้ำ (integration test ใหม่ยิง request แบบ `Promise.all` สองอันพร้อมกัน)
+- [ ] `cancel()`/`decline()` ที่ทำสำเร็จก่อน `accept()` เข้าถึง transaction → `accept()` ที่ตามมาได้
+      409 ไม่ใช่ 200 ทับสถานะ `cancelled`/`declined`
+- [ ] `DELETE /appointments/:id/review` โดยเจ้าของรีวิว → 200, รีวิวหายจากรายการ
+      `GET /shops/:id` (ผ่าน `deletedAt` filter ที่มีอยู่แล้ว), `ratingAvg`/`ratingCount` ของร้าน
+      ถูกคำนวณใหม่ถูกต้อง (ทดสอบกรณีร้านมีรีวิวอื่นเหลืออยู่ ผลเฉลี่ยต้องตรง และกรณีเป็นรีวิว
+      สุดท้าย ผลต้องเป็น `0`/`0` ไม่ใช่ error)
+- [ ] `DELETE /appointments/:id/review` โดยคนอื่นที่ไม่ใช่เจ้าของรีวิว (รวมถึงร้านของนัดนั้นเอง) →
+      403
+- [ ] `DELETE /appointments/:id/review` เมื่อไม่มีรีวิวอยู่ หรือถูกลบไปแล้ว → 404
+- [ ] `GET /appointments/:id/same-day` โดยฝั่งร้านของนัดที่มี pending proposal → คืนรายการนัด
+      `confirmed` อื่นของร้านเดียวกันในวันเดียวกัน (ไม่รวมตัวเอง) เรียงตามเวลา
+- [ ] `GET /appointments/:id/same-day` โดยลูกค้า (ไม่ใช่ร้าน) → 403
+- [ ] `GET /appointments/:id/same-day` เมื่อไม่มี pending proposal → คืน array ว่าง ไม่ error
+- [ ] typecheck + lint ผ่านทั้ง `apps/api` และ `apps/web`
+- [ ] unit/integration test ใหม่ผ่านครบตามข้อข้างต้น เพิ่มเข้าไฟล์เดิม
+      `apps/api/src/__tests__/appointments.integration.test.ts`
 
-## นอกขอบเขต (อย่าทำในงานนี้)
+## นอกขอบเขต (พบระหว่างตรวจ แต่ไม่ทำในงานนี้)
 
-- ไม่ต้องสร้าง API endpoint สำหรับ `brand_colors`/`color_palettes` — hardcode ตารางสีใน `composer.ts`
-  จาก `seedData.ts` พอ (เป็น gap แยกที่พบระหว่างตรวจโค้ด แต่ไม่ใช่สิ่งที่ Slice 6 พล็อตไว้ให้ทำ)
-- ไม่ต้องทำ ΔE2000 (เอกสารเลือก ΔE76 ไว้แล้วโดยตั้งใจ — ดู "Why alternative was rejected" ใน A-22)
-- ไม่ต้องแตะ `apps/ai` (Python ฝั่ง Recipe generation ทำงานถูกต้องอยู่แล้ว ตรวจแล้วในรอบก่อนหน้า)
-- ไม่ต้องทำ benchmark ตัวเลขจริงของ A-20/A-21/A-22 (เอกสารเองบอกว่า "ยังไม่ได้วัด — Phase 14" คือ
-  Slice 10 ไม่ใช่งานนี้)
-- ไม่ต้องแก้ `NailDecoration` naming gap ที่พบใน Slice 4 (แยกงานคนละเรื่อง)
+- `transition()` (decline/cancel/complete/no_show, `service.ts:241-261`) มี TOCTOU pattern
+  คล้ายกับที่แก้ใน `accept()` (อ่าน `row.status` นอก transaction แล้ว update โดยไม่กรองสถานะซ้ำใน
+  `tx`) — ความเสี่ยงต่ำกว่า `accept()` เพราะ action พวกนี้ปกติมาจากฝ่ายเดียว ไม่ใช่ race ระหว่างสอง
+  ฝ่ายเหมือน accept แต่เป็นช่องโหว่ประเภทเดียวกันที่ควรแก้แยกเป็นงานถัดไป
+- ไม่มีเทส CSRF/fake-upload/XSS/prompt-injection อัตโนมัติ (พบใน Slice 8) — งานแยกต่างหาก
+- ไม่มี endpoint ให้ admin เพิ่มความรู้ AI (`knowledge_entries`, พบใน Slice 6) — งานแยกต่างหาก
+- gitleaks ยังไม่ได้ตั้งค่า (พบใน Slice 8) — งานแยกต่างหาก
+- ไม่ทำ moderation flow ให้ admin/ร้านลบรีวิวของคนอื่นได้ — เฉพาะเจ้าของเท่านั้นตามขอบเขตนี้

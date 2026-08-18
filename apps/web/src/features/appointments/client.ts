@@ -8,6 +8,13 @@ import type {
 } from '@nail-studio/contracts'
 import { apiFetch } from '@/api/client.ts'
 
+export interface SameDayAppointment {
+  id: string
+  agreedStartAt: string
+  durationMinutes: number
+  customerName: string
+}
+
 export function fetchAppointments(): Promise<Appointment[]> {
   return apiFetch<Appointment[]>('/appointments')
 }
@@ -35,6 +42,14 @@ export function proposeAppointment(id: string, input: ProposeAppointmentInput): 
 
 export function reviewAppointment(id: string, input: ReviewAppointmentInput): Promise<AppointmentDetail> {
   return apiFetch<AppointmentDetail>(`/appointments/${id}/review`, { method: 'POST', body: input })
+}
+
+export function deleteAppointmentReview(id: string): Promise<{ ok: true }> {
+  return apiFetch<{ ok: true }>(`/appointments/${id}/review`, { method: 'DELETE' })
+}
+
+export function fetchSameDayConfirmed(id: string): Promise<SameDayAppointment[]> {
+  return apiFetch<SameDayAppointment[]>(`/appointments/${id}/same-day`)
 }
 
 export function sendAppointmentMessage(id: string, content: string) {

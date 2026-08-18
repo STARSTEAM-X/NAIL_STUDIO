@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import type { AppointmentDetail } from '@nail-studio/contracts'
+import { useCurrentUser } from '@/features/auth/useAuth.ts'
 import {
   appointmentAction,
+  deleteAppointmentReview,
   fetchAppointment,
+  fetchSameDayConfirmed,
   markAppointmentMessagesRead,
   proposeAppointment,
   reviewAppointment,
   sendAppointmentMessage,
+  type SameDayAppointment,
 } from '@/features/appointments/client.ts'
 
 export function AppointmentDetailPage() {
@@ -17,7 +21,9 @@ export function AppointmentDetailPage() {
   const [proposalTime, setProposalTime] = useState('')
   const [reviewRating, setReviewRating] = useState(5)
   const [reviewComment, setReviewComment] = useState('')
+  const [sameDayAppointments, setSameDayAppointments] = useState<SameDayAppointment[]>([])
   const [error, setError] = useState<string | null>(null)
+  const { data: currentUser } = useCurrentUser()
 
   const reload = () => {
     if (!appointmentId) return
@@ -30,6 +36,20 @@ export function AppointmentDetailPage() {
     const timer = window.setInterval(reload, 10_000)
     return () => window.clearInterval(timer)
   }, [appointmentId])
+
+  const pending = detail?.proposals.find((item) => item.status === 'pending')
+  const isShopSide = currentUser?.id === detail?.shopId
+  useEffect(() => {
+    if (!appointmentId || !pending || !isShopSide) {
+      setSameDayAppointments([])
+      return
+    }
+    let active = true
+    void fetchSameDayConfirmed(appointmentId)
+      .then((items) => { if (active) setSameDayAppointments(items) })
+      .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : 'โหลดนัดหมายวันเดียวกันไม่สำเร็จ') })
+    return () => { active = false }
+  }, [appointmentId, isShopSide, pending?.id, pending?.proposedStartAt])
 
   if (!appointmentId) return <p className="error center">ไม่พบรหัสการนัดหมาย</p>
   if (!detail) return <p className="muted center">กำลังโหลด…</p>
@@ -48,7 +68,10 @@ export function AppointmentDetailPage() {
   const submitReview = async () => {
     try { setDetail(await reviewAppointment(appointmentId, { rating: reviewRating, comment: reviewComment || undefined })) } catch (cause) { setError(cause instanceof Error ? cause.message : 'ส่งรีวิวไม่สำเร็จ') }
   }
-  const pending = detail.proposals.find((item) => item.status === 'pending')
+  const deleteReview = async () => {
+    if (!window.confirm('ต้องการลบรีวิวนี้หรือไม่')) return
+    try { await deleteAppointmentReview(appointmentId); reload() } catch (cause) { setError(cause instanceof Error ? cause.message : 'ลบรีวิวไม่สำเร็จ') }
+  }
 
   return (
     <section className="page appointment-detail-page">
@@ -59,6 +82,7 @@ export function AppointmentDetailPage() {
         <div className="card">
           <h2>ไทม์ไลน์การต่อรอง</h2>
           {detail.proposals.map((item) => <div className="proposal-row" key={item.id}><strong>{item.proposedBy}</strong><span>{new Date(item.proposedStartAt).toLocaleString()} · {item.durationMinutes} นาที</span><span>{item.status}</span>{item.message && <small>{item.message}</small>}</div>)}
+          {pending && isShopSide && sameDayAppointments.length > 0 && <div className="editor-notice" role="status">ร้านมีนัดที่ยืนยันแล้ววันเดียวกันอีก {sameDayAppointments.length} รายการ: {sameDayAppointments.map((item) => `${new Date(item.agreedStartAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (${item.customerName})`).join(', ')}</div>}
           {pending && <button type="button" className="btn btn-primary" onClick={() => { void action('accept') }}>ยอมรับข้อเสนอปัจจุบัน</button>}
           <div className="proposal-form"><input type="datetime-local" value={proposalTime} onChange={(event) => setProposalTime(event.target.value)} /><button type="button" className="btn btn-ghost" disabled={!proposalTime} onClick={() => { void submitProposal() }}>เสนอเวลาใหม่</button></div>
           <div className="appointment-actions"><button type="button" className="btn btn-ghost" onClick={() => { void action('cancel') }}>ยกเลิก</button>{detail.status === 'confirmed' && <button type="button" className="btn btn-primary" onClick={() => { void action('complete') }}>ทำเสร็จแล้ว</button>}{detail.status === 'pending' && <button type="button" className="btn btn-ghost" onClick={() => { void action('decline') }}>ปฏิเสธ</button>}</div>
@@ -70,6 +94,7 @@ export function AppointmentDetailPage() {
         </div>
       </div>
       {detail.status === 'completed' && !detail.review && <div className="card review-form"><h2>รีวิวร้าน</h2><label>คะแนน<select value={reviewRating} onChange={(event) => setReviewRating(Number(event.target.value))}>{[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}</option>)}</select></label><textarea value={reviewComment} maxLength={2000} onChange={(event) => setReviewComment(event.target.value)} /><button type="button" className="btn btn-primary" onClick={() => { void submitReview() }}>ส่งรีวิว</button></div>}
+      {detail.review && currentUser?.id === detail.review.authorId && <div className="card review-form"><h2>รีวิวของคุณ</h2><p>{detail.review.rating}/5{detail.review.comment ? ` · ${detail.review.comment}` : ''}</p><button type="button" className="btn btn-ghost btn-danger" onClick={() => { void deleteReview() }}>ลบรีวิว</button></div>}
     </section>
   )
 }

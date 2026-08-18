@@ -64,7 +64,7 @@ function mapMessage(message: AppointmentRow['messages'][number]) {
 }
 
 function mapReview(review: AppointmentRow['review']) {
-  if (!review) return null
+  if (!review || review.deletedAt) return null
   return {
     id: review.id,
     appointmentId: review.appointmentId,
@@ -186,9 +186,19 @@ export async function accept(userId: string, appointmentId: string): Promise<App
   if (!allowedTransition(row.status, 'confirmed') || proposal.proposedBy === actor) throw AppError.conflict('คุณไม่สามารถตอบรับข้อเสนอนี้ได้ในสถานะปัจจุบัน')
 
   const updated = await prisma.$transaction(async (tx) => {
-    await tx.appointmentProposal.update({ where: { id: proposal.id }, data: { status: 'accepted' } })
+    const proposalResult = await tx.appointmentProposal.updateMany({
+      where: { id: proposal.id, status: 'pending' },
+      data: { status: 'accepted' },
+    })
+    if (proposalResult.count === 0) throw AppError.conflict('ข้อเสนอนี้ถูกตอบรับหรือเปลี่ยนสถานะไปแล้ว')
+
+    const appointmentResult = await tx.appointment.updateMany({
+      where: { id: appointmentId, status: row.status },
+      data: { status: 'confirmed', agreedStartAt: proposal.proposedStartAt, durationMinutes: proposal.durationMinutes },
+    })
+    if (appointmentResult.count === 0) throw AppError.conflict('สถานะการนัดหมายถูกเปลี่ยนไปแล้วระหว่างทำรายการ')
+
     await tx.appointmentProposal.updateMany({ where: { appointmentId, status: 'pending', id: { not: proposal.id } }, data: { status: 'superseded' } })
-    const appointment = await tx.appointment.update({ where: { id: appointmentId }, data: { status: 'confirmed', agreedStartAt: proposal.proposedStartAt, durationMinutes: proposal.durationMinutes }, include: appointmentInclude })
     await createNotification(tx, {
       userId: actor === 'customer' ? row.shopId : row.customerId,
       kind: 'appointment_status',
@@ -196,9 +206,62 @@ export async function accept(userId: string, appointmentId: string): Promise<App
       sourceType: 'appointment',
       sourceId: appointmentId,
     })
-    return appointment
+    return tx.appointment.findUniqueOrThrow({ where: { id: appointmentId }, include: appointmentInclude })
   })
   return detailFromRow(updated)
+}
+
+export async function deleteReview(userId: string, appointmentId: string): Promise<void> {
+  const row = await findForParticipant(userId, appointmentId)
+  if (!row.review) throw AppError.notFound('ไม่พบรีวิวของการนัดหมายนี้')
+  if (row.review.authorId !== userId) throw AppError.forbidden('เฉพาะเจ้าของรีวิวเท่านั้นที่ลบได้')
+
+  await prisma.$transaction(async (tx) => {
+    const result = await tx.shopReview.updateMany({
+      where: { id: row.review!.id, deletedAt: null },
+      data: { deletedAt: new Date() },
+    })
+    if (result.count === 0) throw AppError.notFound('ไม่พบรีวิวของการนัดหมายนี้')
+
+    const aggregate = await tx.shopReview.aggregate({
+      where: { shopId: row.shopId, deletedAt: null },
+      _avg: { rating: true },
+      _count: true,
+    })
+    await tx.shopProfile.update({
+      where: { userId: row.shopId },
+      data: {
+        ratingCount: aggregate._count,
+        ratingAvg: aggregate._avg.rating?.toFixed(2) ?? '0',
+      },
+    })
+  })
+}
+
+function utcDayRange(date: Date): { start: Date; end: Date } {
+  const start = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000)
+  return { start, end }
+}
+
+export async function listSameDayConfirmed(userId: string, appointmentId: string) {
+  const row = await findForParticipant(userId, appointmentId)
+  if (actorFor(row, userId) !== 'shop') throw AppError.forbidden('เฉพาะร้านเท่านั้นที่ดูรายการนี้ได้')
+  const pending = row.proposals.find((item) => item.status === 'pending')
+  if (!pending) return []
+
+  const { start, end } = utcDayRange(pending.proposedStartAt)
+  const rows = await prisma.appointment.findMany({
+    where: {
+      shopId: row.shopId,
+      status: 'confirmed',
+      id: { not: appointmentId },
+      agreedStartAt: { gte: start, lt: end },
+    },
+    select: { id: true, agreedStartAt: true, durationMinutes: true, customer: { select: { displayName: true } } },
+    orderBy: { agreedStartAt: 'asc' },
+  })
+  return rows.map((r) => ({ id: r.id, agreedStartAt: r.agreedStartAt!.toISOString(), durationMinutes: r.durationMinutes, customerName: r.customer.displayName }))
 }
 
 export async function propose(userId: string, appointmentId: string, input: ProposeAppointmentInput): Promise<AppointmentDetail> {
