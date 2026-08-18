@@ -99,6 +99,10 @@ export function useTemplateLike() {
           })),
         }
       })
+      // หน้ารายละเอียดใช้ query คนละก้อนกับฟีด ถ้าไม่อัปเดตด้วยยอดจะค้างอยู่ค่าก่อนกด
+      queryClient.setQueryData<TemplateDetail>(templateKeys.detail(templateId), (current) =>
+        current ? { ...current, likeCount: result.likeCount } : current,
+      )
     },
   })
 }
@@ -164,6 +168,9 @@ export function useTemplateRemix() {
           })),
         }
       })
+      queryClient.setQueryData<TemplateDetail>(templateKeys.detail(templateId), (current) =>
+        current ? { ...current, remixCount: result.remixCount } : current,
+      )
     },
   })
 }
