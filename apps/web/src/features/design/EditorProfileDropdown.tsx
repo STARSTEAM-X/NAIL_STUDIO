@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PublicUser } from '@nail-studio/contracts'
+import { Link } from 'react-router-dom'
+import { Icon } from '@/components/Icon.tsx'
+import { avatarGradient, getInitials, ROLE_SHORT_LABELS } from '@/lib/user.ts'
 
 interface EditorProfileDropdownProps {
   user: PublicUser | null | undefined
@@ -7,18 +10,6 @@ interface EditorProfileDropdownProps {
   onLogout: () => void
   onViewProfile?: () => void
   onUnavailableAction?: (label: string) => void
-}
-
-const ROLE_LABELS: Record<PublicUser['role'], string> = {
-  user: 'ผู้ใช้งาน',
-  shop: 'ร้านทำเล็บ',
-  admin: 'ผู้ดูแลระบบ',
-}
-
-function getInitials(displayName: string | undefined) {
-  const parts = displayName?.trim().split(/\s+/).filter(Boolean) ?? []
-  if (parts.length > 1) return `${parts[0]?.[0] ?? ''}${parts[1]?.[0] ?? ''}`.toUpperCase()
-  return parts[0]?.slice(0, 2).toUpperCase() || 'NS'
 }
 
 export function EditorProfileDropdown({
@@ -69,12 +60,18 @@ export function EditorProfileDropdown({
         title="เมนูโปรไฟล์"
         onClick={() => setOpen((current) => !current)}
       >
-        <span className="editor-profile-avatar" aria-hidden="true">{getInitials(user?.displayName)}</span>
+        <span
+          className="editor-profile-avatar"
+          style={user ? { backgroundImage: avatarGradient(user.id) } : undefined}
+          aria-hidden="true"
+        >
+          {getInitials(user?.displayName)}
+        </span>
         <span className="editor-profile-trigger-copy">
           <strong>{user?.displayName ?? 'ผู้ใช้งาน'}</strong>
-          <small>{user ? ROLE_LABELS[user.role] : 'บัญชีของฉัน'}</small>
+          <small>{user ? ROLE_SHORT_LABELS[user.role] : 'บัญชีของฉัน'}</small>
         </span>
-        <span className="editor-profile-chevron" aria-hidden="true">⌄</span>
+        <span className="editor-profile-chevron" aria-hidden="true"><Icon name="chevron-down" size={14} /></span>
       </button>
 
       {open && (
@@ -85,7 +82,7 @@ export function EditorProfileDropdown({
             </span>
             <div className="editor-profile-summary-copy">
               <strong>{user?.displayName ?? 'ผู้ใช้งาน'}</strong>
-              <span>{user ? ROLE_LABELS[user.role] : 'บัญชีของฉัน'}</span>
+              <span>{user ? ROLE_SHORT_LABELS[user.role] : 'บัญชีของฉัน'}</span>
               {user?.email && <small>{user.email}</small>}
             </div>
           </div>
@@ -102,29 +99,14 @@ export function EditorProfileDropdown({
               else runUnavailableAction('ดูโปรไฟล์')
             }}
           >
-            <span className="editor-profile-menu-icon" aria-hidden="true">♙</span>
+            <span className="editor-profile-menu-icon" aria-hidden="true"><Icon name="user" size={15} /></span>
             <span>ดูโปรไฟล์</span>
             <kbd>⌘ E</kbd>
           </button>
-          <button
-            type="button"
-            role="menuitem"
-            className="editor-profile-menu-item"
-            onClick={() => runUnavailableAction('ตั้งค่าเครื่องมือ')}
-          >
-            <span className="editor-profile-menu-icon" aria-hidden="true">⚙</span>
-            <span>ตั้งค่าเครื่องมือ</span>
-            <kbd>⌘ W</kbd>
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className="editor-profile-menu-item"
-            onClick={() => runUnavailableAction('อัปเกรดเป็นมืออาชีพ')}
-          >
-            <span className="editor-profile-menu-icon" aria-hidden="true">✦</span>
-            <span>อัปเกรดเป็นมืออาชีพ</span>
-          </button>
+          <Link to="/projects" role="menuitem" className="editor-profile-menu-item" onClick={() => setOpen(false)}>
+            <span className="editor-profile-menu-icon" aria-hidden="true"><Icon name="folder" size={15} /></span>
+            <span>งานของฉัน</span>
+          </Link>
 
           <div className="editor-profile-divider" />
 
@@ -135,7 +117,7 @@ export function EditorProfileDropdown({
             disabled={isLoggingOut}
             onClick={onLogout}
           >
-            <span className="editor-profile-menu-icon" aria-hidden="true">↪</span>
+            <span className="editor-profile-menu-icon" aria-hidden="true"><Icon name="logout" size={15} /></span>
             <span>{isLoggingOut ? 'กำลังออกจากระบบ…' : 'ออกจากระบบ'}</span>
           </button>
         </div>

@@ -1,0 +1,240 @@
+/* ร้านทำเล็บ โปรไฟล์ และหน้าแอดมิน */
+
+.shops-page, .shop-detail-page, .shop-manage-page, .moderation-page { max-width: 1180px; }
+.shops-search { max-width: 32rem; margin-bottom: var(--sp-5); }
+
+.shops-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: var(--sp-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.shop-card {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+}
+.shop-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.shop-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.shop-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-2); }
+.shop-card-head h2 { margin: 0; color: var(--deep); font-size: var(--fs-md); overflow-wrap: anywhere; }
+.shop-card-rating { display: flex; align-items: center; gap: var(--sp-1); margin: 0; color: var(--accent); font-size: var(--fs-sm); font-weight: 700; }
+.shop-card-rating span { color: var(--muted); font-weight: 400; }
+.shop-card-location { display: flex; align-items: center; gap: var(--sp-1); margin: 0; color: var(--muted); font-size: var(--fs-xs); }
+.shop-card-description {
+  display: -webkit-box;
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.shop-card-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-top: auto;
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+/* ---------- รายละเอียดร้าน ---------- */
+
+.shop-detail-page { display: flex; flex-direction: column; gap: var(--sp-4); }
+.shop-hero { padding: var(--sp-5); }
+.shop-hero-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--sp-3); }
+.shop-hero-head h1 { margin: 0.1rem 0 0.2rem; color: var(--deep); font-size: var(--fs-2xl); letter-spacing: -0.02em; }
+.shop-hero-location { display: flex; align-items: center; gap: var(--sp-1); margin: 0; color: var(--muted); font-size: var(--fs-sm); }
+.shop-hero-description { margin: var(--sp-4) 0 0; color: var(--ink); font-size: var(--fs-base); line-height: 1.65; white-space: pre-wrap; }
+
+.shop-detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) 21rem; gap: var(--sp-4); align-items: start; }
+.shop-booking { position: sticky; top: var(--sp-4); }
+
+.shop-services { display: flex; flex-direction: column; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; }
+.shop-services button {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.shop-services button:hover { border-color: var(--accent); }
+.shop-services button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.shop-service-on button { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+.shop-service-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); }
+.shop-service-head strong { color: var(--deep); font-size: var(--fs-sm); }
+.shop-service-head span { color: var(--accent); font-size: var(--fs-sm); font-weight: 700; white-space: nowrap; }
+.shop-services p { margin: 0; color: var(--ink); font-size: var(--fs-xs); line-height: 1.5; }
+.shop-service-duration { display: inline-flex; align-items: center; gap: var(--sp-1); color: var(--muted); font-size: var(--fs-xs); }
+
+.shop-reviews { display: flex; flex-direction: column; gap: var(--sp-3); margin: 0; padding: 0; list-style: none; }
+.shop-reviews > li { padding: var(--sp-3); border: 1px solid var(--rule); border-radius: var(--r-md); background: var(--surface); }
+.shop-reviews > li > p { margin: var(--sp-2) 0 0; font-size: var(--fs-sm); line-height: 1.6; overflow-wrap: anywhere; }
+.shop-review-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); }
+.shop-review-stars { color: var(--accent); font-size: var(--fs-md); letter-spacing: 0.05em; }
+.shop-review-dim { color: var(--rule); }
+.shop-review-head time { color: var(--muted); font-size: var(--fs-xs); }
+
+/* ---------- จัดการร้าน ---------- */
+
+.shop-manage-grid { display: grid; grid-template-columns: minmax(0, 22rem) minmax(0, 1fr); gap: var(--sp-4); align-items: start; }
+.shop-manage-column { display: flex; min-width: 0; flex-direction: column; gap: var(--sp-4); }
+
+.shop-service-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px dashed var(--rule);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--chip) 30%, var(--surface));
+}
+.shop-service-form h3 { margin: 0; color: var(--deep); font-size: var(--fs-sm); }
+.shop-service-form-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); }
+.shop-service-form-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-2); }
+
+.shop-manage-services { display: flex; flex-direction: column; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; }
+.shop-manage-services li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+}
+.shop-manage-service-info { display: flex; min-width: 0; flex-direction: column; gap: 0.1rem; }
+.shop-manage-service-info strong { color: var(--deep); font-size: var(--fs-sm); }
+.shop-manage-service-info span { color: var(--accent); font-size: var(--fs-xs); font-weight: 700; }
+.shop-manage-service-info p { margin: 0.2rem 0 0; color: var(--muted); font-size: var(--fs-xs); }
+.shop-manage-service-actions { display: flex; gap: var(--sp-2); }
+
+.shop-reply-form { display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-2); }
+.shop-reply-form .ui-btn { align-self: flex-end; }
+
+/* ---------- โปรไฟล์ ---------- */
+
+.profile-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-5);
+  margin-top: var(--sp-3);
+}
+.profile-hero-copy { min-width: 0; flex: 1; }
+.profile-hero-copy h1 { margin: 0.1rem 0 0.2rem; color: var(--deep); font-size: var(--fs-2xl); letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.profile-hero-role { margin: 0 0 0.15rem; color: var(--accent); font-size: var(--fs-sm); font-weight: 700; }
+.profile-hero-copy .muted { margin: 0; }
+.profile-hero-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+
+.profile-edit { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-4) var(--sp-5); }
+.profile-edit h2 { display: flex; align-items: center; gap: var(--sp-2); margin: 0; color: var(--deep); font-size: var(--fs-md); }
+.profile-edit h2 svg { color: var(--accent); }
+.profile-edit input[readonly] { background: color-mix(in srgb, var(--ground) 75%, white); color: var(--muted); cursor: default; }
+.profile-edit-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-2); }
+
+.profile-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--sp-3);
+  margin: var(--sp-4) 0;
+}
+.profile-stats div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+.profile-stats strong { color: var(--deep); font-size: var(--fs-xl); font-variant-numeric: tabular-nums; }
+.profile-stats span { color: var(--muted); font-size: var(--fs-xs); }
+
+/* ---------- แอดมิน ---------- */
+
+.moderation-list { display: flex; flex-direction: column; gap: var(--sp-3); margin: 0; padding: 0; list-style: none; }
+.moderation-item { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-4); }
+.moderation-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.moderation-head time { margin-left: auto; color: var(--muted); font-size: var(--fs-xs); }
+.moderation-target { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.moderation-target a { display: inline-flex; align-items: center; gap: var(--sp-1); color: var(--deep); font-weight: 700; text-decoration: none; }
+.moderation-target a:hover { color: var(--accent); }
+.moderation-count { color: var(--muted); font-size: var(--fs-xs); }
+.moderation-detail { margin: 0; padding: var(--sp-3); border-left: 3px solid var(--rule); background: var(--ground); font-size: var(--fs-sm); }
+.moderation-reporter { margin: 0; color: var(--muted); font-size: var(--fs-xs); }
+.moderation-reporter a { color: var(--accent); }
+
+/* ---------- งานออกแบบ: แถบเครื่องมือใหม่ ---------- */
+
+.projects-toolbar { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-bottom: var(--sp-4); }
+.projects-toolbar .nc-search { flex: 1 1 18rem; }
+.projects-sort select {
+  height: 100%;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-sm);
+}
+.projects-sort select:focus-visible { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
+
+.project-card-actions { display: flex; gap: var(--sp-1); }
+.project-card-action {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 1px solid var(--rule);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+}
+.project-card-action:hover { border-color: var(--accent); color: var(--accent); }
+.project-card-action:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.project-card-action:disabled { cursor: wait; opacity: 0.6; }
+.project-card-delete:hover { border-color: var(--danger); color: var(--danger); }
+
+/* ---------- ตอบสนองต่อขนาดจอ ---------- */
+
+@media (max-width: 960px) {
+  .shop-detail-grid, .shop-manage-grid { grid-template-columns: minmax(0, 1fr); }
+  .shop-booking { position: static; }
+}
+
+@media (max-width: 640px) {
+  .shops-grid { grid-template-columns: minmax(0, 1fr); }
+  .profile-hero { align-items: flex-start; flex-direction: column; padding: var(--sp-4); }
+  .profile-hero-actions { width: 100%; }
+  .profile-hero-actions .ui-btn { flex: 1; }
+  .shop-service-form-row { grid-template-columns: minmax(0, 1fr); }
+  .shop-manage-services li { align-items: stretch; flex-direction: column; }
+  .projects-toolbar { flex-direction: column; }
+}

@@ -1,100 +1,268 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import type { AppointmentDetail } from '@nail-studio/contracts'
+import { useParams } from 'react-router-dom'
+import { Icon } from '@/components/Icon.tsx'
+import { BackLink } from '@/components/ui/BackLink.tsx'
+import { Button } from '@/components/ui/Button.tsx'
+import { EmptyState, ErrorState, ListSkeleton } from '@/components/ui/States.tsx'
+import { useToast } from '@/components/ui/Toast.tsx'
 import { useCurrentUser } from '@/features/auth/useAuth.ts'
+import { AppointmentChat } from '@/features/appointments/components/AppointmentChat.tsx'
+import { AppointmentStatusBadge } from '@/features/appointments/components/AppointmentStatusBadge.tsx'
+import { ProposalTimeline } from '@/features/appointments/components/ProposalTimeline.tsx'
+import { ReviewSection } from '@/features/appointments/components/ReviewSection.tsx'
+import { isOpenStatus } from '@/features/appointments/labels.ts'
 import {
-  appointmentAction,
-  deleteAppointmentReview,
-  fetchAppointment,
-  fetchSameDayConfirmed,
-  markAppointmentMessagesRead,
-  proposeAppointment,
-  reviewAppointment,
-  sendAppointmentMessage,
-  type SameDayAppointment,
-} from '@/features/appointments/client.ts'
+  useAppointment,
+  useAppointmentAction,
+  useDeleteAppointmentReview,
+  useMarkMessagesRead,
+  useProposeAppointment,
+  useReviewAppointment,
+  useSameDayAppointments,
+  useSendAppointmentMessage,
+  type AppointmentActionName,
+} from '@/features/appointments/useAppointments.ts'
+import { usePageTitle } from '@/lib/usePageTitle.ts'
+import { formatAppointmentTime, formatBaht, formatDuration, formatTime, localInputToIso } from '@/lib/datetime.ts'
 
 export function AppointmentDetailPage() {
   const { appointmentId } = useParams<{ appointmentId: string }>()
-  const [detail, setDetail] = useState<AppointmentDetail | null>(null)
-  const [message, setMessage] = useState('')
-  const [proposalTime, setProposalTime] = useState('')
-  const [reviewRating, setReviewRating] = useState(5)
-  const [reviewComment, setReviewComment] = useState('')
-  const [sameDayAppointments, setSameDayAppointments] = useState<SameDayAppointment[]>([])
-  const [error, setError] = useState<string | null>(null)
   const { data: currentUser } = useCurrentUser()
+  const toast = useToast()
 
-  const reload = () => {
-    if (!appointmentId) return
-    void fetchAppointment(appointmentId).then(setDetail).catch((cause) => setError(cause instanceof Error ? cause.message : 'โหลดนัดหมายไม่สำเร็จ'))
-  }
-  useEffect(reload, [appointmentId])
+  const appointment = useAppointment(appointmentId)
+  const action = useAppointmentAction(appointmentId)
+  const propose = useProposeAppointment(appointmentId)
+  const sendMessage = useSendAppointmentMessage(appointmentId)
+  const submitReview = useReviewAppointment(appointmentId)
+  const removeReview = useDeleteAppointmentReview(appointmentId)
+  const markRead = useMarkMessagesRead()
+
+  const [proposalTime, setProposalTime] = useState('')
+  const [proposalNote, setProposalNote] = useState('')
+
+  const detail = appointment.data
+  usePageTitle(detail ? `นัดกับ ${detail.shopName}` : 'การนัดหมาย')
+  const pendingProposal = detail?.proposals.find((item) => item.status === 'pending')
+  const isShopSide = Boolean(detail && currentUser?.id === detail.shopId)
+  const sameDay = useSameDayAppointments(appointmentId, Boolean(pendingProposal) && isShopSide)
+
+  // ทำเครื่องหมายว่าอ่านแล้วครั้งเดียวต่อการเปิดหน้า ไม่ใช่ทุกครั้งที่ refetch
+  const markReadMutate = markRead.mutate
   useEffect(() => {
-    if (!appointmentId) return
-    void markAppointmentMessagesRead(appointmentId)
-    const timer = window.setInterval(reload, 10_000)
-    return () => window.clearInterval(timer)
-  }, [appointmentId])
+    if (appointmentId) markReadMutate(appointmentId)
+  }, [appointmentId, markReadMutate])
 
-  const pending = detail?.proposals.find((item) => item.status === 'pending')
-  const isShopSide = currentUser?.id === detail?.shopId
-  useEffect(() => {
-    if (!appointmentId || !pending || !isShopSide) {
-      setSameDayAppointments([])
-      return
-    }
-    let active = true
-    void fetchSameDayConfirmed(appointmentId)
-      .then((items) => { if (active) setSameDayAppointments(items) })
-      .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : 'โหลดนัดหมายวันเดียวกันไม่สำเร็จ') })
-    return () => { active = false }
-  }, [appointmentId, isShopSide, pending?.id, pending?.proposedStartAt])
+  if (!appointmentId) {
+    return (
+      <section className="page ap-page">
+        <ErrorState title="ไม่พบรหัสการนัดหมาย" error={new Error('ลิงก์ที่เปิดไม่มีรหัสของนัดหมาย')} />
+      </section>
+    )
+  }
 
-  if (!appointmentId) return <p className="error center">ไม่พบรหัสการนัดหมาย</p>
-  if (!detail) return <p className="muted center">กำลังโหลด…</p>
-
-  const action = async (name: 'accept' | 'decline' | 'cancel' | 'complete') => {
-    try { setDetail(await appointmentAction(appointmentId, name)) } catch (cause) { setError(cause instanceof Error ? cause.message : 'ทำรายการไม่สำเร็จ') }
-  }
-  const submitProposal = async () => {
-    if (!proposalTime) return
-    try { setDetail(await proposeAppointment(appointmentId, { proposedStartAt: new Date(proposalTime).toISOString(), durationMinutes: detail.durationMinutes })) } catch (cause) { setError(cause instanceof Error ? cause.message : 'เสนอเวลาไม่สำเร็จ') }
-  }
-  const submitMessage = async () => {
-    if (!message.trim()) return
-    try { await sendAppointmentMessage(appointmentId, message.trim()); setMessage(''); reload() } catch (cause) { setError(cause instanceof Error ? cause.message : 'ส่งข้อความไม่สำเร็จ') }
-  }
-  const submitReview = async () => {
-    try { setDetail(await reviewAppointment(appointmentId, { rating: reviewRating, comment: reviewComment || undefined })) } catch (cause) { setError(cause instanceof Error ? cause.message : 'ส่งรีวิวไม่สำเร็จ') }
-  }
-  const deleteReview = async () => {
-    if (!window.confirm('ต้องการลบรีวิวนี้หรือไม่')) return
-    try { await deleteAppointmentReview(appointmentId); reload() } catch (cause) { setError(cause instanceof Error ? cause.message : 'ลบรีวิวไม่สำเร็จ') }
+  const runAction = (name: AppointmentActionName, successMessage: string) => {
+    action.mutate(name, {
+      onSuccess: () => toast.success(successMessage),
+      onError: (error) => toast.error(error instanceof Error ? error.message : 'ทำรายการไม่สำเร็จ'),
+    })
   }
 
   return (
-    <section className="page appointment-detail-page">
-      <Link to="/appointments" className="back-link">← กลับรายการนัดหมาย</Link>
-      <header className="page-head"><div><h1>{detail.shopName}</h1><p className="muted">{detail.serviceName ?? 'นัดหมาย'} · {detail.status}</p></div></header>
-      {error && <p className="error" role="alert">{error}</p>}
-      <div className="appointment-detail-grid">
-        <div className="card">
-          <h2>ไทม์ไลน์การต่อรอง</h2>
-          {detail.proposals.map((item) => <div className="proposal-row" key={item.id}><strong>{item.proposedBy}</strong><span>{new Date(item.proposedStartAt).toLocaleString()} · {item.durationMinutes} นาที</span><span>{item.status}</span>{item.message && <small>{item.message}</small>}</div>)}
-          {pending && isShopSide && sameDayAppointments.length > 0 && <div className="editor-notice" role="status">ร้านมีนัดที่ยืนยันแล้ววันเดียวกันอีก {sameDayAppointments.length} รายการ: {sameDayAppointments.map((item) => `${new Date(item.agreedStartAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (${item.customerName})`).join(', ')}</div>}
-          {pending && <button type="button" className="btn btn-primary" onClick={() => { void action('accept') }}>ยอมรับข้อเสนอปัจจุบัน</button>}
-          <div className="proposal-form"><input type="datetime-local" value={proposalTime} onChange={(event) => setProposalTime(event.target.value)} /><button type="button" className="btn btn-ghost" disabled={!proposalTime} onClick={() => { void submitProposal() }}>เสนอเวลาใหม่</button></div>
-          <div className="appointment-actions"><button type="button" className="btn btn-ghost" onClick={() => { void action('cancel') }}>ยกเลิก</button>{detail.status === 'confirmed' && <button type="button" className="btn btn-primary" onClick={() => { void action('complete') }}>ทำเสร็จแล้ว</button>}{detail.status === 'pending' && <button type="button" className="btn btn-ghost" onClick={() => { void action('decline') }}>ปฏิเสธ</button>}</div>
-        </div>
-        <div className="card appointment-chat">
-          <h2>ข้อความกับร้าน</h2>
-          <div className="appointment-messages">{detail.messages.map((item) => <p key={item.id} className={item.senderId ? 'message' : 'message system'}>{item.content}</p>)}</div>
-          <div className="proposal-form"><input value={message} maxLength={2000} onChange={(event) => setMessage(event.target.value)} placeholder="พิมพ์ข้อความ…" /><button type="button" className="btn btn-primary" onClick={() => { void submitMessage() }}>ส่ง</button></div>
-        </div>
-      </div>
-      {detail.status === 'completed' && !detail.review && <div className="card review-form"><h2>รีวิวร้าน</h2><label>คะแนน<select value={reviewRating} onChange={(event) => setReviewRating(Number(event.target.value))}>{[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}</option>)}</select></label><textarea value={reviewComment} maxLength={2000} onChange={(event) => setReviewComment(event.target.value)} /><button type="button" className="btn btn-primary" onClick={() => { void submitReview() }}>ส่งรีวิว</button></div>}
-      {detail.review && currentUser?.id === detail.review.authorId && <div className="card review-form"><h2>รีวิวของคุณ</h2><p>{detail.review.rating}/5{detail.review.comment ? ` · ${detail.review.comment}` : ''}</p><button type="button" className="btn btn-ghost btn-danger" onClick={() => { void deleteReview() }}>ลบรีวิว</button></div>}
+    <section className="page ap-page ap-detail">
+      <BackLink to="/appointments">กลับไปรายการนัดหมาย</BackLink>
+
+      {appointment.isPending && <ListSkeleton count={2} lines={4} />}
+
+      {appointment.error && (
+        <ErrorState
+          title="โหลดนัดหมายไม่สำเร็จ"
+          error={appointment.error}
+          onRetry={() => void appointment.refetch()}
+        />
+      )}
+
+      {!appointment.isPending && !appointment.error && !detail && (
+        <EmptyState icon="search" title="ไม่พบนัดหมายที่ต้องการ" description="นัดหมายนี้อาจถูกลบไปแล้ว" />
+      )}
+
+      {detail && (
+        <>
+          <header className="ap-detail-head ui-card">
+            <div className="ap-detail-title">
+              <h1>{detail.shopName}</h1>
+              <AppointmentStatusBadge status={detail.status} />
+            </div>
+            <dl className="ap-detail-facts">
+              <div>
+                <dt>บริการ</dt>
+                <dd>{detail.serviceName ?? 'บริการที่กำหนดเอง'}</dd>
+              </div>
+              <div>
+                <dt>เวลาที่ตกลง</dt>
+                <dd>{detail.agreedStartAt ? formatAppointmentTime(detail.agreedStartAt) : 'ยังไม่ได้ตกลง'}</dd>
+              </div>
+              <div>
+                <dt>ระยะเวลา</dt>
+                <dd>{formatDuration(detail.durationMinutes)}</dd>
+              </div>
+              {detail.priceQuotedThb && (
+                <div>
+                  <dt>ราคาที่เสนอ</dt>
+                  <dd>{formatBaht(detail.priceQuotedThb)}</dd>
+                </div>
+              )}
+            </dl>
+            {detail.customerNote && (
+              <p className="ap-detail-note"><strong>หมายเหตุจากลูกค้า:</strong> {detail.customerNote}</p>
+            )}
+            {detail.shopNote && (
+              <p className="ap-detail-note"><strong>หมายเหตุจากร้าน:</strong> {detail.shopNote}</p>
+            )}
+          </header>
+
+          <div className="ap-detail-grid">
+            <section className="ui-card ap-panel" aria-labelledby="ap-timeline-title">
+              <h2 id="ap-timeline-title"><Icon name="clock" size={16} /> การต่อรองเวลา</h2>
+
+              {pendingProposal && isShopSide && (sameDay.data?.length ?? 0) > 0 && (
+                <p className="ap-warning" role="status">
+                  <Icon name="alert" size={15} />
+                  วันเดียวกันนี้ร้านมีนัดที่ยืนยันแล้วอีก {sameDay.data?.length} รายการ:{' '}
+                  {sameDay.data?.map((item) => `${formatTime(item.agreedStartAt)} (${item.customerName})`).join(', ')}
+                </p>
+              )}
+
+              <ProposalTimeline proposals={detail.proposals} />
+
+              {pendingProposal && (
+                <Button
+                  variant="primary"
+                  icon="check"
+                  loading={action.isPending && action.variables === 'accept'}
+                  onClick={() => runAction('accept', 'ยืนยันเวลานัดแล้ว')}
+                >
+                  ยอมรับข้อเสนอล่าสุด
+                </Button>
+              )}
+
+              {isOpenStatus(detail.status) && (
+                <form
+                  className="ap-propose"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    const iso = localInputToIso(proposalTime)
+                    if (!iso) return
+                    propose.mutate(
+                      {
+                        proposedStartAt: iso,
+                        durationMinutes: detail.durationMinutes,
+                        ...(proposalNote.trim() ? { message: proposalNote.trim() } : {}),
+                      },
+                      {
+                        onSuccess: () => {
+                          toast.success('เสนอเวลาใหม่แล้ว')
+                          setProposalTime('')
+                          setProposalNote('')
+                        },
+                        onError: (error) => toast.error(error instanceof Error ? error.message : 'เสนอเวลาไม่สำเร็จ'),
+                      },
+                    )
+                  }}
+                >
+                  <h3>เสนอเวลาใหม่</h3>
+                  <label className="ap-field">
+                    <span>วันและเวลา</span>
+                    <input
+                      type="datetime-local"
+                      value={proposalTime}
+                      required
+                      onChange={(event) => setProposalTime(event.target.value)}
+                    />
+                  </label>
+                  <label className="ap-field">
+                    <span>ข้อความประกอบ (ไม่บังคับ)</span>
+                    <input
+                      value={proposalNote}
+                      maxLength={500}
+                      placeholder="เช่น ช่วงนี้ร้านว่างพอดี"
+                      onChange={(event) => setProposalNote(event.target.value)}
+                    />
+                  </label>
+                  <Button type="submit" variant="ghost" disabled={!proposalTime} loading={propose.isPending}>
+                    ส่งข้อเสนอ
+                  </Button>
+                </form>
+              )}
+
+              {isOpenStatus(detail.status) && (
+                <div className="ap-actions">
+                  {detail.status === 'confirmed' && (
+                    <Button
+                      variant="primary"
+                      icon="check"
+                      loading={action.isPending && action.variables === 'complete'}
+                      onClick={() => runAction('complete', 'ทำเครื่องหมายว่าเสร็จสิ้นแล้ว')}
+                    >
+                      ทำเสร็จแล้ว
+                    </Button>
+                  )}
+                  {detail.status !== 'confirmed' && isShopSide && (
+                    <Button
+                      variant="ghost"
+                      loading={action.isPending && action.variables === 'decline'}
+                      onClick={() => runAction('decline', 'ปฏิเสธคำขอแล้ว')}
+                    >
+                      ปฏิเสธคำขอ
+                    </Button>
+                  )}
+                  <Button
+                    variant="danger"
+                    loading={action.isPending && action.variables === 'cancel'}
+                    onClick={() => runAction('cancel', 'ยกเลิกนัดหมายแล้ว')}
+                  >
+                    ยกเลิกนัดหมาย
+                  </Button>
+                </div>
+              )}
+            </section>
+
+            <section className="ui-card ap-panel" aria-labelledby="ap-chat-title">
+              <h2 id="ap-chat-title"><Icon name="comment" size={16} /> ข้อความกับร้าน</h2>
+              <AppointmentChat
+                messages={detail.messages}
+                currentUserId={currentUser?.id}
+                pending={sendMessage.isPending}
+                onSend={(content) =>
+                  sendMessage.mutate(content, {
+                    onError: (error) => toast.error(error instanceof Error ? error.message : 'ส่งข้อความไม่สำเร็จ'),
+                  })
+                }
+              />
+            </section>
+          </div>
+
+          <ReviewSection
+            review={detail.review}
+            canWrite={detail.status === 'completed' && !isShopSide}
+            canDelete={Boolean(detail.review && currentUser?.id === detail.review.authorId)}
+            submitting={submitReview.isPending}
+            deleting={removeReview.isPending}
+            onSubmit={(input) =>
+              submitReview.mutate(input, {
+                onSuccess: () => toast.success('ขอบคุณสำหรับรีวิว'),
+                onError: (error) => toast.error(error instanceof Error ? error.message : 'ส่งรีวิวไม่สำเร็จ'),
+              })
+            }
+            onDelete={() =>
+              removeReview.mutate(undefined, {
+                onSuccess: () => toast.success('ลบรีวิวแล้ว'),
+                onError: (error) => toast.error(error instanceof Error ? error.message : 'ลบรีวิวไม่สำเร็จ'),
+              })
+            }
+          />
+        </>
+      )}
     </section>
   )
 }

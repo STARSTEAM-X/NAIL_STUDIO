@@ -421,6 +421,7 @@
 .nc-post-meta { display: flex; align-items: center; gap: 0.3rem; margin: 0; color: var(--muted); font-size: 0.72rem; }
 .nc-post-visibility { display: inline-flex; align-items: center; gap: 0.2rem; }
 .nc-post-head .nc-badge { margin-left: auto; }
+.nc-post-head .nc-post-report { margin-left: 0; }
 
 .nc-post-body { display: flex; flex-direction: column; gap: 0.4rem; padding: 0 0.95rem 0.75rem; }
 .nc-post-title { margin: 0; font-size: 1.05rem; line-height: 1.35; overflow-wrap: anywhere; }

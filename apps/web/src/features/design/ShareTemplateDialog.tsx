@@ -1,6 +1,8 @@
-import { useState, type FormEvent } from 'react'
+import { useId, useState, type FormEvent } from 'react'
 import type { CreateTemplateInput } from '@nail-studio/contracts'
 import { TEMPLATE_CATEGORIES, TEMPLATE_PRIMARY_COLORS } from '@nail-studio/contracts'
+import { Button } from '@/components/ui/Button.tsx'
+import { Dialog } from '@/components/ui/Dialog.tsx'
 
 type ShareTemplateFormInput = Pick<CreateTemplateInput, 'name' | 'caption' | 'category' | 'primaryColor'>
 
@@ -34,24 +36,31 @@ export function ShareTemplateDialog({
     })
   }
 
-  return (
-    <div className="dialog-backdrop">
-      <form
-        className="share-template-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="share-template-title"
-        onSubmit={handleSubmit}
-      >
-        <div className="share-template-dialog-head">
-          <div>
-            <p className="eyebrow">COMMUNITY</p>
-            <h2 id="share-template-title">แชร์ผลงาน</h2>
-          </div>
-          <button type="button" className="dialog-close" aria-label="ปิด" disabled={pending} onClick={onClose}>×</button>
-        </div>
-        <p className="hint">ผลงานนี้จะแสดงใน Community และโปรไฟล์ของคุณให้คนอื่นเข้าชมได้</p>
+  const formId = useId()
 
+  return (
+    <Dialog
+      title="แชร์ผลงาน"
+      description="ผลงานนี้จะแสดงใน Community และโปรไฟล์ของคุณให้คนอื่นเข้าชมได้"
+      onClose={pending ? undefined : onClose}
+      dismissible={!pending}
+      footer={
+        <>
+          <Button variant="ghost" disabled={pending} onClick={onClose}>ยกเลิก</Button>
+          <Button
+            type="submit"
+            form={formId}
+            variant="primary"
+            disabled={!name.trim()}
+            loading={pending}
+            loadingLabel="กำลังแชร์…"
+          >
+            แชร์ลง Community
+          </Button>
+        </>
+      }
+    >
+      <form id={formId} className="share-template-form" onSubmit={handleSubmit}>
         <label className="share-template-field">
           <span>ชื่อผลงาน</span>
           <input value={name} maxLength={120} required disabled={pending} onChange={(event) => setName(event.target.value)} />
@@ -80,14 +89,7 @@ export function ShareTemplateDialog({
         </div>
 
         {errorMessage && <p className="error" role="alert">{errorMessage}</p>}
-
-        <div className="share-template-actions">
-          <button type="button" className="btn btn-ghost" disabled={pending} onClick={onClose}>ยกเลิก</button>
-          <button type="submit" className="btn btn-primary" disabled={pending || !name.trim()}>
-            {pending ? 'กำลังแชร์…' : 'แชร์ลง Community'}
-          </button>
-        </div>
       </form>
-    </div>
+    </Dialog>
   )
 }

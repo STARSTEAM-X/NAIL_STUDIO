@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '@/components/Icon.tsx'
+import { usePageTitle } from '@/lib/usePageTitle.ts'
 import { useCurrentUser } from '@/features/auth/useAuth.ts'
-import { Avatar } from '@/features/community/components/Avatar.tsx'
+import { Avatar } from '@/components/ui/Avatar.tsx'
 import { CommunityComposer } from '@/features/community/components/CommunityComposer.tsx'
 import { CommunityNav } from '@/features/community/components/CommunityNav.tsx'
 import { CommunityRail } from '@/features/community/components/CommunityRail.tsx'
 import { CommunityToolbar } from '@/features/community/components/CommunityToolbar.tsx'
-import { EmptyState, ErrorState, FeedSkeletonList } from '@/features/community/components/FeedStates.tsx'
+import { EmptyState, ErrorState, FeedSkeletonList } from '@/components/ui/States.tsx'
 import { PostCard } from '@/features/community/components/PostCard.tsx'
 import { TemplateTile } from '@/features/community/components/TemplateTile.tsx'
 import { useCommunityFilters } from '@/features/community/useCommunityFilters.ts'
@@ -22,6 +23,7 @@ function matchesQuery(haystack: (string | null)[], query: string): boolean {
 }
 
 export function CommunityPage() {
+  usePageTitle('ชุมชน')
   const { data: currentUser } = useCurrentUser()
   const { state, setState, buildHref, reset, apiFilters, hasActiveFilters } = useCommunityFilters()
   const templates = useTemplates(apiFilters)

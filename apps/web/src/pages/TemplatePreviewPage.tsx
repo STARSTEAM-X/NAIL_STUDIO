@@ -4,16 +4,12 @@ import { NailScene } from '@/3d/scene/NailScene.tsx'
 import { ReadOnlyDesignScene } from '@/3d/scene/ReadOnlyDesignScene.tsx'
 import { WebGlGuard } from '@/3d/scene/WebGlGuard.tsx'
 import { Icon } from '@/components/Icon.tsx'
+import { usePageTitle } from '@/lib/usePageTitle.ts'
 import { useCurrentUser } from '@/features/auth/useAuth.ts'
-import { Avatar } from '@/features/community/components/Avatar.tsx'
-import { EmptyState, ErrorState } from '@/features/community/components/FeedStates.tsx'
-import {
-  formatCount,
-  formatFullDate,
-  formatRelativeTime,
-  ORIGIN_LABELS,
-  PRIMARY_COLOR_SWATCHES,
-} from '@/features/community/format.ts'
+import { Avatar } from '@/components/ui/Avatar.tsx'
+import { EmptyState, ErrorState } from '@/components/ui/States.tsx'
+import { formatCount, formatDateTime, formatRelativeTime } from '@/lib/datetime.ts'
+import { ORIGIN_LABELS, PRIMARY_COLOR_SWATCHES } from '@/features/community/format.ts'
 import { useCreateTemplateComment, useTemplate } from '@/features/community/useTemplates.ts'
 import { useTemplateActions } from '@/features/community/useTemplateActions.ts'
 import { DesignStoreProvider } from '@/features/design/DesignStoreProvider.tsx'
@@ -57,6 +53,8 @@ export function TemplatePreviewPage() {
       </div>
     )
   }
+
+  usePageTitle(template.data?.name)
 
   const detail = template.data
   const liked = detail?.isLiked ?? false
@@ -113,7 +111,7 @@ export function TemplatePreviewPage() {
                     <Link to={`/users/${detail.author.id}`}>{detail.author.displayName}</Link>
                     <small>
                       เผยแพร่ <time dateTime={detail.createdAt}>{formatRelativeTime(detail.createdAt)}</time>
-                      {' · '}{formatFullDate(detail.createdAt)}
+                      {' · '}{formatDateTime(detail.createdAt)}
                     </small>
                   </span>
                 </div>
@@ -274,7 +272,7 @@ export function TemplatePreviewPage() {
                     </dd>
                   </div>
                   <div><dt>ที่มา</dt><dd>{ORIGIN_LABELS[detail.origin] ?? detail.origin}</dd></div>
-                  <div><dt>เผยแพร่เมื่อ</dt><dd>{formatFullDate(detail.createdAt)}</dd></div>
+                  <div><dt>เผยแพร่เมื่อ</dt><dd>{formatDateTime(detail.createdAt)}</dd></div>
                 </dl>
                 <Link to={`/users/${detail.author.id}`} className="nc-detail-author-link">
                   <Icon name="user" size={15} /> ดูผลงานอื่นของ {detail.author.displayName}

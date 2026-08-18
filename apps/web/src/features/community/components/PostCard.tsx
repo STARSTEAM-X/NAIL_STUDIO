@@ -1,9 +1,14 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { TemplateCard } from '@nail-studio/contracts'
 import { Icon } from '@/components/Icon.tsx'
-import { formatCount, formatRelativeTime, ORIGIN_SHORT_LABELS } from '../format.ts'
+import { formatCount, formatRelativeTime } from '@/lib/datetime.ts'
+import { ORIGIN_SHORT_LABELS } from '../format.ts'
 import type { TemplateActions } from '../useTemplateActions.ts'
-import { Avatar } from './Avatar.tsx'
+import { Avatar } from '@/components/ui/Avatar.tsx'
+import { useToast } from '@/components/ui/Toast.tsx'
+import { useReportTemplate } from '../useTemplates.ts'
+import { ReportDialog } from './ReportDialog.tsx'
 import { TemplateThumb } from './TemplateThumb.tsx'
 
 interface PostCardProps {
@@ -18,6 +23,9 @@ interface PostCardProps {
  * ทุกยอดที่แสดงมาจาก API จริง ไม่มีค่าจำลอง
  */
 export function PostCard({ template, actions }: PostCardProps) {
+  const [reportOpen, setReportOpen] = useState(false)
+  const report = useReportTemplate()
+  const toast = useToast()
   const liked = template.isLiked
   const detailPath = `/community/templates/${template.id}`
   const shared = actions.sharedId === template.id
@@ -37,6 +45,15 @@ export function PostCard({ template, actions }: PostCardProps) {
         <span className={`nc-badge nc-badge-${template.origin}`}>
           {ORIGIN_SHORT_LABELS[template.origin] ?? template.origin}
         </span>
+        <button
+          type="button"
+          className="nc-post-report"
+          aria-label={`รายงานผลงาน ${template.name}`}
+          title="รายงานผลงานนี้"
+          onClick={() => setReportOpen(true)}
+        >
+          <Icon name="alert" size={15} />
+        </button>
       </header>
 
       <div className="nc-post-body">
@@ -111,6 +128,23 @@ export function PostCard({ template, actions }: PostCardProps) {
           <span>{actions.isRemixPending(template.id) ? 'กำลังสร้าง…' : 'รีมิกซ์'}</span>
         </button>
       </div>
+
+      {reportOpen && (
+        <ReportDialog
+          templateName={template.name}
+          pending={report.isPending}
+          onClose={() => setReportOpen(false)}
+          onSubmit={(input) =>
+            report.mutate(
+              { templateId: template.id, ...input },
+              {
+                onSuccess: () => { toast.success('ส่งรายงานแล้ว ทีมงานจะตรวจสอบให้'); setReportOpen(false) },
+                onError: (error) => toast.error(error instanceof Error ? error.message : 'ส่งรายงานไม่สำเร็จ'),
+              },
+            )
+          }
+        />
+      )}
     </article>
   )
 }

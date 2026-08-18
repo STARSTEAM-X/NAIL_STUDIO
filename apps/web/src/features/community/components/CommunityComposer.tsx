@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import type { PublicUser } from '@nail-studio/contracts'
 import { Icon } from '@/components/Icon.tsx'
-import { Avatar } from './Avatar.tsx'
+import { Avatar } from '@/components/ui/Avatar.tsx'
 
 /**
  * กล่องเริ่มโพสต์

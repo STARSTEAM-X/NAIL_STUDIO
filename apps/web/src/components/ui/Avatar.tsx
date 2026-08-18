@@ -1,15 +1,15 @@
 import { Link } from 'react-router-dom'
-import { avatarGradient, getInitials } from '../format.ts'
+import { avatarGradient, getInitials } from '@/lib/user.ts'
 
 interface AvatarProps {
   userId: string
   displayName: string
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'sm' | 'md' | 'lg' | undefined
   /** ห่อด้วยลิงก์ไปโปรไฟล์สาธารณะ — ปิดได้เมื่ออยู่ในลิงก์อื่นอยู่แล้ว */
-  linkToProfile?: boolean
+  linkToProfile?: boolean | undefined
 }
 
-/** อวาตาร์ตัวอักษรย่อที่ใช้ร่วมกันทุกที่ในชุมชน (ระบบยังไม่มีรูปโปรไฟล์จริง) */
+/** อวาตาร์ตัวอักษรย่อของทั้งแอป (ระบบยังไม่มีรูปโปรไฟล์จริง) */
 export function Avatar({ userId, displayName, size = 'md', linkToProfile = true }: AvatarProps) {
   const inner = (
     <span

@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom'
 import type { TemplateCard } from '@nail-studio/contracts'
 import { Icon } from '@/components/Icon.tsx'
-import { formatCount, formatRelativeTime, ORIGIN_SHORT_LABELS } from '../format.ts'
+import { formatCount, formatRelativeTime } from '@/lib/datetime.ts'
+import { ORIGIN_SHORT_LABELS } from '../format.ts'
 import type { TemplateActions } from '../useTemplateActions.ts'
-import { Avatar } from './Avatar.tsx'
+import { Avatar } from '@/components/ui/Avatar.tsx'
 import { TemplateThumb } from './TemplateThumb.tsx'
 
 interface TemplateTileProps {

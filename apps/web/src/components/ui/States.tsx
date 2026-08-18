@@ -52,11 +52,38 @@ export function FeedSkeletonList({ count = 3, variant = 'post' }: { count?: numb
   )
 }
 
+
+/** แถบโครงกระดูกทั่วไป — ใช้ประกอบ skeleton ของหน้าใดก็ได้ */
+export function SkeletonLine({ width = '100%', height }: { width?: string; height?: string }) {
+  return <span className="nc-skel nc-skel-line" style={{ width, ...(height ? { height } : {}) }} />
+}
+
+/** โครงกระดูกของการ์ดทั่วไป เช่น การ์ดงานออกแบบหรือการ์ดนัดหมาย */
+export function CardSkeleton({ lines = 3 }: { lines?: number }) {
+  return (
+    <div className="ui-card ui-skeleton-card" aria-hidden="true">
+      {Array.from({ length: lines }, (_, index) => (
+        <SkeletonLine key={index} width={`${90 - index * 18}%`} />
+      ))}
+    </div>
+  )
+}
+
+/** รายการโครงกระดูกสำหรับหน้าที่แสดงเป็นลิสต์ */
+export function ListSkeleton({ count = 3, lines = 3 }: { count?: number; lines?: number }) {
+  return (
+    <div className="ui-skeleton-list" role="status" aria-label="กำลังโหลดข้อมูล">
+      {Array.from({ length: count }, (_, index) => <CardSkeleton key={index} lines={lines} />)}
+      <span className="nc-visually-hidden">กำลังโหลดข้อมูล…</span>
+    </div>
+  )
+}
+
 interface StatePanelProps {
-  icon?: IconName
+  icon?: IconName | undefined
   title: string
-  description?: string
-  children?: ReactNode
+  description?: string | undefined
+  children?: ReactNode | undefined
 }
 
 /** สถานะว่าง — ใช้ทั้งฟีดว่าง ผลค้นหาไม่พบ และคอมเมนต์ยังไม่มี */
@@ -72,10 +99,10 @@ export function EmptyState({ icon = 'sparkle', title, description, children }: S
 }
 
 interface ErrorStateProps {
-  title?: string
+  title?: string | undefined
   error: unknown
-  onRetry?: () => void
-  retryLabel?: string
+  onRetry?: () => void | undefined
+  retryLabel?: string | undefined
 }
 
 /** สถานะผิดพลาดพร้อมปุ่มลองใหม่ — แสดงข้อความจาก API เมื่อมี เพื่อให้ผู้ใช้รู้สาเหตุจริง */

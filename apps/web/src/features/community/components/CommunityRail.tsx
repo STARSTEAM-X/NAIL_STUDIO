@@ -2,10 +2,10 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import type { TemplateCard } from '@nail-studio/contracts'
 import { Icon } from '@/components/Icon.tsx'
-import { formatCount } from '../format.ts'
+import { formatCount } from '@/lib/datetime.ts'
 import type { CommunityFeedState } from '../useCommunityFilters.ts'
 import type { TemplateCategory } from '../useTemplates.ts'
-import { Avatar } from './Avatar.tsx'
+import { Avatar } from '@/components/ui/Avatar.tsx'
 
 interface CommunityRailProps {
   /** ผลงานที่โหลดมาแล้วจริงจาก API — แผงด้านขวาสรุปจากชุดนี้เท่านั้น */

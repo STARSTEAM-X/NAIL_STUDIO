@@ -8,6 +8,9 @@ import {
 } from '@tanstack/react-query'
 import type {
   CreateTemplateInput,
+  TemplateModerationReport,
+  TemplateReportInput,
+  TemplateReportResult,
   CreateTemplateCommentInput,
   TemplateCard,
   TemplateCommentResult,
@@ -208,5 +211,28 @@ export function useCreateTemplateComment() {
       void queryClient.invalidateQueries({ queryKey: templateKeys.detail(templateId), exact: true })
       void queryClient.invalidateQueries({ queryKey: templateKeys.all })
     },
+  })
+}
+
+/** รายงานผลงานที่ไม่เหมาะสม — endpoint มีมาตั้งแต่ต้นแต่ยังไม่เคยมีปุ่มใน UI */
+export interface TemplateReportRequest extends TemplateReportInput {
+  templateId: string
+}
+
+export function useReportTemplate() {
+  return useMutation({
+    mutationFn: ({ templateId, reason, detail }: TemplateReportRequest) =>
+      apiFetch<TemplateReportResult>(`/templates/${templateId}/report`, {
+        method: 'POST',
+        body: { reason, ...(detail ? { detail } : {}) },
+      }),
+  })
+}
+
+/** คิวรายงานสำหรับผู้ดูแลระบบ */
+export function useModerationQueue() {
+  return useQuery({
+    queryKey: [...templateKeys.all, 'moderation'] as const,
+    queryFn: () => apiFetch<TemplateModerationReport[]>('/templates/moderation/reports'),
   })
 }

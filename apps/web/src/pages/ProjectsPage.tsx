@@ -1,30 +1,88 @@
-import { useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { ApiRequestError } from '@/api/client.ts'
+import type { ProjectSummary } from '@nail-studio/contracts'
+import { API_BASE } from '@/api/client.ts'
 import { Icon } from '@/components/Icon.tsx'
-import { useCreateProject, useDeleteProject, useProjects } from '@/features/projects/useProjects.ts'
+import { Button } from '@/components/ui/Button.tsx'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog.tsx'
+import { EmptyState, ErrorState, FeedSkeletonList } from '@/components/ui/States.tsx'
+import { useToast } from '@/components/ui/Toast.tsx'
+import {
+  fetchProjectDetail,
+  openingDocument,
+  useCreateProject,
+  useDeleteProject,
+  useDuplicateProject,
+  useProjects,
+} from '@/features/projects/useProjects.ts'
+import { formatDate } from '@/lib/datetime.ts'
+import { usePageTitle } from '@/lib/usePageTitle.ts'
 
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000'
-const PROJECT_DATE_FORMAT = new Intl.DateTimeFormat('th-TH', {
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-})
+type SortKey = 'updated' | 'created' | 'name'
+
+const SORT_LABELS: Record<SortKey, string> = {
+  updated: 'แก้ไขล่าสุด',
+  created: 'สร้างล่าสุด',
+  name: 'ชื่อ ก–ฮ',
+}
 
 export function ProjectsPage() {
+  usePageTitle('งานออกแบบของฉัน')
   const projects = useProjects()
   const createProject = useCreateProject()
   const deleteProject = useDeleteProject()
+  const duplicateProject = useDuplicateProject()
+  const toast = useToast()
+
   const [name, setName] = useState('')
+  const [search, setSearch] = useState('')
+  const [sort, setSort] = useState<SortKey>('updated')
+  const [pendingDelete, setPendingDelete] = useState<ProjectSummary | null>(null)
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
+
+  const items = useMemo(() => {
+    const all = projects.data ?? []
+    const needle = search.trim().toLowerCase()
+    const filtered = needle ? all.filter((project) => project.name.toLowerCase().includes(needle)) : all
+    return [...filtered].sort((a, b) => {
+      if (sort === 'name') return a.name.localeCompare(b.name, 'th')
+      if (sort === 'created') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    })
+  }, [projects.data, search, sort])
+
+  const projectCount = projects.data?.length ?? 0
 
   function handleCreate(event: FormEvent) {
     event.preventDefault()
     const trimmed = name.trim()
     if (!trimmed) return
-    createProject.mutate(trimmed, { onSuccess: () => setName('') })
+    createProject.mutate(trimmed, {
+      onSuccess: () => { setName(''); toast.success('สร้างงานใหม่แล้ว') },
+      onError: (error) => toast.error(error instanceof Error ? error.message : 'สร้างงานไม่สำเร็จ'),
+    })
   }
 
-  const projectCount = projects.data?.length ?? 0
+  /**
+   * ทำสำเนาต้องส่งเอกสารงานไปด้วย (duplicateProjectSchema บังคับ)
+   * จึงต้องดึงรายละเอียดงานก่อนหนึ่งครั้ง — หน้ารายการมีแค่ข้อมูลสรุป
+   */
+  const duplicate = async (project: ProjectSummary) => {
+    setDuplicatingId(project.id)
+    try {
+      const detail = await fetchProjectDetail(project.id)
+      await duplicateProject.mutateAsync({
+        projectId: project.id,
+        name: `${project.name} (สำเนา)`,
+        document: openingDocument(detail),
+      })
+      toast.success('ทำสำเนางานแล้ว')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'ทำสำเนาไม่สำเร็จ')
+    } finally {
+      setDuplicatingId(null)
+    }
+  }
 
   return (
     <section className="page projects-page">
@@ -55,54 +113,83 @@ export function ProjectsPage() {
             onChange={(event) => setName(event.target.value)}
           />
         </label>
-        <button
+        <Button
           type="submit"
-          className="btn btn-primary project-create-button"
-          disabled={createProject.isPending || name.trim().length === 0}
+          variant="primary"
+          icon="plus"
+          className="project-create-button"
+          disabled={name.trim().length === 0}
+          loading={createProject.isPending}
+          loadingLabel="กำลังสร้าง…"
         >
-          <Icon name="plus" size={17} />
-          <span>{createProject.isPending ? 'กำลังสร้าง…' : 'สร้างงานใหม่'}</span>
-        </button>
+          สร้างงานใหม่
+        </Button>
       </form>
 
-      {createProject.error instanceof ApiRequestError && (
-        <p className="error project-feedback" role="alert">{createProject.error.message}</p>
-      )}
-
-      {projects.isPending && (
-        <div className="project-loading" role="status">
-          <span className="project-loading-dot" />
-          <span>กำลังโหลดงานของคุณ…</span>
+      {projectCount > 0 && (
+        <div className="projects-toolbar">
+          <div className="nc-search">
+            <Icon name="search" size={16} />
+            <input
+              type="search"
+              value={search}
+              placeholder="ค้นหาชื่องาน"
+              aria-label="ค้นหางานออกแบบ"
+              onChange={(event) => setSearch(event.target.value)}
+            />
+            {search && (
+              <button type="button" className="nc-search-clear" aria-label="ล้างคำค้นหา" onClick={() => setSearch('')}>
+                <Icon name="x" size={14} />
+              </button>
+            )}
+          </div>
+          <label className="projects-sort">
+            <span className="nc-visually-hidden">จัดเรียงตาม</span>
+            <select value={sort} onChange={(event) => setSort(event.target.value as SortKey)}>
+              {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
+                <option key={key} value={key}>{SORT_LABELS[key]}</option>
+              ))}
+            </select>
+          </label>
         </div>
       )}
+
+      {projects.isPending && <FeedSkeletonList variant="tile" count={6} />}
 
       {projects.error && (
-        <p className="error project-feedback" role="alert">
-          โหลดรายการงานไม่สำเร็จ
-          {projects.error instanceof ApiRequestError ? ` — ${projects.error.message}` : ''}
-        </p>
+        <ErrorState
+          title="โหลดรายการงานไม่สำเร็จ"
+          error={projects.error}
+          onRetry={() => void projects.refetch()}
+        />
       )}
 
-      {projects.data?.length === 0 && (
-        <div className="project-empty-state">
-          <span className="project-empty-icon" aria-hidden="true"><Icon name="sparkle" size={24} /></span>
-          <h2>เริ่มสร้างงานแรกของคุณ</h2>
-          <p>ตั้งชื่อโปรเจกต์ด้านบน แล้วเริ่มออกแบบลายเล็บได้เลย</p>
-        </div>
+      {!projects.isPending && !projects.error && projectCount === 0 && (
+        <EmptyState
+          icon="sparkle"
+          title="เริ่มสร้างงานแรกของคุณ"
+          description="ตั้งชื่อโปรเจกต์ด้านบน แล้วเริ่มออกแบบลายเล็บ 3 มิติได้เลย"
+        />
       )}
 
-      {projects.data && projects.data.length > 0 && (
+      {projectCount > 0 && items.length === 0 && (
+        <EmptyState icon="search" title="ไม่พบงานที่ตรงกับคำค้นหา" description="ลองใช้คำอื่น หรือล้างคำค้นหา">
+          <Button variant="ghost" onClick={() => setSearch('')}>ล้างคำค้นหา</Button>
+        </EmptyState>
+      )}
+
+      {items.length > 0 && (
         <section className="projects-list-section" aria-labelledby="projects-list-title">
           <header className="projects-list-head">
             <div>
-              <h2 id="projects-list-title">งานล่าสุด</h2>
+              <h2 id="projects-list-title">{search ? 'ผลการค้นหา' : 'งานล่าสุด'}</h2>
               <p>เลือกงานเพื่อกลับไปแก้ไขต่อ</p>
             </div>
-            <span className="project-count">{projectCount} งาน</span>
+            <span className="project-count">{items.length} งาน</span>
           </header>
 
           <ul className="project-grid">
-            {projects.data.map((project) => (
+            {items.map((project) => (
               <li key={project.id} className="card project-card">
                 <Link to={`/editor/${project.id}`} className="project-link">
                   <div className="project-card-preview">
@@ -129,28 +216,52 @@ export function ProjectsPage() {
                     </div>
                     <span className="project-card-meta">
                       <Icon name="clock" size={14} />
-                      แก้ไขล่าสุด {PROJECT_DATE_FORMAT.format(new Date(project.updatedAt))}
+                      แก้ไขล่าสุด {formatDate(project.updatedAt)}
                     </span>
                   </div>
                 </Link>
-                <button
-                  type="button"
-                  className="project-card-delete"
-                  aria-label={`ลบงาน ${project.name}`}
-                  title="ลบงาน"
-                  disabled={deleteProject.isPending}
-                  onClick={() => {
-                    if (window.confirm(`ลบงาน "${project.name}" ใช่หรือไม่?`)) {
-                      deleteProject.mutate(project.id)
-                    }
-                  }}
-                >
-                  <Icon name="trash" size={16} />
-                </button>
+                <div className="project-card-actions">
+                  <button
+                    type="button"
+                    className="project-card-action"
+                    aria-label={`ทำสำเนางาน ${project.name}`}
+                    title="ทำสำเนา"
+                    disabled={duplicatingId === project.id}
+                    onClick={() => { void duplicate(project) }}
+                  >
+                    <Icon name={duplicatingId === project.id ? 'clock' : 'layers'} size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    className="project-card-action project-card-delete"
+                    aria-label={`ลบงาน ${project.name}`}
+                    title="ลบงาน"
+                    onClick={() => setPendingDelete(project)}
+                  >
+                    <Icon name="trash" size={16} />
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
         </section>
+      )}
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title={`ลบงาน "${pendingDelete.name}"?`}
+          message={`งานนี้มี ${pendingDelete.versionCount} เวอร์ชันที่จะถูกลบไปด้วย และผลงานที่เผยแพร่จากงานนี้จะไม่สามารถเปิดดูรายละเอียดได้อีก การกระทำนี้ย้อนกลับไม่ได้`}
+          confirmLabel="ลบงานนี้"
+          destructive
+          pending={deleteProject.isPending}
+          onConfirm={() =>
+            deleteProject.mutate(pendingDelete.id, {
+              onSuccess: () => { toast.success('ลบงานแล้ว'); setPendingDelete(null) },
+              onError: (error) => toast.error(error instanceof Error ? error.message : 'ลบงานไม่สำเร็จ'),
+            })
+          }
+          onCancel={() => setPendingDelete(null)}
+        />
       )}
     </section>
   )

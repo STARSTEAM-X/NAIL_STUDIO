@@ -5,35 +5,40 @@ type AuthMode = 'login' | 'register'
 
 interface AuthLayoutProps {
   active: AuthMode
+  /** หัวข้อของหน้า — ต้องต่างกันระหว่างเข้าสู่ระบบกับสมัครสมาชิก ไม่ใช่ "Welcome" เหมือนกันทั้งคู่ */
+  title: string
+  subtitle: string
   children: ReactNode
 }
-export function AuthLayout({ active, children }: AuthLayoutProps) {
+
+export function AuthLayout({ active, title, subtitle, children }: AuthLayoutProps) {
   return (
     <main className="auth-page">
       <header className="auth-heading">
-        <h1>Welcome</h1>
+        <h1>{title}</h1>
         <div className="auth-heading-subtitle">
           <span aria-hidden="true" />
-          <em>Nail Design</em>
+          <em>Nail Studio 3D</em>
           <span aria-hidden="true" />
         </div>
+        <p className="auth-subtitle">{subtitle}</p>
       </header>
 
       <section className="auth-card">
-        <nav className="auth-switch" aria-label="Authentication">
+        <nav className="auth-switch" aria-label="เข้าสู่ระบบหรือสมัครสมาชิก">
           <Link
             to="/login"
             className={active === 'login' ? 'is-active' : undefined}
             aria-current={active === 'login' ? 'page' : undefined}
           >
-            Sign IN
+            เข้าสู่ระบบ
           </Link>
           <Link
             to="/register"
             className={active === 'register' ? 'is-active' : undefined}
             aria-current={active === 'register' ? 'page' : undefined}
           >
-            Sign UP
+            สมัครสมาชิก
           </Link>
         </nav>
         {children}
@@ -48,7 +53,9 @@ interface AuthPasswordFieldProps {
   value: string
   autoComplete: string
   onChange: (event: ChangeEvent<HTMLInputElement>) => void
-  minLength?: number
+  minLength?: number | undefined
+  /** เกณฑ์ของรหัสผ่าน — บอกตั้งแต่แรก ไม่ใช่ให้ผู้ใช้รู้ตอนถูกปฏิเสธ */
+  hint?: string | undefined
 }
 
 export function AuthPasswordField({
@@ -58,6 +65,7 @@ export function AuthPasswordField({
   autoComplete,
   onChange,
   minLength,
+  hint,
 }: AuthPasswordFieldProps) {
   const [visible, setVisible] = useState(false)
 
@@ -72,12 +80,13 @@ export function AuthPasswordField({
           required
           minLength={minLength}
           value={value}
+          aria-describedby={hint ? `${id}-hint` : undefined}
           onChange={onChange}
         />
         <button
           type="button"
           className="auth-password-toggle"
-          aria-label={visible ? 'Hide password' : 'Show password'}
+          aria-label={visible ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
           onClick={() => setVisible((current) => !current)}
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -96,6 +105,7 @@ export function AuthPasswordField({
           </svg>
         </button>
       </div>
+      {hint && <p className="auth-hint" id={`${id}-hint`}>{hint}</p>}
     </div>
   )
 }
