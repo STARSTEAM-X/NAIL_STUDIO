@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ApiRequestError } from '@/api/client.ts'
 import { AuthLayout, AuthPasswordField } from '@/components/AuthLayout.tsx'
 import { useRegister } from '@/features/auth/useAuth.ts'
+import { maskDdMmYyyyInput, parseDdMmYyyy } from '@/utils/dateFormat.ts'
 
 const MIN_PASSWORD_LENGTH = 12
 
@@ -13,11 +14,14 @@ export function RegisterPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState<'user' | 'shop'>('user')
-  const [dateOfBirth, setDateOfBirth] = useState('')
+  const [dateOfBirthText, setDateOfBirthText] = useState('')
   const [termsAccepted, setTermsAccepted] = useState(false)
+  const dateOfBirth = parseDdMmYyyy(dateOfBirthText)
+  const dateOfBirthError = dateOfBirthText.length === 10 && !dateOfBirth
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
+    if (dateOfBirthError) return
     register.mutate(
       {
         email,
@@ -108,14 +112,19 @@ export function RegisterPage() {
           <div className="auth-date-shell">
             <input
               id="dateOfBirth"
-              type="date"
-              value={dateOfBirth}
-              onChange={(event) => setDateOfBirth(event.target.value)}
+              type="text"
+              inputMode="numeric"
+              placeholder="dd/mm/yyyy"
+              maxLength={10}
+              value={dateOfBirthText}
+              aria-invalid={dateOfBirthError}
+              onChange={(event) => setDateOfBirthText(maskDdMmYyyyInput(event.target.value))}
             />
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13H4V6a1 1 0 0 1 1-1Z" />
             </svg>
           </div>
+          {dateOfBirthError && <p className="error auth-message" role="alert">วันที่ไม่ถูกต้อง กรุณากรอกรูปแบบ dd/mm/yyyy</p>}
         </div>
 
         <label className="auth-terms">
@@ -130,7 +139,7 @@ export function RegisterPage() {
 
         {message && <p className="error auth-message" role="alert">{message}</p>}
 
-        <button type="submit" className="auth-submit" disabled={register.isPending}>
+        <button type="submit" className="auth-submit" disabled={register.isPending || dateOfBirthError}>
           {register.isPending ? 'Submitting…' : 'Submit'}
         </button>
       </form>
