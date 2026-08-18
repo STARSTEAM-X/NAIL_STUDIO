@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useCurrentUser, useLogout } from '@/features/auth/useAuth.ts'
 import { EditorProfileDropdown } from '@/features/design/EditorProfileDropdown.tsx'
+import { TopProgressBar } from './TopProgressBar.tsx'
 import { NotificationBell } from './NotificationBell.tsx'
 import { Icon } from './Icon.tsx'
 
@@ -22,6 +23,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className={`shell ${isEditor ? 'shell-editor' : ''}`}>
+      <TopProgressBar />
       {!isEditor && (
         <nav className="navbar">
           <Link to="/projects" className="brand">

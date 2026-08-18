@@ -1,5 +1,6 @@
 import { useParams } from 'react-router-dom'
 import { ApiRequestError } from '@/api/client.ts'
+import { LoadingScreen } from '@/components/Loading.tsx'
 import { openingDocument, useProject, type ProjectDetail } from '@/features/projects/useProjects.ts'
 import { NailEditor } from '@/features/design/NailEditor.tsx'
 import { DesignStoreProvider } from '@/features/design/DesignStoreProvider.tsx'
@@ -9,7 +10,7 @@ export function EditorPage() {
   const project = useProject(projectId)
 
   if (!projectId) return <p className="error center">ไม่พบรหัสงาน</p>
-  if (project.isPending) return <p className="muted center">กำลังโหลดงาน…</p>
+  if (project.isPending) return <LoadingScreen label="กำลังโหลดงาน…" />
 
   if (project.error) {
     return (

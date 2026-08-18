@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications } from '@/features/notifications/useNotifications.ts'
 import { Icon } from './Icon.tsx'
+import { InlineLoading } from './Loading.tsx'
 
 export function NotificationBell() {
   const navigate = useNavigate()
@@ -37,7 +38,7 @@ export function NotificationBell() {
               อ่านทั้งหมด
             </button>
           </div>
-          {notifications.isPending && <p className="muted notification-empty">กำลังโหลด…</p>}
+          {notifications.isPending && <InlineLoading label="กำลังโหลด…" />}
           {notifications.error && <p className="error notification-empty">โหลดแจ้งเตือนไม่สำเร็จ</p>}
           {!notifications.isPending && !notifications.error && notifications.data?.items.length === 0 && (
             <p className="muted notification-empty">ยังไม่มีการแจ้งเตือน</p>

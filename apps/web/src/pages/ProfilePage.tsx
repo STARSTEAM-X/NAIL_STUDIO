@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import type { PublicUser } from '@nail-studio/contracts'
 import { ApiRequestError } from '@/api/client.ts'
 import { Icon } from '@/components/Icon.tsx'
+import { LoadingScreen } from '@/components/Loading.tsx'
 import { useCurrentUser, useUpdateProfile } from '@/features/auth/useAuth.ts'
 
 const ROLE_LABELS: Record<PublicUser['role'], string> = {
@@ -33,7 +34,7 @@ export function ProfilePage() {
     if (user) setDisplayName(user.displayName)
   }, [user])
 
-  if (isPending) return <div className="center">กำลังโหลดโปรไฟล์…</div>
+  if (isPending) return <LoadingScreen label="กำลังโหลดโปรไฟล์…" />
   if (!user) return null
 
   const isDirty = displayName.trim() !== user.displayName

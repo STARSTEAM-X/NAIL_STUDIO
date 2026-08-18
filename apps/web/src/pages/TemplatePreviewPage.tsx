@@ -5,6 +5,7 @@ import { NailScene } from '@/3d/scene/NailScene.tsx'
 import { ReadOnlyDesignScene } from '@/3d/scene/ReadOnlyDesignScene.tsx'
 import { WebGlGuard } from '@/3d/scene/WebGlGuard.tsx'
 import { CommentIcon, HeartIcon, RemixIcon, ShareIcon } from '@/components/icons/CommunityIcons.tsx'
+import { LoadingScreen } from '@/components/Loading.tsx'
 import { getInitials, ORIGIN_LABELS } from '@/features/community/initials.ts'
 import {
   useCreateTemplateComment,
@@ -51,7 +52,7 @@ export function TemplatePreviewPage() {
   }
 
   if (!templateId) return <p className="error center">ไม่พบรหัสดีไซน์</p>
-  if (template.isPending) return <p className="muted center">กำลังโหลดตัวอย่าง 3D…</p>
+  if (template.isPending) return <LoadingScreen label="กำลังโหลดตัวอย่าง 3D…" />
   if (template.error) {
     return (
       <p className="error center" role="alert">

@@ -1,6 +1,7 @@
 import { Link, useParams } from 'react-router-dom'
 import type { PublicProfileTemplate, PublicUser } from '@nail-studio/contracts'
 import { API_BASE, ApiRequestError } from '@/api/client.ts'
+import { LoadingScreen, Spinner } from '@/components/Loading.tsx'
 import { useCurrentUser } from '@/features/auth/useAuth.ts'
 import { usePublicProfile } from '@/features/users/usePublicProfile.ts'
 
@@ -35,7 +36,7 @@ export function PublicProfilePage() {
   const profile = usePublicProfile(userId)
   const { data: currentUser } = useCurrentUser()
 
-  if (profile.isPending) return <div className="center">กำลังโหลดโปรไฟล์…</div>
+  if (profile.isPending) return <LoadingScreen label="กำลังโหลดโปรไฟล์…" />
   if (profile.error) {
     const message = profile.error instanceof ApiRequestError && profile.error.status === 404
       ? 'ไม่พบโปรไฟล์ผู้ใช้นี้'
@@ -97,7 +98,10 @@ export function PublicProfilePage() {
             disabled={profile.isFetchingNextPage}
             onClick={() => void profile.fetchNextPage()}
           >
-            {profile.isFetchingNextPage ? 'กำลังโหลด…' : 'โหลดเพิ่ม'}
+            <span className="community-load-more-spinner">
+              {profile.isFetchingNextPage && <Spinner size={14} />}
+            </span>
+            <span>โหลดเพิ่ม</span>
           </button>
         )}
       </section>

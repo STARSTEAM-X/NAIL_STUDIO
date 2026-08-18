@@ -17,3 +17,18 @@ createRoot(container).render(
     </BrowserRouter>
   </StrictMode>,
 )
+
+const splash = document.getElementById('boot-splash')
+if (splash) {
+  const removeSplash = () => {
+    if (splash.isConnected) splash.remove()
+  }
+
+  // กัน transitionend ไม่ยิงเมื่อผู้ใช้เปิด reduced-motion
+  setTimeout(removeSplash, 500)
+  requestAnimationFrame(() => {
+    if (!splash.isConnected) return
+    splash.style.opacity = '0'
+    splash.addEventListener('transitionend', removeSplash, { once: true })
+  })
+}

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { TEMPLATE_CATEGORIES, TEMPLATE_PRIMARY_COLORS } from '@nail-studio/contracts'
 import { API_BASE, ApiRequestError } from '@/api/client.ts'
 import { CommentIcon, HeartIcon, RemixIcon, ShareIcon } from '@/components/icons/CommunityIcons.tsx'
+import { SkeletonGrid, Spinner } from '@/components/Loading.tsx'
 import { useCurrentUser } from '@/features/auth/useAuth.ts'
 import { getInitials, ORIGIN_LABELS } from '@/features/community/initials.ts'
 import {
@@ -160,7 +161,7 @@ export function CommunityPage() {
           {shareError && <p className="error community-feedback" role="alert">{shareError}</p>}
           {sharedTemplateId && <p className="community-success" role="status">แชร์ลิงก์ผลงานแล้ว</p>}
 
-      {templates.isPending && <p className="muted">กำลังโหลดดีไซน์จากชุมชน…</p>}
+      {templates.isPending && <SkeletonGrid count={6} className="community-grid community-feed-grid" />}
       {templates.error && (
         <p className="error" role="alert">
           โหลดฟีดไม่สำเร็จ{templates.error instanceof ApiRequestError ? ` — ${templates.error.message}` : ''}
@@ -256,7 +257,10 @@ export function CommunityPage() {
           disabled={templates.isFetchingNextPage}
           onClick={() => void templates.fetchNextPage()}
         >
-          {templates.isFetchingNextPage ? 'กำลังโหลด…' : 'โหลดเพิ่ม'}
+          <span className="community-load-more-spinner">
+            {templates.isFetchingNextPage && <Spinner size={14} />}
+          </span>
+          <span>โหลดเพิ่ม</span>
         </button>
       )}
         </main>

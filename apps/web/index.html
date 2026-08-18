@@ -4,8 +4,53 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Nail Studio 3D</title>
+    <style>
+      #boot-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: grid;
+        place-content: center;
+        gap: 1rem;
+        background: #f8f4ec;
+        color: #6b1e2b;
+        pointer-events: none;
+        transition: opacity .3s;
+      }
+
+      .boot-ring {
+        width: 3.25rem;
+        height: 3.25rem;
+        margin: 0 auto;
+        border: .25rem solid #e3d6c6;
+        border-top-color: #b5314c;
+        border-radius: 50%;
+        animation: boot-spin .8s linear infinite;
+      }
+
+      .boot-word {
+        margin: 0;
+        color: #6b1e2b;
+        font-size: .85rem;
+        font-weight: 800;
+        letter-spacing: .14em;
+        text-align: center;
+      }
+
+      @keyframes boot-spin {
+        to { transform: rotate(360deg); }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .boot-ring { animation: none; }
+      }
+    </style>
   </head>
   <body>
+    <div id="boot-splash" aria-hidden="true">
+      <div class="boot-ring"></div>
+      <p class="boot-word">NAIL STUDIO <span>3D</span></p>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

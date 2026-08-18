@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiRequestError } from '@/api/client.ts'
 import { Icon } from '@/components/Icon.tsx'
+import { SkeletonGrid } from '@/components/Loading.tsx'
 import { useCreateProject, useDeleteProject, useProjects } from '@/features/projects/useProjects.ts'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000'
@@ -70,10 +71,7 @@ export function ProjectsPage() {
       )}
 
       {projects.isPending && (
-        <div className="project-loading" role="status">
-          <span className="project-loading-dot" />
-          <span>กำลังโหลดงานของคุณ…</span>
-        </div>
+        <SkeletonGrid count={6} className="project-grid" />
       )}
 
       {projects.error && (

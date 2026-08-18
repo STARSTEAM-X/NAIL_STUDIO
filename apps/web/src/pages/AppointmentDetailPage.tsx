@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import type { AppointmentDetail } from '@nail-studio/contracts'
+import { LoadingScreen } from '@/components/Loading.tsx'
 import { useCurrentUser } from '@/features/auth/useAuth.ts'
 import {
   appointmentAction,
@@ -52,7 +53,7 @@ export function AppointmentDetailPage() {
   }, [appointmentId, isShopSide, pending?.id, pending?.proposedStartAt])
 
   if (!appointmentId) return <p className="error center">ไม่พบรหัสการนัดหมาย</p>
-  if (!detail) return <p className="muted center">กำลังโหลด…</p>
+  if (!detail) return <LoadingScreen label="กำลังโหลดนัดหมาย…" />
 
   const action = async (name: 'accept' | 'decline' | 'cancel' | 'complete') => {
     try { setDetail(await appointmentAction(appointmentId, name)) } catch (cause) { setError(cause instanceof Error ? cause.message : 'ทำรายการไม่สำเร็จ') }

@@ -11,6 +11,7 @@ import {
   loadHistoricalVersion,
   localizedTaskError,
 } from '@/features/projects/versionActions.ts'
+import { InlineLoading } from '@/components/Loading.tsx'
 import { useDesignStoreApi } from './DesignStoreProvider.tsx'
 
 interface Props {
@@ -68,7 +69,7 @@ export function VersionHistoryPanel({
         เวอร์ชันเก่าจะเปิดเป็นฉบับร่างใหม่ การบันทึกครั้งถัดไปยังต่อจากเวอร์ชันล่าสุด
       </p>
 
-      {versions.isPending && <p className="muted">กำลังโหลดประวัติ…</p>}
+      {versions.isPending && <InlineLoading label="กำลังโหลดประวัติ…" />}
       {versions.error && (
         <p className="error" role="alert">
           {localizedTaskError(versions.error, 'โหลดประวัติเวอร์ชันไม่สำเร็จ')}

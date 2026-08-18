@@ -7,6 +7,7 @@ import { ProjectsPage } from '@/pages/ProjectsPage.tsx'
 import { ProfilePage } from '@/pages/ProfilePage.tsx'
 import { PublicProfilePage } from '@/pages/PublicProfilePage.tsx'
 import { AppShell } from '@/components/AppShell.tsx'
+import { LoadingScreen } from '@/components/Loading.tsx'
 
 // The 3D editor and community feed are not needed for auth/project startup.
 // Keep them out of the initial JS so the measured bundle can be split before
@@ -19,21 +20,21 @@ const AppointmentDetailPage = lazy(() => import('@/pages/AppointmentDetailPage.t
 
 function Protected({ children }: { children: React.ReactElement }) {
   const { data: user, isPending } = useCurrentUser()
-  if (isPending) return <div className="center">กำลังตรวจสอบสิทธิ์…</div>
+  if (isPending) return <LoadingScreen label="กำลังตรวจสอบสิทธิ์…" brand={false} />
   if (!user) return <Navigate to="/login" replace />
   return children
 }
 
 function GuestOnly({ children }: { children: React.ReactElement }) {
   const { data: user, isPending } = useCurrentUser()
-  if (isPending) return <div className="center">กำลังตรวจสอบสิทธิ์…</div>
+  if (isPending) return <LoadingScreen label="กำลังตรวจสอบสิทธิ์…" brand={false} />
   if (user) return <Navigate to="/projects" replace />
   return children
 }
 
 export function AppRouter() {
   return (
-    <Suspense fallback={<div className="center">กำลังโหลดหน้า…</div>}>
+    <Suspense fallback={<LoadingScreen label="กำลังเปิดหน้า…" />}>
       <Routes>
         <Route path="/login" element={<GuestOnly><LoginPage /></GuestOnly>} />
         <Route path="/register" element={<GuestOnly><RegisterPage /></GuestOnly>} />
