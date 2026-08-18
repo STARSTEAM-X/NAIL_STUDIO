@@ -1,0 +1,313 @@
+/*
+  ระบบ UI กลาง — ปุ่ม dialog toast และสถานะที่ใช้ร่วมกันทุกโดเมน
+  ทุกค่าดึงจาก tokens.css ไม่มีการเดาค่าใหม่ในไฟล์นี้
+*/
+
+/* ---------- ปุ่ม ---------- */
+
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-full);
+  font: inherit;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+.ui-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ui-btn:disabled, .ui-btn[aria-disabled="true"] { cursor: not-allowed; opacity: 0.55; }
+.ui-btn[aria-busy="true"] { cursor: wait; }
+
+.ui-btn-sm { padding: 0.35rem 0.75rem; font-size: var(--fs-xs); }
+.ui-btn-md { padding: 0.5rem 1rem; font-size: var(--fs-sm); }
+.ui-btn-lg { padding: 0.65rem 1.35rem; font-size: var(--fs-base); }
+.ui-btn-block { width: 100%; }
+
+.ui-btn-primary { background: var(--accent); color: #fff; }
+.ui-btn-primary:hover:not(:disabled) { background: var(--deep); }
+
+.ui-btn-ghost { border-color: var(--rule); background: var(--surface); color: var(--ink); }
+.ui-btn-ghost:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+
+.ui-btn-subtle { background: transparent; color: var(--muted); }
+.ui-btn-subtle:hover:not(:disabled) { background: var(--chip); color: var(--deep); }
+
+.ui-btn-danger { border-color: color-mix(in srgb, var(--danger) 35%, var(--rule)); background: var(--surface); color: var(--danger); }
+.ui-btn-danger:hover:not(:disabled) { background: var(--danger); color: #fff; }
+
+.ui-btn-spinner {
+  width: 0.9em;
+  height: 0.9em;
+  flex: 0 0 auto;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: ui-spin 700ms linear infinite;
+}
+@keyframes ui-spin { to { transform: rotate(360deg); } }
+
+/* ---------- Dialog ---------- */
+
+.ui-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dialog);
+  display: grid;
+  place-items: center;
+  padding: var(--sp-4);
+  background: rgb(23 18 15 / 45%);
+  backdrop-filter: blur(3px);
+  overflow-y: auto;
+}
+.ui-dialog {
+  display: flex;
+  width: 100%;
+  max-height: calc(100vh - 2 * var(--sp-4));
+  flex-direction: column;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+.ui-dialog:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ui-dialog-sm { max-width: 26rem; }
+.ui-dialog-md { max-width: 34rem; }
+.ui-dialog-lg { max-width: 46rem; }
+
+.ui-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5) var(--sp-3);
+  border-bottom: 1px solid var(--rule);
+}
+.ui-dialog-head h2 { margin: 0; color: var(--deep); font-size: var(--fs-lg); }
+.ui-dialog-head p { margin: var(--sp-1) 0 0; color: var(--muted); font-size: var(--fs-sm); }
+.ui-dialog-close {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  margin-left: auto;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.ui-dialog-close:hover { background: var(--chip); color: var(--deep); }
+.ui-dialog-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.ui-dialog-body { padding: var(--sp-4) var(--sp-5); overflow-y: auto; }
+.ui-dialog-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-5) var(--sp-4);
+  border-top: 1px solid var(--rule);
+}
+.ui-confirm-message { margin: 0; color: var(--ink); font-size: var(--fs-base); line-height: 1.6; }
+
+/* ---------- Toast ---------- */
+
+.ui-toast-viewport {
+  position: fixed;
+  right: var(--sp-4);
+  bottom: var(--sp-4);
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  max-width: min(24rem, calc(100vw - 2 * var(--sp-4)));
+}
+.ui-toast {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--fs-sm);
+  animation: ui-toast-in 180ms ease;
+}
+.ui-toast span { flex: 1; min-width: 0; }
+.ui-toast button {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.ui-toast button:hover { color: var(--deep); }
+.ui-toast button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ui-toast-success { border-color: color-mix(in srgb, var(--ok) 40%, var(--rule)); color: var(--ok); }
+.ui-toast-error { border-color: color-mix(in srgb, var(--danger) 40%, var(--rule)); color: var(--danger); }
+.ui-toast-info { color: var(--deep); }
+.ui-toast-info svg { color: var(--accent); }
+
+@keyframes ui-toast-in {
+  from { opacity: 0; transform: translateY(0.5rem); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---------- ลิงก์ย้อนกลับ ---------- */
+
+.ui-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  color: var(--accent);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+.ui-back-link:hover { text-decoration: underline; }
+.ui-back-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-xs); }
+
+/* ---------- การ์ดและ skeleton กลาง ---------- */
+
+.ui-card {
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+.ui-skeleton-list { display: flex; flex-direction: column; gap: var(--sp-3); }
+.ui-skeleton-card { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-4); }
+
+/* ---------- Skip link ---------- */
+
+.ui-skip-link {
+  position: absolute;
+  top: var(--sp-2);
+  left: var(--sp-2);
+  z-index: 100;
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--r-full);
+  background: var(--accent);
+  color: #fff;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-200%);
+  transition: transform 120ms ease;
+}
+.ui-skip-link:focus { transform: none; }
+
+/* ---------- แถบสถานะแบบ pill ---------- */
+
+.ui-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: 0.15rem 0.6rem;
+  border: 1px solid transparent;
+  border-radius: var(--r-full);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ui-status-neutral { background: var(--chip); color: var(--deep); }
+.ui-status-pending { background: color-mix(in srgb, var(--warn) 12%, var(--surface)); border-color: color-mix(in srgb, var(--warn) 30%, transparent); color: var(--warn); }
+.ui-status-ok { background: color-mix(in srgb, var(--ok) 12%, var(--surface)); border-color: color-mix(in srgb, var(--ok) 30%, transparent); color: var(--ok); }
+.ui-status-danger { background: color-mix(in srgb, var(--danger) 10%, var(--surface)); border-color: color-mix(in srgb, var(--danger) 30%, transparent); color: var(--danger); }
+.ui-status-info { background: color-mix(in srgb, var(--info) 12%, var(--surface)); border-color: color-mix(in srgb, var(--info) 30%, transparent); color: var(--info); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-btn-spinner { animation: none; }
+  .ui-toast { animation: none; }
+}
+
+@media (max-width: 640px) {
+  .ui-toast-viewport { right: var(--sp-3); bottom: var(--sp-3); left: var(--sp-3); max-width: none; }
+  .ui-dialog-foot { flex-direction: column-reverse; }
+  .ui-dialog-foot .ui-btn { width: 100%; }
+}
+
+/* ---------- กล่องรายงานผลงาน ---------- */
+
+.report-reasons { display: flex; flex-direction: column; gap: var(--sp-1); margin: 0 0 var(--sp-3); padding: 0; border: 0; }
+.report-reasons legend { margin-bottom: var(--sp-2); padding: 0; color: var(--muted); font-size: var(--fs-xs); font-weight: 700; }
+.report-reason {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.report-reason:hover { border-color: var(--accent); }
+.report-reason input { accent-color: var(--accent); }
+.report-reason:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+.report-detail { margin-top: var(--sp-2); }
+
+.nc-post-report {
+  display: grid;
+  width: 1.85rem;
+  height: 1.85rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.nc-post-report:hover { background: var(--chip); color: var(--danger); }
+.nc-post-report:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* ---------- ฟอร์มภายใน dialog ของ editor ---------- */
+
+.share-template-form { display: flex; flex-direction: column; gap: var(--sp-3); }
+.share-template-field { display: flex; flex-direction: column; gap: var(--sp-1); font-size: var(--fs-sm); }
+.share-template-field > span { color: var(--muted); font-weight: 600; }
+.share-template-field small { color: var(--muted); font-weight: 400; }
+.share-template-field input,
+.share-template-field textarea,
+.share-template-field select {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-sm);
+}
+.share-template-field textarea { resize: vertical; }
+.share-template-field input:focus-visible,
+.share-template-field textarea:focus-visible,
+.share-template-field select:focus-visible { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
+.share-template-fields-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
+
+.conflict-actions { display: flex; flex-direction: column; gap: var(--sp-3); }
+.conflict-actions form { display: flex; flex-direction: column; gap: var(--sp-1); }
+.conflict-actions label { color: var(--muted); font-size: var(--fs-xs); font-weight: 600; }
+.conflict-actions input {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-sm);
+}
+.conflict-actions input:focus-visible { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
+
+@media (max-width: 640px) {
+  .share-template-fields-row { grid-template-columns: minmax(0, 1fr); }
+}

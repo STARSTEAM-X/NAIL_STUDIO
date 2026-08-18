@@ -1,0 +1,257 @@
+/* โดเมนนัดหมายและร้าน — ใช้ token กลางทั้งหมด */
+
+.ap-page { max-width: 1180px; }
+
+.ap-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-5);
+}
+.ap-header h1 { margin: 0.1rem 0 0.2rem; color: var(--deep); font-size: var(--fs-2xl); letter-spacing: -0.02em; }
+.ap-header .muted { margin: 0; }
+
+.ap-layout {
+  display: grid;
+  grid-template-columns: minmax(19rem, 24rem) minmax(0, 1fr);
+  gap: var(--sp-4);
+  align-items: start;
+}
+
+/* ---------- ฟอร์มขอนัด ---------- */
+
+.ap-booking {
+  position: sticky;
+  top: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+}
+.ap-booking h2, .ap-panel h2, .ap-review h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-2);
+  color: var(--deep);
+  font-size: var(--fs-md);
+}
+.ap-booking h2 svg, .ap-panel h2 svg, .ap-review h2 svg { color: var(--accent); }
+.ap-booking-hint { margin: 0; color: var(--muted); font-size: var(--fs-xs); text-align: center; }
+
+.ap-field { display: flex; flex-direction: column; gap: var(--sp-1); font-size: var(--fs-sm); }
+.ap-field > span { color: var(--muted); font-weight: 600; }
+.ap-field small { color: var(--muted); font-size: var(--fs-xs); }
+.ap-field small.error { color: var(--danger); }
+.ap-field input,
+.ap-field select,
+.ap-field textarea {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-sm);
+}
+.ap-field textarea { resize: vertical; }
+.ap-field input:focus-visible,
+.ap-field select:focus-visible,
+.ap-field textarea:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+
+/* ---------- รายการนัด ---------- */
+
+.ap-list-section { display: flex; min-width: 0; flex-direction: column; gap: var(--sp-3); }
+.ap-list-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); }
+.ap-list-head h2 { margin: 0; color: var(--deep); font-size: var(--fs-lg); }
+.ap-list-count { color: var(--muted); font-size: var(--fs-xs); }
+.ap-filters { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+
+.ap-list { display: flex; flex-direction: column; gap: var(--sp-3); margin: 0; padding: 0; list-style: none; }
+.ap-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 140ms ease, transform 140ms ease;
+}
+.ap-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.ap-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ap-card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+.ap-card-head strong { color: var(--deep); font-size: var(--fs-md); overflow-wrap: anywhere; }
+.ap-card-service { margin: 0; color: var(--ink); font-size: var(--fs-sm); }
+.ap-card-meta { display: flex; flex-wrap: wrap; gap: var(--sp-4); color: var(--muted); font-size: var(--fs-xs); }
+.ap-card-meta span { display: inline-flex; align-items: center; gap: var(--sp-1); }
+
+/* ---------- หน้ารายละเอียด ---------- */
+
+.ap-detail { display: flex; flex-direction: column; gap: var(--sp-4); }
+.ap-detail-head { padding: var(--sp-4) var(--sp-5); }
+.ap-detail-title { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
+.ap-detail-title h1 { margin: 0; color: var(--deep); font-size: var(--fs-xl); overflow-wrap: anywhere; }
+.ap-detail-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--sp-3);
+  margin: var(--sp-4) 0 0;
+}
+.ap-detail-facts dt { color: var(--muted); font-size: var(--fs-xs); }
+.ap-detail-facts dd { margin: 0.1rem 0 0; color: var(--deep); font-size: var(--fs-sm); font-weight: 700; }
+.ap-detail-note { margin: var(--sp-3) 0 0; color: var(--ink); font-size: var(--fs-sm); }
+
+.ap-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); align-items: start; }
+.ap-panel { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-4); }
+
+.ap-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: var(--sp-3);
+  border: 1px solid color-mix(in srgb, var(--warn) 30%, var(--rule));
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--warn) 8%, var(--surface));
+  color: var(--warn);
+  font-size: var(--fs-xs);
+}
+.ap-warning svg { flex: 0 0 auto; margin-top: 0.1rem; }
+
+/* ---------- ไทม์ไลน์ ---------- */
+
+.ap-timeline { display: flex; flex-direction: column; gap: var(--sp-3); margin: 0; padding: 0; list-style: none; }
+.ap-timeline li { position: relative; display: flex; gap: var(--sp-3); padding-left: var(--sp-1); }
+.ap-timeline-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  flex: 0 0 auto;
+  margin-top: 0.45rem;
+  border: 2px solid var(--rule);
+  border-radius: 50%;
+  background: var(--surface);
+}
+.ap-timeline-active .ap-timeline-dot { border-color: var(--accent); background: var(--accent); }
+.ap-timeline-body { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 0.2rem; }
+.ap-timeline-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2); }
+.ap-timeline-head strong { color: var(--deep); font-size: var(--fs-sm); }
+.ap-timeline-time { display: flex; align-items: center; gap: var(--sp-1); margin: 0; color: var(--ink); font-size: var(--fs-sm); }
+.ap-timeline-message { margin: 0; color: var(--ink); font-size: var(--fs-xs); overflow-wrap: anywhere; }
+.ap-timeline-body time { color: var(--muted); font-size: var(--fs-xs); }
+
+.ap-propose {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding-top: var(--sp-3);
+  border-top: 1px dashed var(--rule);
+}
+.ap-propose h3 { margin: 0; color: var(--deep); font-size: var(--fs-sm); }
+.ap-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); padding-top: var(--sp-3); border-top: 1px dashed var(--rule); }
+
+/* ---------- แชท ---------- */
+
+.ap-chat { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: var(--sp-3); }
+.ap-chat-messages {
+  display: flex;
+  min-height: 12rem;
+  max-height: 24rem;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  background: var(--ground);
+  overflow-y: auto;
+}
+.ap-chat-empty { margin: auto; text-align: center; }
+.ap-chat-system { margin: 0; color: var(--muted); font-size: var(--fs-xs); text-align: center; }
+.ap-chat-row { display: flex; }
+.ap-chat-mine { justify-content: flex-end; }
+.ap-chat-bubble {
+  max-width: 80%;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+.ap-chat-mine .ap-chat-bubble {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+.ap-chat-bubble p { margin: 0; font-size: var(--fs-sm); line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ap-chat-bubble time { display: block; margin-top: 0.15rem; color: var(--muted); font-size: 0.68rem; text-align: right; }
+
+.ap-chat-form { display: flex; gap: var(--sp-2); }
+.ap-chat-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-sm);
+}
+.ap-chat-form input:focus-visible { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
+
+/* ---------- รีวิว ---------- */
+
+.ap-review { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-4) var(--sp-5); }
+.ap-review .muted { margin: 0; }
+.ap-review .ui-btn { align-self: flex-start; }
+.ap-rating { display: flex; align-items: center; gap: var(--sp-1); }
+.ap-rating-star {
+  display: grid;
+  padding: var(--sp-1);
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--rule);
+  cursor: pointer;
+}
+.ap-rating-star:hover { color: var(--mauve); }
+.ap-rating-star:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ap-rating-on { color: var(--accent); }
+.ap-rating-on svg { fill: color-mix(in srgb, var(--accent) 30%, transparent); }
+.ap-rating-value { margin-left: var(--sp-2); color: var(--muted); font-size: var(--fs-sm); }
+.ap-review-score { margin: 0; color: var(--accent); font-size: var(--fs-lg); letter-spacing: 0.1em; }
+.ap-review-score span { margin-left: var(--sp-2); color: var(--muted); font-size: var(--fs-sm); letter-spacing: normal; }
+.ap-review-comment { margin: 0; font-size: var(--fs-sm); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ap-review-date { margin: 0; color: var(--muted); font-size: var(--fs-xs); }
+.ap-review-reply {
+  padding: var(--sp-3);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  background: color-mix(in srgb, var(--chip) 45%, var(--surface));
+}
+.ap-review-reply strong { color: var(--deep); font-size: var(--fs-xs); }
+.ap-review-reply p { margin: var(--sp-1) 0 0; font-size: var(--fs-sm); }
+
+/* ---------- ตอบสนองต่อขนาดจอ ---------- */
+
+@media (max-width: 960px) {
+  .ap-layout { grid-template-columns: minmax(0, 1fr); }
+  .ap-booking { position: static; }
+  .ap-detail-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .ap-header { align-items: stretch; flex-direction: column; }
+  .ap-detail-head { padding: var(--sp-4); }
+  .ap-chat-bubble { max-width: 92%; }
+  .ap-actions .ui-btn { flex: 1; }
+}

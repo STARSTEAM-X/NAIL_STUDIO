@@ -5,6 +5,8 @@ import type { CreateTemplateInput } from '@nail-studio/contracts'
 import { useCurrentUser, useLogout } from '@/features/auth/useAuth.ts'
 import { useCreateTemplate } from '@/features/community/useTemplates.ts'
 import { NotificationBell } from '@/components/NotificationBell.tsx'
+import { Icon } from '@/components/Icon.tsx'
+import { usePageTitle } from '@/lib/usePageTitle.ts'
 import { NailScene } from '@/3d/scene/NailScene.tsx'
 import { ThumbnailCapture, type ThumbnailCaptureHandle } from '@/3d/scene/ThumbnailCapture.tsx'
 import { SnapshotCapture, type SnapshotCaptureHandle } from '@/3d/scene/SnapshotCapture.tsx'
@@ -78,6 +80,7 @@ export function NailEditor({ projectId, detail }: Props) {
   const [activePanel, setActivePanel] = useState<EditorPanelId>('paint')
   const [rightPanel, setRightPanel] = useState<'canvas' | 'history'>('canvas')
   const [projectName, setProjectName] = useState(detail.project.name)
+  usePageTitle(projectName)
   const [editingProjectName, setEditingProjectName] = useState(false)
   const [projectNameDraft, setProjectNameDraft] = useState('')
   const handScale = useDesign((state) => state.document.hand.proportions.handScale)
@@ -289,7 +292,7 @@ export function NailEditor({ projectId, detail }: Props) {
             title="กลับไปงานของฉัน"
             onClick={() => navigate('/projects')}
           >
-            <span aria-hidden="true">←</span>
+            <Icon name="arrow-left" size={15} />
           </button>
           <button
             type="button"
@@ -363,7 +366,7 @@ export function NailEditor({ projectId, detail }: Props) {
               })()
             }}
           >
-            <span className="editor-topbar-action-icon" aria-hidden="true">↓</span>
+            <span className="editor-topbar-action-icon" aria-hidden="true"><Icon name="share" size={15} /></span>
             <span className="editor-topbar-action-label">PNG</span>
           </button>
           <button
@@ -380,7 +383,7 @@ export function NailEditor({ projectId, detail }: Props) {
               }
             }}
           >
-            <span className="editor-topbar-action-icon" aria-hidden="true">⇩</span>
+            <span className="editor-topbar-action-icon" aria-hidden="true"><Icon name="layers" size={15} /></span>
             <span className="editor-topbar-action-label">JSON</span>
           </button>
           <button
@@ -393,7 +396,7 @@ export function NailEditor({ projectId, detail }: Props) {
               setShareDialogOpen(true)
             }}
           >
-            <span className="editor-topbar-action-icon" aria-hidden="true">↗</span>
+            <span className="editor-topbar-action-icon" aria-hidden="true"><Icon name="arrow-up-right" size={15} /></span>
             <span className="editor-topbar-action-label">แชร์</span>
           </button>
           <div className="editor-topbar-nav" aria-label="ทางลัด">
@@ -444,7 +447,7 @@ export function NailEditor({ projectId, detail }: Props) {
               })
             }}
           >
-            <span aria-hidden="true">✓</span>
+            <Icon name="check" size={15} />
             <span>{saveVersion.isPending || autosave.isVersionSavePending ? 'กำลังบันทึก…' : 'บันทึก'}</span>
           </button>
         </div>
@@ -463,6 +466,8 @@ export function NailEditor({ projectId, detail }: Props) {
           <button type="button" className="btn btn-ghost" onClick={offlineDraft.dismissWarning}>ปิด</button>
         </p>
       )}
+
+      <h1 className="nc-visually-hidden">แก้ไขงานออกแบบ: {projectName}</h1>
 
       <div className="editor-body">
         <aside className="editor-sidebar">
@@ -506,7 +511,7 @@ export function NailEditor({ projectId, detail }: Props) {
               className={`editor-panel-tab ${rightPanel === 'canvas' ? 'editor-panel-tab-active' : ''}`}
               onClick={() => setRightPanel('canvas')}
             >
-              <span aria-hidden="true">▧</span> แคนวาส
+              <Icon name="grid" size={15} /> แคนวาส
             </button>
             <button
               type="button"
@@ -515,7 +520,7 @@ export function NailEditor({ projectId, detail }: Props) {
               className={`editor-panel-tab ${rightPanel === 'history' ? 'editor-panel-tab-active' : ''}`}
               onClick={() => setRightPanel('history')}
             >
-              <span aria-hidden="true">↺</span> ประวัติ
+              <Icon name="remix" size={15} /> ประวัติ
             </button>
           </div>
           <div className="editor-right-panel-scroll">

@@ -1,147 +1,232 @@
-import { Link, useParams } from 'react-router-dom'
-import type { PublicProfileTemplate, PublicUser } from '@nail-studio/contracts'
-import { API_BASE, ApiRequestError } from '@/api/client.ts'
-import { LoadingScreen, Spinner } from '@/components/Loading.tsx'
-import { useCurrentUser } from '@/features/auth/useAuth.ts'
+import { useEffect, useState, type FormEvent } from 'react'
+import { useParams, useSearchParams } from 'react-router-dom'
+import { ApiRequestError } from '@/api/client.ts'
+import { Icon } from '@/components/Icon.tsx'
+import { BackLink } from '@/components/ui/BackLink.tsx'
+import { Button } from '@/components/ui/Button.tsx'
+import { EmptyState, ErrorState, FeedSkeletonList } from '@/components/ui/States.tsx'
+import { useToast } from '@/components/ui/Toast.tsx'
+import { useCurrentUser, useLogout } from '@/features/auth/useAuth.ts'
+import { useUpdateProfile } from '@/features/auth/useAuth.ts'
+import { TemplateTile } from '@/features/community/components/TemplateTile.tsx'
+import { useTemplateActions } from '@/features/community/useTemplateActions.ts'
 import { usePublicProfile } from '@/features/users/usePublicProfile.ts'
+import { formatCount, formatLongDate } from '@/lib/datetime.ts'
+import { avatarGradient, getInitials, ROLE_LABELS } from '@/lib/user.ts'
+import { usePageTitle } from '@/lib/usePageTitle.ts'
+import { useNavigate } from 'react-router-dom'
 
-const ROLE_LABELS: Record<PublicUser['role'], string> = {
-  user: 'ผู้ใช้งานทั่วไป',
-  shop: 'ร้านทำเล็บ',
-  admin: 'ผู้ดูแลระบบ',
-}
-
-const JOINED_DATE_FORMAT = new Intl.DateTimeFormat('th-TH', {
-  day: 'numeric',
-  month: 'long',
-  year: 'numeric',
-})
-
-const PREVIEW_CLASSES: Record<string, string> = {
-  Red: 'template-preview-red',
-  Pink: 'template-preview-pink',
-  Nude: 'template-preview-nude',
-  Black: 'template-preview-black',
-  White: 'template-preview-white',
-}
-
-function getInitials(displayName: string) {
-  const parts = displayName.trim().split(/\s+/).filter(Boolean)
-  if (parts.length > 1) return `${parts[0]?.[0] ?? ''}${parts[1]?.[0] ?? ''}`.toUpperCase()
-  return parts[0]?.slice(0, 2).toUpperCase() || 'NS'
-}
-
+/**
+ * โปรไฟล์ผู้ใช้ — รวมโปรไฟล์สาธารณะกับการแก้ไขไว้ในหน้าเดียว
+ *
+ * เดิมแยกเป็นสอง route: /users/:id (ดู) กับ /profile (แก้ไข) ซึ่งแสดงข้อมูลชุดเดียวกัน
+ * และเขียนโค้ดซ้ำกันทั้ง hero, avatar, ROLE_LABELS และวันที่สมัคร
+ * ที่แย่กว่านั้นคือ /profile เข้าถึงได้ทางเดียวคือกดปุ่มในหน้านี้ — ลึกสองชั้นและเดาไม่ได้
+ */
 export function PublicProfilePage() {
   const { userId } = useParams<{ userId: string }>()
+  const [searchParams, setSearchParams] = useSearchParams()
   const profile = usePublicProfile(userId)
   const { data: currentUser } = useCurrentUser()
+  const actions = useTemplateActions()
+  const navigate = useNavigate()
+  const toast = useToast()
 
-  if (profile.isPending) return <LoadingScreen label="กำลังโหลดโปรไฟล์…" />
-  if (profile.error) {
-    const message = profile.error instanceof ApiRequestError && profile.error.status === 404
-      ? 'ไม่พบโปรไฟล์ผู้ใช้นี้'
-      : 'โหลดโปรไฟล์ไม่สำเร็จ'
-    return <p className="error center" role="alert">{message}</p>
-  }
-  if (!profile.profile) return <p className="error center">ไม่พบโปรไฟล์ผู้ใช้ที่ต้องการ</p>
+  const updateProfile = useUpdateProfile()
+  const logout = useLogout()
+  const [displayName, setDisplayName] = useState('')
 
   const user = profile.profile
-  const isOwnProfile = currentUser?.id === user.id
+  const isOwnProfile = currentUser?.id === user?.id
+  const editing = isOwnProfile && searchParams.get('edit') === '1'
+
+  usePageTitle(user?.displayName)
+
+  useEffect(() => {
+    if (currentUser) setDisplayName(currentUser.displayName)
+  }, [currentUser])
+
+  const setEditing = (next: boolean) => {
+    const params = new URLSearchParams(searchParams)
+    if (next) params.set('edit', '1')
+    else params.delete('edit')
+    setSearchParams(params, { replace: true })
+  }
+
+  if (profile.isPending) {
+    return (
+      <section className="page public-profile-page">
+        <FeedSkeletonList variant="tile" count={6} />
+      </section>
+    )
+  }
+
+  if (profile.error) {
+    const notFound = profile.error instanceof ApiRequestError && profile.error.status === 404
+    return (
+      <section className="page public-profile-page">
+        <BackLink to="/community">กลับไปชุมชน</BackLink>
+        {notFound ? (
+          <EmptyState icon="search" title="ไม่พบโปรไฟล์ผู้ใช้นี้" description="ผู้ใช้อาจถูกลบหรือลิงก์ไม่ถูกต้อง" />
+        ) : (
+          <ErrorState title="โหลดโปรไฟล์ไม่สำเร็จ" error={profile.error} onRetry={() => void profile.refetch()} />
+        )}
+      </section>
+    )
+  }
+
+  if (!user) {
+    return (
+      <section className="page public-profile-page">
+        <EmptyState icon="search" title="ไม่พบโปรไฟล์ที่ต้องการ" />
+      </section>
+    )
+  }
+
+  const submitProfile = (event: FormEvent) => {
+    event.preventDefault()
+    const nextName = displayName.trim()
+    if (!nextName || nextName === currentUser?.displayName) return
+    updateProfile.mutate(
+      { displayName: nextName },
+      {
+        onSuccess: () => {
+          toast.success('บันทึกโปรไฟล์แล้ว')
+          setEditing(false)
+          void profile.refetch()
+        },
+        onError: (error) => toast.error(error instanceof Error ? error.message : 'บันทึกโปรไฟล์ไม่สำเร็จ'),
+      },
+    )
+  }
+
+  const totals = profile.templates.reduce(
+    (accumulator, template) => ({
+      likes: accumulator.likes + template.likeCount,
+      remixes: accumulator.remixes + template.remixCount,
+    }),
+    { likes: 0, remixes: 0 },
+  )
 
   return (
     <section className="page public-profile-page">
-      <Link to="/community" className="profile-back-link">
-        <span aria-hidden="true">←</span>
-        กลับไปชุมชน
-      </Link>
+      <BackLink to="/community">กลับไปชุมชน</BackLink>
 
-      <header className="public-profile-hero">
-        <span className="profile-avatar profile-avatar-large" aria-hidden="true">{getInitials(user.displayName)}</span>
-        <div>
-          <p className="eyebrow">COMMUNITY PROFILE</p>
+      <header className="ui-card profile-hero">
+        <span
+          className="nc-avatar nc-avatar-lg"
+          style={{ backgroundImage: avatarGradient(user.id) }}
+          aria-hidden="true"
+        >
+          {getInitials(user.displayName)}
+        </span>
+        <div className="profile-hero-copy">
+          <p className="eyebrow">{isOwnProfile ? 'บัญชีของฉัน' : 'COMMUNITY PROFILE'}</p>
           <h1>{user.displayName}</h1>
-          <p className="public-profile-role">{ROLE_LABELS[user.role]}</p>
-          <p className="profile-hero-copy">สมาชิกตั้งแต่ {JOINED_DATE_FORMAT.format(new Date(user.createdAt))}</p>
+          <p className="profile-hero-role">{ROLE_LABELS[user.role]}</p>
+          <p className="muted">สมาชิกตั้งแต่ {formatLongDate(user.createdAt)}</p>
         </div>
-        {isOwnProfile && <Link to="/profile" className="btn btn-primary public-profile-edit">แก้ไขโปรไฟล์</Link>}
+        {isOwnProfile && !editing && (
+          <div className="profile-hero-actions">
+            <Button variant="ghost" icon="user" onClick={() => setEditing(true)}>แก้ไขโปรไฟล์</Button>
+            <Button
+              variant="ghost"
+              icon="logout"
+              loading={logout.isPending}
+              onClick={() => logout.mutate(undefined, { onSuccess: () => navigate('/login', { replace: true }) })}
+            >
+              ออกจากระบบ
+            </Button>
+          </div>
+        )}
       </header>
 
-      <section className="public-profile-summary" aria-label="สรุปโปรไฟล์">
-        <div><strong>{user.templateCount}</strong><span>ผลงานที่เผยแพร่</span></div>
-        <div><strong>{ROLE_LABELS[user.role]}</strong><span>ประเภทบัญชี</span></div>
+      {editing && currentUser && (
+        <form className="ui-card profile-edit" onSubmit={submitProfile}>
+          <h2><Icon name="user" size={16} /> แก้ไขข้อมูลบัญชี</h2>
+          <label className="ap-field">
+            <span>ชื่อที่แสดง</span>
+            <input
+              value={displayName}
+              maxLength={60}
+              autoComplete="name"
+              onChange={(event) => setDisplayName(event.target.value)}
+            />
+            <small>ชื่อนี้จะแสดงในเมนูโปรไฟล์ ในฟีดชุมชน และบนผลงานที่คุณเผยแพร่</small>
+          </label>
+          <label className="ap-field">
+            <span>อีเมล</span>
+            <input value={currentUser.email} readOnly aria-readonly="true" />
+            <small>อีเมลใช้สำหรับเข้าสู่ระบบ และยังแก้ไขจากหน้านี้ไม่ได้</small>
+          </label>
+          <label className="ap-field">
+            <span>ประเภทบัญชี</span>
+            <input value={ROLE_LABELS[currentUser.role]} readOnly aria-readonly="true" />
+          </label>
+          <div className="profile-edit-actions">
+            <Button variant="ghost" onClick={() => setEditing(false)}>ยกเลิก</Button>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={!displayName.trim() || displayName.trim() === currentUser.displayName}
+              loading={updateProfile.isPending}
+              loadingLabel="กำลังบันทึก…"
+            >
+              บันทึกการเปลี่ยนแปลง
+            </Button>
+          </div>
+        </form>
+      )}
+
+      <section className="profile-stats" aria-label="สรุปผลงาน">
+        <div><strong>{formatCount(user.templateCount)}</strong><span>ผลงานที่เผยแพร่</span></div>
+        <div><strong>{formatCount(totals.likes)}</strong><span>ถูกใจที่ได้รับ</span></div>
+        <div><strong>{formatCount(totals.remixes)}</strong><span>ถูกนำไปรีมิกซ์</span></div>
       </section>
 
       <section className="public-profile-work" aria-labelledby="public-profile-work-title">
         <header className="public-profile-section-head">
           <div>
             <p className="eyebrow">PUBLIC WORK</p>
-            <h2 id="public-profile-work-title">ผลงานของ {user.displayName}</h2>
+            <h2 id="public-profile-work-title">
+              {isOwnProfile ? 'ผลงานที่ฉันเผยแพร่' : `ผลงานของ ${user.displayName}`}
+            </h2>
           </div>
           <span className="public-profile-count">{user.templateCount} แบบ</span>
         </header>
 
         {profile.templates.length === 0 ? (
-          <div className="public-profile-empty">
-            <h3>ยังไม่มีผลงานที่เผยแพร่</h3>
-            <p>เมื่อผู้ใช้นี้เผยแพร่ดีไซน์ ผลงานจะแสดงที่หน้านี้</p>
-          </div>
+          <EmptyState
+            icon="sparkle"
+            title={isOwnProfile ? 'คุณยังไม่ได้เผยแพร่ผลงาน' : 'ยังไม่มีผลงานที่เผยแพร่'}
+            description={
+              isOwnProfile
+                ? 'เปิดงานออกแบบของคุณแล้วกด “แชร์” ในโปรแกรมแก้ไข เพื่อให้ผลงานปรากฏที่นี่'
+                : 'เมื่อผู้ใช้นี้เผยแพร่ดีไซน์ ผลงานจะแสดงที่หน้านี้'
+            }
+          >
+            {isOwnProfile && <Button variant="primary" onClick={() => navigate('/projects')}>ไปที่งานของฉัน</Button>}
+          </EmptyState>
         ) : (
-          <div className="community-grid public-profile-grid">
-            {profile.templates.map((template) => <PublicTemplateCard key={template.id} template={template} />)}
+          <div className="nc-tile-grid">
+            {profile.templates.map((template) => (
+              <TemplateTile key={template.id} template={template} actions={actions} />
+            ))}
           </div>
         )}
 
         {profile.hasNextPage && (
-          <button
-            type="button"
-            className="btn btn-ghost community-load-more"
-            disabled={profile.isFetchingNextPage}
+          <Button
+            variant="ghost"
+            className="nc-load-more"
+            loading={profile.isFetchingNextPage}
+            loadingLabel="กำลังโหลด…"
             onClick={() => void profile.fetchNextPage()}
           >
-            <span className="community-load-more-spinner">
-              {profile.isFetchingNextPage && <Spinner size={14} />}
-            </span>
-            <span>โหลดเพิ่ม</span>
-          </button>
+            โหลดผลงานเพิ่ม
+          </Button>
         )}
       </section>
     </section>
-  )
-}
-
-function PublicTemplateCard({ template }: { template: PublicProfileTemplate }) {
-  return (
-    <article className="template-card">
-      <Link to={`/community/templates/${template.id}`} className="public-profile-template-link">
-        <div
-          className={`template-preview ${template.hasThumbnail ? 'template-preview-image' : PREVIEW_CLASSES[template.primaryColor ?? ''] ?? 'template-preview-default'}`}
-          aria-hidden={!template.hasThumbnail}
-        >
-          {template.hasThumbnail ? (
-            <img
-              src={`${API_BASE}/api/v1/templates/${template.id}/thumbnail`}
-              crossOrigin="use-credentials"
-              alt={`ภาพตัวอย่าง ${template.name}`}
-              loading="lazy"
-            />
-          ) : (
-            <span>{template.primaryColor ?? 'Nail art'}</span>
-          )}
-        </div>
-        <div className="template-card-body">
-          <div className="template-card-title">
-            <h3>{template.name}</h3>
-            <span className="template-origin">{template.origin === 'ai' ? 'AI' : template.origin === 'remix' ? 'รีมิกซ์' : 'ต้นฉบับ'}</span>
-          </div>
-          {template.caption && <p className="template-caption">{template.caption}</p>}
-          <div className="template-stats" aria-label="สถิติการมีส่วนร่วม">
-            <span>♥ {template.likeCount}</span>
-            <span>↗ {template.shareCount}</span>
-            <span>↻ {template.remixCount}</span>
-            <span>💬 {template.commentCount}</span>
-          </div>
-        </div>
-      </Link>
-    </article>
   )
 }

@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ApiRequestError } from '@/api/client.ts'
+import { ToastProvider } from '@/components/ui/Toast.tsx'
 
 /**
  * สร้าง QueryClient ใน state ไม่ใช่ตัวแปรระดับโมดูล
@@ -30,5 +31,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
       }),
   )
 
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  return (
+    <QueryClientProvider client={client}>
+      <ToastProvider>{children}</ToastProvider>
+    </QueryClientProvider>
+  )
 }

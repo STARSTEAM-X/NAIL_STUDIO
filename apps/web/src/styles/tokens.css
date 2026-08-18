@@ -1,0 +1,76 @@
+/*
+  Design token ของทั้งแอป — แหล่งความจริงเดียว
+
+  ก่อนหน้านี้ token ถูกประกาศสองที่ใน index.css (บรรทัด 7 และ 979)
+  โดยที่ --paper และ --soft ซ่อนอยู่ใต้หัวข้อ "editor workspace"
+  ทั้งที่หน้าอื่นก็ใช้ ทำให้หาไม่เจอและมีการตั้งค่าซ้ำ
+
+  สเกลด้านล่างมีไว้เพื่อหยุดการเดาค่า: ก่อนหน้านี้มี border-radius 22 ค่า
+  และ font-size 33 ค่าต่างกัน ซึ่งไล่กันทีละ 0.01rem จนแยกด้วยตาไม่ออก
+*/
+
+:root {
+  /* ---------- สี ---------- */
+  --ground: #f8f4ec;
+  --surface: #fffdf9;
+  --paper: #fffdf9;
+  --soft: #f4e7df;
+  --ink: #3a3a3a;
+  --muted: #7d6f66;
+  --rule: #e3d6c6;
+  --accent: #b5314c;
+  --deep: #6b1e2b;
+  --mauve: #b18d88;
+  --chip: #e8ddd0;
+  --ok: #2f7d4f;
+  --danger: #b3122e;
+  --warn: #b25a0d;
+  --info: #1f5d80;
+
+  /* ---------- มุมโค้ง ---------- */
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+  --r-full: 999px;
+
+  /* ---------- ระยะห่าง ---------- */
+  --sp-1: 0.25rem;
+  --sp-2: 0.5rem;
+  --sp-3: 0.75rem;
+  --sp-4: 1rem;
+  --sp-5: 1.5rem;
+  --sp-6: 2rem;
+  --sp-7: 3rem;
+
+  /* ---------- ขนาดตัวอักษร ---------- */
+  --fs-xs: 0.72rem;
+  --fs-sm: 0.82rem;
+  --fs-base: 0.9rem;
+  --fs-md: 1rem;
+  --fs-lg: 1.15rem;
+  --fs-xl: 1.35rem;
+  --fs-2xl: 1.75rem;
+
+  /* ---------- เงา ---------- */
+  --shadow-sm: 0 2px 8px rgb(80 45 30 / 6%);
+  --shadow-md: 0 6px 22px rgb(80 45 30 / 8%);
+  --shadow-lg: 0 14px 34px rgb(80 45 30 / 13%);
+
+  /* ---------- อื่นๆ ---------- */
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+  --z-sticky: 10;
+  --z-popover: 30;
+  --z-dialog: 60;
+  --z-toast: 80;
+}
+
+/*
+  Breakpoint มาตรฐาน 3 ระดับ (เดิมมี 8 ค่ากระจัดกระจาย: 380/540/640/720/900/960/1080/1200)
+  CSS ยังไม่รองรับตัวแปรใน @media จึงเขียนไว้เป็นสัญญาให้ยึดตาม:
+
+    mobile  : @media (max-width: 640px)
+    tablet  : @media (max-width: 960px)
+    desktop : @media (max-width: 1200px)
+*/

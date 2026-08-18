@@ -1,0 +1,826 @@
+/*
+  ชุมชน (Community) — ระบบดีไซน์เฉพาะของ /community และ /community/templates/*
+  ทุกคลาสขึ้นต้นด้วย `nc-` เพื่อไม่ให้ชนกับสไตล์เดิมของหน้าอื่น
+  โทเคนสี/ตัวอักษรยังใช้ชุดเดียวกับทั้งแอป (index.css) เพื่อให้ธีมมืดในอนาคตทำที่เดียว
+*/
+
+.nc-page {
+  --nc-radius: 16px;
+  --nc-radius-sm: 12px;
+  --nc-gap: 1rem;
+  --nc-shadow: 0 6px 22px rgb(80 45 30 / 7%);
+  --nc-shadow-lift: 0 14px 34px rgb(80 45 30 / 13%);
+  --nc-line: color-mix(in srgb, var(--rule) 85%, transparent);
+  --nc-soft: color-mix(in srgb, var(--chip) 42%, var(--surface));
+  padding: 1.25rem clamp(0.75rem, 2.5vw, 2rem) 3.5rem;
+}
+
+.nc-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------- โครง 3 คอลัมน์ ---------- */
+
+.nc-layout {
+  display: grid;
+  grid-template-columns: 15.5rem minmax(0, 1fr) 19rem;
+  gap: clamp(0.85rem, 1.6vw, 1.5rem);
+  align-items: start;
+  max-width: 1500px;
+  margin: 0 auto;
+}
+
+.nc-main { display: flex; min-width: 0; flex-direction: column; gap: var(--nc-gap); }
+
+/* ---------- การ์ดพื้นฐาน ---------- */
+
+.nc-card {
+  border: 1px solid var(--nc-line);
+  border-radius: var(--nc-radius);
+  background: var(--surface);
+  box-shadow: var(--nc-shadow);
+}
+
+/* ---------- แถบนำทางซ้าย ---------- */
+
+.nc-nav {
+  position: sticky;
+  top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: calc(100vh - 6rem);
+}
+
+.nc-nav-scroll { display: flex; flex-direction: column; gap: 1.1rem; overflow-y: auto; padding-right: 0.15rem; }
+.nc-nav-group { display: flex; flex-direction: column; gap: 0.15rem; }
+.nc-nav-label {
+  margin: 0 0 0.3rem 0.7rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.nc-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 140ms ease, color 140ms ease;
+}
+.nc-nav-item svg { flex: 0 0 auto; color: var(--muted); }
+.nc-nav-item:hover { background: var(--nc-soft); }
+.nc-nav-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.nc-nav-on,
+.nc-nav-item.active {
+  border-color: color-mix(in srgb, var(--accent) 22%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  color: var(--deep);
+}
+.nc-nav-on svg { color: var(--accent); }
+
+.nc-nav-cta { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; border-radius: 999px; }
+
+/* ---------- หัวหน้าฟีด ---------- */
+
+.nc-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.85rem;
+}
+.nc-header-copy { min-width: 0; }
+.nc-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 0.15rem;
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+.nc-header h1 { margin: 0; color: var(--deep); font-size: clamp(1.4rem, 2.4vw, 1.85rem); letter-spacing: -0.02em; }
+.nc-header-sub { margin: 0.25rem 0 0; max-width: 42rem; color: var(--muted); font-size: 0.86rem; }
+.nc-header-actions { display: flex; align-items: center; gap: 0.5rem; }
+.nc-header-actions .btn { display: inline-flex; align-items: center; gap: 0.35rem; border-radius: 999px; }
+.nc-header-me {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.3rem 0.75rem 0.3rem 0.3rem;
+  border: 1px solid var(--nc-line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--deep);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+.nc-header-me:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ---------- แถบเครื่องมือ (ค้นหา/เรียง/มุมมอง/ตัวกรอง) ---------- */
+
+.nc-toolbar {
+  position: sticky;
+  top: 0.5rem;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 0.75rem;
+  border: 1px solid var(--nc-line);
+  border-radius: var(--nc-radius);
+  background: color-mix(in srgb, var(--surface) 92%, var(--ground));
+  backdrop-filter: blur(8px);
+  box-shadow: var(--nc-shadow);
+}
+.nc-toolbar-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+
+.nc-search {
+  display: flex;
+  flex: 1 1 16rem;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0 0.7rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--ground);
+  color: var(--muted);
+}
+.nc-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
+.nc-search input {
+  width: 100%;
+  min-width: 0;
+  padding: 0.55rem 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.87rem;
+}
+.nc-search input:focus { outline: none; }
+.nc-search input::-webkit-search-cancel-button { display: none; }
+.nc-search-clear {
+  display: grid;
+  width: 1.35rem;
+  height: 1.35rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--chip);
+  color: var(--ink);
+  cursor: pointer;
+}
+.nc-search-clear:hover { background: var(--accent); color: #fff; }
+
+.nc-segment {
+  display: flex;
+  gap: 0.15rem;
+  padding: 0.2rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--ground);
+}
+.nc-segment button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.8rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+.nc-segment button:hover { color: var(--deep); }
+.nc-segment button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.nc-segment-on { background: var(--surface); color: var(--deep) !important; box-shadow: 0 2px 6px rgb(80 45 30 / 12%); }
+.nc-segment-icons button { padding: 0.4rem 0.6rem; }
+
+.nc-filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--deep);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.nc-filter-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.nc-filter-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.nc-filter-toggle-on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); color: var(--accent); }
+
+.nc-filter-panel { display: flex; flex-direction: column; gap: 0.7rem; padding-top: 0.15rem; border-top: 1px dashed var(--nc-line); }
+.nc-filter-group { display: flex; flex-direction: column; gap: 0.4rem; }
+.nc-filter-label { margin: 0.5rem 0 0; color: var(--muted); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; }
+.nc-chip-row { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.nc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.nc-chip:hover { border-color: var(--accent); color: var(--accent); }
+.nc-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.nc-chip-on { border-color: var(--accent); background: var(--accent); color: #fff; }
+.nc-chip-on:hover { color: #fff; }
+.nc-swatch { display: inline-block; width: 0.85rem; height: 0.85rem; flex: 0 0 auto; border: 1px solid rgb(0 0 0 / 12%); border-radius: 50%; }
+
+.nc-toolbar-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+.nc-active-filters { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.nc-token {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--nc-soft);
+  color: var(--deep);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.nc-token:hover { border-color: var(--accent); color: var(--accent); }
+.nc-token-reset { background: transparent; color: var(--accent); }
+
+/* ---------- กล่องเริ่มโพสต์ ---------- */
+
+.nc-composer { display: flex; flex-direction: column; gap: 0.65rem; padding: 0.85rem 0.95rem; }
+.nc-composer-top { display: flex; align-items: center; gap: 0.65rem; }
+.nc-composer-prompt {
+  flex: 1;
+  min-width: 0;
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--ground);
+  color: var(--muted);
+  font-size: 0.86rem;
+  text-decoration: none;
+}
+.nc-composer-prompt:hover { border-color: var(--accent); background: var(--nc-soft); color: var(--deep); }
+.nc-composer-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; padding-top: 0.6rem; border-top: 1px solid var(--nc-line); }
+.nc-composer-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+.nc-composer-action:hover { background: var(--nc-soft); color: var(--deep); }
+.nc-composer-action svg { color: var(--accent); }
+.nc-composer-cta { margin-left: auto; display: inline-flex; align-items: center; gap: 0.35rem; border-radius: 999px; }
+
+/* ---------- แถบแจ้งเตือนในหน้า ---------- */
+
+.nc-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid var(--nc-line);
+  border-radius: var(--nc-radius-sm);
+  background: var(--surface);
+  font-size: 0.82rem;
+}
+.nc-banner button { margin-left: auto; display: grid; place-items: center; border: 0; background: transparent; color: inherit; cursor: pointer; }
+.nc-banner-error { border-color: color-mix(in srgb, var(--danger) 35%, var(--rule)); background: color-mix(in srgb, var(--danger) 7%, var(--surface)); color: var(--danger); }
+.nc-banner-ok { border-color: color-mix(in srgb, var(--ok) 35%, var(--rule)); background: color-mix(in srgb, var(--ok) 8%, var(--surface)); color: var(--ok); }
+
+/* ---------- อวาตาร์ ---------- */
+
+.nc-avatar-link { display: inline-flex; border-radius: 50%; text-decoration: none; }
+.nc-avatar-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.nc-avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #482d35, #d8898f 58%, #f4c9bc);
+  color: #fff;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  user-select: none;
+}
+.nc-avatar-sm { width: 1.75rem; height: 1.75rem; font-size: 0.6rem; }
+.nc-avatar-md { width: 2.5rem; height: 2.5rem; font-size: 0.78rem; }
+.nc-avatar-lg { width: 3.25rem; height: 3.25rem; font-size: 0.95rem; }
+
+/* ---------- ป้ายและแท็ก ---------- */
+
+.nc-badge {
+  flex: 0 0 auto;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--nc-line);
+  border-radius: 999px;
+  background: var(--nc-soft);
+  color: var(--deep);
+  font-size: 0.68rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.nc-badge-ai { border-color: color-mix(in srgb, #6b4ea8 35%, var(--rule)); background: color-mix(in srgb, #6b4ea8 12%, var(--surface)); color: #57408a; }
+.nc-badge-remix { border-color: color-mix(in srgb, var(--accent) 32%, var(--rule)); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); color: var(--accent); }
+
+.nc-tag-row { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0; }
+.nc-tag {
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: var(--nc-soft);
+  color: var(--deep);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+.nc-tag:hover { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); color: var(--accent); }
+.nc-tag-static { cursor: default; }
+
+/* ---------- ภาพตัวอย่าง ---------- */
+
+.nc-thumb {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  place-items: center;
+  width: 100%;
+  background-color: #17120f;
+  background-size: cover;
+}
+.nc-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+/* สีอ่อน (ขาว/นู้ด/ชมพู) ต้องใช้ตัวอักษรเข้ม ไม่งั้นข้อความจะจมหายไปกับพื้นหลัง */
+.nc-thumb-light .nc-thumb-placeholder { color: var(--deep); text-shadow: none; }
+.nc-thumb-placeholder {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: rgb(255 255 255 / 90%);
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 25%);
+  text-transform: uppercase;
+}
+
+/* ---------- ฟีดโพสต์ ---------- */
+
+.nc-feed-list { display: flex; flex-direction: column; gap: var(--nc-gap); }
+
+.nc-post { display: flex; flex-direction: column; overflow: hidden; }
+.nc-post-head { display: flex; align-items: center; gap: 0.65rem; padding: 0.85rem 0.95rem 0.6rem; }
+.nc-post-identity { display: flex; min-width: 0; flex-direction: column; }
+.nc-post-author { color: var(--deep); font-size: 0.88rem; font-weight: 800; text-decoration: none; }
+.nc-post-author:hover { color: var(--accent); text-decoration: underline; }
+.nc-post-meta { display: flex; align-items: center; gap: 0.3rem; margin: 0; color: var(--muted); font-size: 0.72rem; }
+.nc-post-visibility { display: inline-flex; align-items: center; gap: 0.2rem; }
+.nc-post-head .nc-badge { margin-left: auto; }
+.nc-post-head .nc-post-report { margin-left: 0; }
+
+.nc-post-body { display: flex; flex-direction: column; gap: 0.4rem; padding: 0 0.95rem 0.75rem; }
+.nc-post-title { margin: 0; font-size: 1.05rem; line-height: 1.35; overflow-wrap: anywhere; }
+.nc-post-title a { color: var(--deep); text-decoration: none; }
+.nc-post-title a:hover { color: var(--accent); text-decoration: underline; }
+.nc-post-caption { margin: 0; color: var(--ink); font-size: 0.88rem; line-height: 1.55; overflow-wrap: anywhere; }
+
+.nc-post-media { position: relative; display: block; background: #17120f; }
+.nc-post-media-cta {
+  position: absolute;
+  right: 0.7rem;
+  bottom: 0.7rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: rgb(23 18 15 / 72%);
+  color: #fff;
+  font-size: 0.74rem;
+  font-weight: 700;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.nc-post-media:hover .nc-post-media-cta,
+.nc-post-media:focus-visible .nc-post-media-cta { opacity: 1; }
+.nc-post-media:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.nc-post-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.6rem 0.95rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.nc-post-summary-likes { display: inline-flex; align-items: center; gap: 0.35rem; font-weight: 600; }
+.nc-reaction { display: grid; width: 1.15rem; height: 1.15rem; place-items: center; border-radius: 50%; background: var(--accent); color: #fff; }
+.nc-post-summary-right { display: flex; flex-wrap: wrap; gap: 0.65rem; }
+.nc-post-summary-right a { color: inherit; text-decoration: none; }
+.nc-post-summary-right a:hover { color: var(--accent); text-decoration: underline; }
+
+.nc-post-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.2rem;
+  padding: 0.35rem;
+  border-top: 1px solid var(--nc-line);
+}
+.nc-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.5rem;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+.nc-action:hover:not(:disabled) { background: var(--nc-soft); color: var(--deep); }
+.nc-action:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.nc-action:disabled { cursor: wait; opacity: 0.6; }
+.nc-action-on { color: var(--accent); }
+.nc-action-on svg { fill: color-mix(in srgb, var(--accent) 25%, transparent); }
+.nc-action-done { color: var(--ok); }
+.nc-action-primary { color: var(--accent); }
+.nc-action-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 12%, var(--surface)); color: var(--accent); }
+
+/* ---------- การ์ดแบบกริด ---------- */
+
+.nc-tile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: var(--nc-gap); }
+.nc-tile { display: flex; flex-direction: column; overflow: hidden; transition: transform 160ms ease, box-shadow 160ms ease; }
+.nc-tile:hover { transform: translateY(-2px); box-shadow: var(--nc-shadow-lift); }
+.nc-tile-media { position: relative; display: block; }
+.nc-tile-media:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.nc-tile-badge { position: absolute; top: 0.55rem; left: 0.55rem; background: rgb(255 255 255 / 92%); }
+.nc-tile-overlay {
+  position: absolute;
+  right: 0.55rem;
+  bottom: 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background: rgb(23 18 15 / 74%);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.nc-tile:hover .nc-tile-overlay, .nc-tile-media:focus-visible .nc-tile-overlay { opacity: 1; }
+
+.nc-tile-body { display: flex; flex: 1; flex-direction: column; gap: 0.45rem; padding: 0.75rem 0.85rem 0.85rem; }
+.nc-tile-title { margin: 0; font-size: 0.95rem; line-height: 1.35; overflow-wrap: anywhere; }
+.nc-tile-title a { color: var(--deep); text-decoration: none; }
+.nc-tile-title a:hover { color: var(--accent); text-decoration: underline; }
+.nc-tile-author { display: flex; align-items: center; gap: 0.4rem; min-width: 0; color: var(--muted); font-size: 0.75rem; }
+.nc-tile-author a { color: var(--deep); font-weight: 700; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nc-tile-author a:hover { color: var(--accent); }
+.nc-tile-author time { margin-left: auto; flex: 0 0 auto; font-size: 0.7rem; }
+.nc-tile-stats {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: auto;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--nc-line);
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+.nc-tile-stats > span, .nc-stat-button { display: inline-flex; align-items: center; gap: 0.25rem; }
+.nc-stat-button { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; font-size: inherit; cursor: pointer; }
+.nc-stat-button:hover:not(:disabled), .nc-stat-on { color: var(--accent); }
+.nc-stat-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.nc-stat-button:disabled { cursor: wait; opacity: 0.6; }
+.nc-stat-on svg { fill: color-mix(in srgb, var(--accent) 25%, transparent); }
+.nc-tile-remix {
+  margin-left: auto;
+  padding: 0.25rem 0.7rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--deep);
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.nc-tile-remix:hover:not(:disabled) { border-color: var(--accent); background: var(--accent); color: #fff; }
+.nc-tile-remix:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.nc-tile-remix:disabled { cursor: wait; opacity: 0.6; }
+
+/* ---------- แผงด้านขวา ---------- */
+
+.nc-rail { position: sticky; top: 1rem; display: flex; flex-direction: column; gap: 0.85rem; max-height: calc(100vh - 3rem); overflow-y: auto; }
+.nc-rail-card { padding: 0.9rem 1rem; }
+.nc-rail-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.7rem;
+  color: var(--deep);
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+.nc-rail-card h2 svg { color: var(--accent); }
+
+.nc-rail-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; margin: 0; }
+.nc-rail-stats div { padding: 0.5rem 0.6rem; border-radius: var(--nc-radius-sm); background: var(--nc-soft); }
+.nc-rail-stats dt { color: var(--muted); font-size: 0.7rem; }
+.nc-rail-stats dd { margin: 0.1rem 0 0; color: var(--deep); font-size: 1.05rem; font-weight: 800; }
+
+.nc-rail-people { display: flex; flex-direction: column; gap: 0.6rem; margin: 0; padding: 0; list-style: none; }
+.nc-rail-people li { display: flex; align-items: center; gap: 0.55rem; }
+.nc-rail-person-copy { display: flex; min-width: 0; flex-direction: column; }
+.nc-rail-person-copy a { color: var(--deep); font-size: 0.82rem; font-weight: 700; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nc-rail-person-copy a:hover { color: var(--accent); }
+.nc-rail-person-copy small { color: var(--muted); font-size: 0.7rem; }
+
+.nc-rail-tags { display: flex; flex-direction: column; gap: 0.45rem; margin: 0; padding: 0; list-style: none; }
+.nc-rail-tags li { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.nc-rail-tags a { color: var(--deep); font-size: 0.82rem; font-weight: 700; text-decoration: none; }
+.nc-rail-tags a:hover { color: var(--accent); }
+.nc-rail-tags small { color: var(--muted); font-size: 0.7rem; }
+
+.nc-rail-guidelines ul { display: flex; flex-direction: column; gap: 0.35rem; margin: 0; padding-left: 1.05rem; color: var(--muted); font-size: 0.78rem; line-height: 1.5; list-style: disc; }
+
+/* ---------- สถานะ (ว่าง / ผิดพลาด / กำลังโหลด) ---------- */
+
+.nc-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 2.4rem 1.25rem;
+  border: 1px dashed color-mix(in srgb, var(--rule) 90%, transparent);
+  border-radius: var(--nc-radius);
+  background: color-mix(in srgb, var(--surface) 70%, var(--ground));
+  text-align: center;
+}
+.nc-state-icon {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  color: var(--accent);
+}
+.nc-state h3 { margin: 0.35rem 0 0; color: var(--deep); font-size: 1rem; }
+.nc-state p { margin: 0; max-width: 30rem; color: var(--muted); font-size: 0.84rem; }
+.nc-state-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin-top: 0.65rem; }
+.nc-state-error { border-color: color-mix(in srgb, var(--danger) 30%, var(--rule)); background: color-mix(in srgb, var(--danger) 5%, var(--surface)); }
+.nc-state-error .nc-state-icon { background: color-mix(in srgb, var(--danger) 12%, var(--surface)); color: var(--danger); }
+
+.nc-skeleton { pointer-events: none; }
+.nc-skel { display: block; border-radius: 8px; background: linear-gradient(90deg, var(--chip) 25%, color-mix(in srgb, var(--chip) 45%, var(--surface)) 37%, var(--chip) 63%); background-size: 400% 100%; animation: nc-shimmer 1.4s ease infinite; }
+.nc-skel-avatar { width: 2.5rem; height: 2.5rem; border-radius: 50%; }
+.nc-skel-lines { display: flex; flex: 1; flex-direction: column; gap: 0.35rem; }
+.nc-skel-line { height: 0.7rem; }
+.nc-skel-media { aspect-ratio: 16 / 10; border-radius: 0; }
+.nc-skel-media-tile { aspect-ratio: 4 / 3; }
+.nc-skel-pill { height: 2rem; border-radius: 999px; }
+.nc-skel-stage { aspect-ratio: 16 / 10; min-height: 18rem; border-radius: var(--nc-radius); }
+.nc-skeleton .nc-post-body, .nc-skeleton .nc-tile-body { gap: 0.45rem; }
+
+@keyframes nc-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nc-skel { animation: none; }
+  .nc-tile, .nc-post-media-cta, .nc-tile-overlay { transition: none; }
+}
+
+.nc-load-more { align-self: center; min-width: 12rem; border-radius: 999px; }
+.nc-feed-end { margin: 0.5rem 0 0; color: var(--muted); font-size: 0.78rem; text-align: center; }
+
+/* ---------- หน้ารายละเอียดดีไซน์ ---------- */
+
+.nc-detail-page { max-width: 1360px; margin: 0 auto; }
+.nc-breadcrumb { display: flex; align-items: center; gap: 0.45rem; margin-bottom: 0.85rem; color: var(--muted); font-size: 0.82rem; }
+.nc-breadcrumb a { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--accent); font-weight: 700; text-decoration: none; }
+.nc-breadcrumb a:hover { text-decoration: underline; }
+.nc-breadcrumb-current { overflow: hidden; color: var(--deep); font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+
+.nc-detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) 21rem; gap: clamp(0.85rem, 1.6vw, 1.35rem); align-items: start; }
+.nc-detail-main { display: flex; min-width: 0; flex-direction: column; gap: var(--nc-gap); }
+.nc-detail-side { position: sticky; top: 1rem; display: flex; flex-direction: column; gap: 0.85rem; }
+
+.nc-detail-stage {
+  position: relative;
+  min-height: min(64vh, 640px);
+  overflow: hidden;
+  border: 1px solid var(--nc-line);
+  border-radius: var(--nc-radius);
+  background: #17120f;
+  box-shadow: var(--nc-shadow-lift);
+}
+.nc-detail-stage > div, .nc-detail-stage canvas { display: block; width: 100%; height: 100%; min-height: min(64vh, 640px); }
+.nc-detail-stage-badge {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 90%);
+  color: var(--deep);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.nc-detail-summary { display: flex; flex-direction: column; gap: 0.7rem; padding: 1rem 1.1rem; }
+.nc-detail-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; }
+.nc-detail-title-row h1 { margin: 0; color: var(--deep); font-size: clamp(1.25rem, 2.2vw, 1.7rem); line-height: 1.25; overflow-wrap: anywhere; }
+.nc-detail-author { display: flex; align-items: center; gap: 0.6rem; }
+.nc-detail-author-copy { display: flex; min-width: 0; flex-direction: column; }
+.nc-detail-author-copy a { color: var(--deep); font-size: 0.88rem; font-weight: 800; text-decoration: none; }
+.nc-detail-author-copy a:hover { color: var(--accent); }
+.nc-detail-author-copy small { color: var(--muted); font-size: 0.72rem; }
+.nc-detail-caption { margin: 0; color: var(--ink); font-size: 0.92rem; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.nc-detail-cta { display: flex; flex-direction: column; gap: 0.6rem; }
+.nc-detail-primary { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; width: 100%; border-radius: 999px; padding: 0.65rem 1rem; }
+.nc-detail-hint { margin: 0; color: var(--muted); font-size: 0.75rem; line-height: 1.5; }
+.nc-detail-secondary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.4rem; }
+.nc-detail-secondary .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; border-radius: 999px; font-size: 0.8rem; }
+.nc-detail-liked { border-color: var(--accent); color: var(--accent); }
+.nc-detail-liked svg { fill: color-mix(in srgb, var(--accent) 25%, transparent); }
+
+.nc-detail-meta { display: flex; flex-direction: column; gap: 0.45rem; margin: 0; }
+.nc-detail-meta div { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.nc-detail-meta dt { color: var(--muted); font-size: 0.78rem; }
+.nc-detail-meta dd { margin: 0; color: var(--deep); font-size: 0.82rem; font-weight: 700; text-align: right; }
+.nc-detail-color { display: inline-flex; align-items: center; gap: 0.35rem; }
+.nc-detail-author-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--nc-line);
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+.nc-detail-author-link:hover { text-decoration: underline; }
+
+.nc-inline-error { display: flex; align-items: center; gap: 0.3rem; margin: 0; color: var(--danger); font-size: 0.76rem; }
+
+/* ---------- ความคิดเห็น ---------- */
+
+.nc-comments { padding: 1rem 1.1rem 1.15rem; }
+.nc-comments h2 { display: flex; align-items: center; gap: 0.4rem; margin: 0 0 0.85rem; color: var(--deep); font-size: 1rem; }
+.nc-comments h2 svg { color: var(--accent); }
+.nc-comment-form { display: flex; gap: 0.6rem; }
+.nc-comment-field { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 0.4rem; }
+.nc-comment-field textarea {
+  width: 100%;
+  min-height: 3.2rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--nc-radius-sm);
+  background: var(--ground);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.86rem;
+  resize: vertical;
+}
+.nc-comment-field textarea:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
+.nc-comment-form-foot { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; color: var(--muted); font-size: 0.72rem; }
+.nc-comment-form-foot .btn { border-radius: 999px; }
+.nc-count-warn { color: var(--danger); }
+
+.nc-comment-list { display: flex; flex-direction: column; gap: 0.75rem; margin: 1rem 0 0; padding: 0; list-style: none; }
+.nc-comment-list li { display: flex; gap: 0.6rem; }
+.nc-comment-bubble { flex: 1; min-width: 0; padding: 0.6rem 0.8rem; border-radius: var(--nc-radius-sm); background: var(--nc-soft); }
+.nc-comment-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.45rem; }
+.nc-comment-head a { color: var(--deep); font-size: 0.82rem; font-weight: 800; text-decoration: none; }
+.nc-comment-head a:hover { color: var(--accent); }
+.nc-comment-head time { color: var(--muted); font-size: 0.7rem; }
+.nc-comment-bubble p { margin: 0.2rem 0 0; font-size: 0.86rem; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.nc-comments .nc-state { padding: 1.75rem 1rem; }
+
+/* ---------- ตอบสนองต่อขนาดจอ ---------- */
+
+/* เดสก์ท็อปแคบ: ซ่อนแผงขวา แต่ยังคงเมนูซ้าย */
+@media (max-width: 1200px) {
+  .nc-layout { grid-template-columns: 14.5rem minmax(0, 1fr); }
+  .nc-rail { display: none; }
+  .nc-detail-grid { grid-template-columns: minmax(0, 1fr) 18.5rem; }
+}
+
+/* แท็บเล็ต: เมนูซ้ายกลายเป็นแถบแนวนอนเหนือฟีด */
+@media (max-width: 960px) {
+  .nc-layout { grid-template-columns: minmax(0, 1fr); }
+  .nc-nav {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    max-height: none;
+    margin: -1.25rem calc(-1 * clamp(0.75rem, 2.5vw, 2rem)) 0;
+    padding: 0.5rem clamp(0.75rem, 2.5vw, 2rem);
+    border-bottom: 1px solid var(--nc-line);
+    background: color-mix(in srgb, var(--surface) 92%, var(--ground));
+    backdrop-filter: blur(8px);
+  }
+  .nc-nav-scroll { flex-direction: row; gap: 0.5rem; overflow-x: auto; padding-bottom: 0.15rem; scrollbar-width: none; }
+  .nc-nav-scroll::-webkit-scrollbar { display: none; }
+  .nc-nav-group { flex-direction: row; gap: 0.3rem; }
+  .nc-nav-label { display: none; }
+  .nc-nav-item { padding: 0.4rem 0.75rem; border: 1px solid var(--rule); border-radius: 999px; font-size: 0.8rem; white-space: nowrap; }
+  .nc-nav-cta { display: none; }
+  .nc-detail-grid { grid-template-columns: minmax(0, 1fr); }
+  .nc-detail-side { position: static; }
+  .nc-detail-stage, .nc-detail-stage > div, .nc-detail-stage canvas { min-height: min(52vh, 460px); }
+}
+
+/* มือถือ */
+@media (max-width: 640px) {
+  .nc-page { padding: 1rem 0.75rem 3rem; }
+  .nc-header { align-items: stretch; flex-direction: column; }
+  .nc-header-actions { width: 100%; }
+  .nc-header-actions .btn { flex: 1; justify-content: center; }
+  .nc-toolbar { position: static; padding: 0.65rem; }
+  .nc-toolbar-row { gap: 0.4rem; }
+  .nc-search { flex: 1 1 100%; }
+  .nc-segment { flex: 1 1 auto; }
+  .nc-segment button { flex: 1; justify-content: center; padding: 0.4rem 0.5rem; }
+  .nc-filter-toggle { flex: 0 0 auto; }
+  .nc-composer-actions .nc-composer-action span { display: inline; }
+  .nc-composer-cta { width: 100%; justify-content: center; margin-left: 0; }
+  .nc-post-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .nc-action span { font-size: 0.78rem; }
+  .nc-tile-grid { grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr)); gap: 0.7rem; }
+  .nc-tile-body { padding: 0.6rem 0.65rem 0.7rem; }
+  .nc-detail-secondary { grid-template-columns: minmax(0, 1fr); }
+  .nc-comment-form { flex-direction: column; }
+  .nc-comment-form > .nc-avatar { display: none; }
+  .nc-rail-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 380px) {
+  .nc-tile-grid { grid-template-columns: minmax(0, 1fr); }
+}

@@ -1,3 +1,4 @@
+import { Icon } from '@/components/Icon.tsx'
 import { BRUSHES, FINISHES, NAIL_LENGTHS, NAIL_SHAPES, type Nail } from '@nail-studio/contracts'
 import type { BrushId } from '@/3d/painting/paintSettings.ts'
 import { useDesign } from './DesignStoreProvider.tsx'
@@ -63,7 +64,7 @@ export function PaintToolbar() {
             aria-pressed={settings.tool === 'brush'}
             onClick={() => setSettings({ tool: 'brush' })}
           >
-            <span aria-hidden="true">✎</span> แปรง
+            <Icon name="palette" size={15} /> แปรง
           </button>
           <button
             type="button"
@@ -71,7 +72,7 @@ export function PaintToolbar() {
             aria-pressed={settings.tool === 'erase'}
             onClick={() => setSettings({ tool: 'erase' })}
           >
-            <span aria-hidden="true">⌫</span> ยางลบ
+            <Icon name="x" size={15} /> ยางลบ
           </button>
         </div>
         <label className="field">

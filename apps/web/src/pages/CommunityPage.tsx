@@ -1,283 +1,213 @@
-import { useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { TEMPLATE_CATEGORIES, TEMPLATE_PRIMARY_COLORS } from '@nail-studio/contracts'
-import { API_BASE, ApiRequestError } from '@/api/client.ts'
-import { CommentIcon, HeartIcon, RemixIcon, ShareIcon } from '@/components/icons/CommunityIcons.tsx'
-import { SkeletonGrid, Spinner } from '@/components/Loading.tsx'
+import { useEffect, useMemo, useRef } from 'react'
+import { Link } from 'react-router-dom'
+import { Icon } from '@/components/Icon.tsx'
+import { usePageTitle } from '@/lib/usePageTitle.ts'
 import { useCurrentUser } from '@/features/auth/useAuth.ts'
-import { getInitials, ORIGIN_LABELS } from '@/features/community/initials.ts'
-import {
-  type TemplateCategory,
-  type TemplatePrimaryColor,
-  type TemplateSort,
-  useTemplateLike,
-  useTemplateRemix,
-  useTemplateShare,
-  useTemplates,
-} from '@/features/community/useTemplates.ts'
+import { Avatar } from '@/components/ui/Avatar.tsx'
+import { CommunityComposer } from '@/features/community/components/CommunityComposer.tsx'
+import { CommunityNav } from '@/features/community/components/CommunityNav.tsx'
+import { CommunityRail } from '@/features/community/components/CommunityRail.tsx'
+import { CommunityToolbar } from '@/features/community/components/CommunityToolbar.tsx'
+import { EmptyState, ErrorState, FeedSkeletonList } from '@/components/ui/States.tsx'
+import { PostCard } from '@/features/community/components/PostCard.tsx'
+import { TemplateTile } from '@/features/community/components/TemplateTile.tsx'
+import { useCommunityFilters } from '@/features/community/useCommunityFilters.ts'
+import { useTemplateActions } from '@/features/community/useTemplateActions.ts'
+import { useTemplates } from '@/features/community/useTemplates.ts'
 
-const PREVIEW_CLASSES: Record<string, string> = {
-  Red: 'template-preview-red',
-  Pink: 'template-preview-pink',
-  Nude: 'template-preview-nude',
-  Black: 'template-preview-black',
-  White: 'template-preview-white',
-}
-
-function formatPostDate(value: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-
-  const minutes = Math.floor((Date.now() - date.getTime()) / 60000)
-  if (minutes < 1) return 'เมื่อสักครู่นี้'
-  if (minutes < 60) return `${minutes} นาทีที่แล้ว`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours} ชั่วโมงที่แล้ว`
-  const days = Math.floor(hours / 24)
-  if (days < 7) return `${days} วันที่แล้ว`
-  return new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }).format(date)
+/** ค้นหาแบบง่ายฝั่งเบราว์เซอร์ ครอบคลุมชื่อ คำบรรยาย ผู้สร้าง สไตล์ และสีหลัก */
+function matchesQuery(haystack: (string | null)[], query: string): boolean {
+  const needle = query.trim().toLowerCase()
+  if (!needle) return true
+  return haystack.some((value) => value?.toLowerCase().includes(needle))
 }
 
 export function CommunityPage() {
-  const navigate = useNavigate()
+  usePageTitle('ชุมชน')
   const { data: currentUser } = useCurrentUser()
-  const [sort, setSort] = useState<TemplateSort>('latest')
-  const [category, setCategory] = useState<TemplateCategory | ''>('')
-  const [color, setColor] = useState<TemplatePrimaryColor | ''>('')
-  const filters = useMemo(
-    () => ({
-      sort,
-      ...(category ? { category } : {}),
-      ...(color ? { color } : {}),
-    }),
-    [category, color, sort],
-  )
-  const templates = useTemplates(filters)
-  const likeMutation = useTemplateLike()
-  const remixMutation = useTemplateRemix()
-  const shareMutation = useTemplateShare()
-  const [sharedTemplateId, setSharedTemplateId] = useState<string | null>(null)
-  const [shareError, setShareError] = useState<string | null>(null)
-  const items = templates.data?.pages.flatMap((page) => page.data) ?? []
+  const { state, setState, buildHref, reset, apiFilters, hasActiveFilters } = useCommunityFilters()
+  const templates = useTemplates(apiFilters)
+  const actions = useTemplateActions()
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
 
-  const shareTemplate = async (templateId: string, name: string) => {
-    setShareError(null)
-    try {
-      let channel: 'link' | 'copy' = 'link'
-      const url = `${window.location.origin}/community/templates/${templateId}`
-      if (navigator.share) {
-        await navigator.share({ title: name, url })
-      } else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(url)
-        channel = 'copy'
-      } else {
-        throw new Error('เบราว์เซอร์นี้ไม่รองรับการแชร์ลิงก์')
-      }
-      shareMutation.mutate(
-        { templateId, channel },
-        { onSuccess: () => setSharedTemplateId(templateId) },
-      )
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return
-      setShareError(error instanceof Error ? error.message : 'แชร์ผลงานไม่สำเร็จ')
-    }
-  }
+  const loaded = useMemo(
+    () => templates.data?.pages.flatMap((page) => page.data) ?? [],
+    [templates.data],
+  )
+
+  const items = useMemo(
+    () =>
+      state.q.trim()
+        ? loaded.filter((template) =>
+            matchesQuery(
+              [template.name, template.caption, template.author.displayName, template.category, template.primaryColor],
+              state.q,
+            ),
+          )
+        : loaded,
+    [loaded, state.q],
+  )
+
+  /**
+   * โหลดหน้าถัดไปอัตโนมัติเมื่อเลื่อนถึงท้ายฟีด
+   * ปุ่ม "โหลดเพิ่ม" ยังคงอยู่ด้านล่างสำหรับผู้ใช้คีย์บอร์ดและกรณี IntersectionObserver ไม่ทำงาน
+   */
+  useEffect(() => {
+    const node = sentinelRef.current
+    if (!node || typeof IntersectionObserver === 'undefined') return
+    if (!templates.hasNextPage || templates.isFetchingNextPage) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) void templates.fetchNextPage()
+      },
+      { rootMargin: '600px 0px' },
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [templates])
+
+  const isInitialLoading = templates.isPending
+  const isEmpty = !isInitialLoading && !templates.error && items.length === 0
+  const searchHidAll = isEmpty && loaded.length > 0
 
   return (
-    <section className="page community-page">
-      <header className="page-head community-head community-hero">
-        <div className="community-hero-copy">
-          <span className="community-hero-mark" aria-hidden="true">✦</span>
-          <p className="eyebrow">NAIL STUDIO COMMUNITY</p>
-          <h1>ไอเดียจากชุมชน</h1>
-          <p className="muted">สำรวจดีไซน์ล่าสุดและแบบที่คนกำลังชื่นชอบ</p>
-        </div>
-        <div className="community-head-actions">
-          {currentUser && <Link to={`/users/${currentUser.id}`} className="btn btn-ghost">โปรไฟล์ของฉัน</Link>}
-          <Link to="/projects" className="btn btn-primary">แชร์ผลงาน</Link>
-        </div>
-      </header>
+    <div className="nc-page">
+      <div className="nc-layout">
+        <CommunityNav state={state} buildHref={buildHref} currentUserId={currentUser?.id} />
 
-      <div className="community-toolbar">
-        <div className="community-sort" role="group" aria-label="เรียงลำดับฟีด">
-          <button
-            type="button"
-            className={`chip ${sort === 'latest' ? 'chip-on' : ''}`}
-            onClick={() => setSort('latest')}
-          >
-            ล่าสุด
-          </button>
-          <button
-            type="button"
-            className={`chip ${sort === 'popular' ? 'chip-on' : ''}`}
-            onClick={() => setSort('popular')}
-          >
-            ยอดนิยม
-          </button>
-        </div>
-        <div className="community-filters" aria-label="ตัวกรองดีไซน์">
-        <label className="field">
-          สไตล์
-          <select
-            aria-label="กรองตามสไตล์"
-            value={category}
-            onChange={(event) => setCategory(event.target.value as TemplateCategory | '')}
-          >
-            <option value="">ทุกสไตล์</option>
-            {TEMPLATE_CATEGORIES.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-        </label>
-        <label className="field">
-          สีหลัก
-          <select
-            aria-label="กรองตามสีหลัก"
-            value={color}
-            onChange={(event) => setColor(event.target.value as TemplatePrimaryColor | '')}
-          >
-            <option value="">ทุกสี</option>
-            {TEMPLATE_PRIMARY_COLORS.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-        </label>
-        </div>
-      </div>
-
-      <div className="community-content">
-        <main className="community-feed">
-          <section className="community-composer" aria-label="แชร์ผลงานใหม่">
-            <div className="community-composer-head">
-              <span className="community-composer-avatar" aria-hidden="true">{getInitials(currentUser?.displayName)}</span>
-              <div className="community-composer-copy">
-                <strong>{currentUser?.displayName ?? 'ผู้ใช้งาน'}</strong>
-                <span>พร้อมแบ่งปันไอเดียใหม่กับชุมชนหรือยัง?</span>
-              </div>
-              <span className="community-privacy">สาธารณะ</span>
+        <main className="nc-main" id="community-feed">
+          <header className="nc-header">
+            <div className="nc-header-copy">
+              <p className="nc-eyebrow"><Icon name="sparkle" size={13} /> NAIL STUDIO COMMUNITY</p>
+              <h1>{state.view === 'grid' ? 'เรียกดูแบบทั้งหมด' : state.sort === 'popular' ? 'ผลงานกำลังมาแรง' : 'ฟีดชุมชน'}</h1>
+              <p className="nc-header-sub">
+                {state.view === 'grid'
+                  ? 'เลือกดูดีไซน์เป็นตาราง กรองตามสไตล์และสีหลัก แล้วรีมิกซ์ได้ทันที'
+                  : 'ดีไซน์ล่าสุดจากคนในชุมชน กดถูกใจ พูดคุย และนำไปต่อยอดเป็นงานของคุณเอง'}
+              </p>
             </div>
-            <div className="community-composer-actions">
-              <span className="community-compose-hint">โพสต์ผลงานของคุณให้คนอื่นได้แรงบันดาลใจ</span>
-              <Link to="/projects" className="btn btn-primary">สร้างและแชร์ผลงาน</Link>
-            </div>
-          </section>
-
-          {shareError && <p className="error community-feedback" role="alert">{shareError}</p>}
-          {sharedTemplateId && <p className="community-success" role="status">แชร์ลิงก์ผลงานแล้ว</p>}
-
-      {templates.isPending && <SkeletonGrid count={6} className="community-grid community-feed-grid" />}
-      {templates.error && (
-        <p className="error" role="alert">
-          โหลดฟีดไม่สำเร็จ{templates.error instanceof ApiRequestError ? ` — ${templates.error.message}` : ''}
-        </p>
-      )}
-      {!templates.isPending && !templates.error && items.length === 0 && (
-        <p className="muted">ยังไม่มีดีไซน์ที่ตรงกับตัวกรองนี้</p>
-      )}
-
-      <div className="community-grid community-feed-grid">
-        {items.map((template) => (
-          <article className="template-card community-post-card" key={template.id}>
-            <div
-              className={`template-preview ${template.hasThumbnail ? 'template-preview-image' : PREVIEW_CLASSES[template.primaryColor ?? ''] ?? 'template-preview-default'}`}
-            >
-              {template.hasThumbnail ? (
-                <img
-                  src={`${API_BASE}/api/v1/templates/${template.id}/thumbnail`}
-                  crossOrigin="use-credentials"
-                  alt={`ภาพตัวอย่าง ${template.name}`}
-                  loading="lazy"
-                />
-              ) : (
-                <span>{template.primaryColor ?? 'Nail art'}</span>
+            <div className="nc-header-actions">
+              {currentUser && (
+                <Link to={`/users/${currentUser.id}`} className="nc-header-me">
+                  <Avatar userId={currentUser.id} displayName={currentUser.displayName} size="sm" linkToProfile={false} />
+                  <span>โปรไฟล์ของฉัน</span>
+                </Link>
               )}
-              <div className="community-post-overlay">
-                <div className="community-post-overlay-head">
-                  <h2><Link to={`/community/templates/${template.id}`}>{template.name}</Link></h2>
-                  <span className="template-origin">{ORIGIN_LABELS[template.origin] ?? template.origin}</span>
-                </div>
-                {template.caption && <p>{template.caption}</p>}
-              </div>
+              <Link to="/projects" className="btn btn-primary"><Icon name="plus" size={15} /> แชร์ผลงาน</Link>
             </div>
-            <div className="template-card-body">
-              <div className="community-post-author">
-                <span className="community-post-author-avatar" aria-hidden="true">{getInitials(template.author.displayName)}</span>
-                <div>
-                  <Link to={`/users/${template.author.id}`}>{template.author.displayName}</Link>
-                  <span className="community-post-meta">
-                    <time dateTime={template.createdAt}>{formatPostDate(template.createdAt)}</time> · สาธารณะ
-                  </span>
-                </div>
-              </div>
-              <div className="template-stats" aria-label="สถิติการมีส่วนร่วม">
-                <button
-                  type="button"
-                  className={`template-like ${template.isLiked ? 'template-like-on' : ''}`}
-                  aria-label={template.isLiked ? 'เลิกไลก์ดีไซน์นี้' : 'ไลก์ดีไซน์นี้'}
-                  aria-pressed={template.isLiked}
-                  disabled={likeMutation.isPending && likeMutation.variables?.templateId === template.id}
-                  onClick={() => {
-                    likeMutation.mutate({ templateId: template.id, liked: template.isLiked })
-                  }}
-                >
-                  <HeartIcon filled={template.isLiked} />{' '}{template.likeCount}
-                </button>
-                <button
-                  type="button"
-                  className="template-social-action"
-                  disabled={shareMutation.isPending && shareMutation.variables?.templateId === template.id}
-                  onClick={() => { void shareTemplate(template.id, template.name) }}
-                >
-                  <ShareIcon />{' '}{sharedTemplateId === template.id ? 'แชร์แล้ว' : template.shareCount}
-                </button>
-                <span><RemixIcon />{' '}{template.remixCount}</span>
-                <Link to={`/community/templates/${template.id}`} className="template-social-action"><CommentIcon />{' '}{template.commentCount}</Link>
-                <button
-                  type="button"
-                  className="template-remix"
-                  disabled={remixMutation.isPending && remixMutation.variables?.templateId === template.id}
-                  onClick={() => {
-                    remixMutation.mutate(
-                      { templateId: template.id },
-                      { onSuccess: (result) => navigate(`/editor/${result.project.id}`) },
-                    )
-                  }}
-                >
-                  <RemixIcon />{' '}
-                  {remixMutation.isPending && remixMutation.variables?.templateId === template.id
-                    ? 'กำลังสร้าง…'
-                    : 'รีมิกซ์'}
-                </button>
-              </div>
-            </div>
-          </article>
-        ))}
-      </div>
+          </header>
 
-      {templates.hasNextPage && (
-        <button
-          type="button"
-          className="btn btn-ghost community-load-more"
-          disabled={templates.isFetchingNextPage}
-          onClick={() => void templates.fetchNextPage()}
-        >
-          <span className="community-load-more-spinner">
-            {templates.isFetchingNextPage && <Spinner size={14} />}
-          </span>
-          <span>โหลดเพิ่ม</span>
-        </button>
-      )}
+          <CommunityToolbar
+            state={state}
+            setState={setState}
+            hasActiveFilters={hasActiveFilters}
+            onReset={reset}
+            resultCount={items.length}
+            isLoading={isInitialLoading}
+          />
+
+          {state.view === 'feed' && <CommunityComposer user={currentUser} />}
+
+          {actions.shareError && (
+            <p className="nc-banner nc-banner-error" role="alert">
+              <Icon name="alert" size={15} /> {actions.shareError}
+              <button type="button" onClick={actions.dismissShareError} aria-label="ปิดข้อความ"><Icon name="x" size={13} /></button>
+            </p>
+          )}
+          {actions.remixError && (
+            <p className="nc-banner nc-banner-error" role="alert"><Icon name="alert" size={15} /> {actions.remixError}</p>
+          )}
+          {actions.sharedId && !actions.shareError && (
+            <p className="nc-banner nc-banner-ok" role="status"><Icon name="check" size={15} /> คัดลอกลิงก์ผลงานเรียบร้อยแล้ว</p>
+          )}
+
+          {isInitialLoading && <FeedSkeletonList variant={state.view === 'grid' ? 'tile' : 'post'} count={state.view === 'grid' ? 6 : 3} />}
+
+          {templates.error && (
+            <ErrorState
+              title="โหลดฟีดชุมชนไม่สำเร็จ"
+              error={templates.error}
+              onRetry={() => void templates.refetch()}
+            />
+          )}
+
+          {isEmpty && (
+            searchHidAll ? (
+              <EmptyState
+                icon="search"
+                title="ไม่พบผลงานที่ตรงกับคำค้นหา"
+                description={`ลองใช้คำอื่น หรือโหลดผลงานเพิ่มเพื่อค้นหาให้ครอบคลุมมากขึ้น`}
+              >
+                <button type="button" className="btn btn-ghost" onClick={() => setState({ q: '' })}>ล้างคำค้นหา</button>
+                {templates.hasNextPage && (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={templates.isFetchingNextPage}
+                    onClick={() => void templates.fetchNextPage()}
+                  >
+                    {templates.isFetchingNextPage ? 'กำลังโหลด…' : 'โหลดผลงานเพิ่ม'}
+                  </button>
+                )}
+              </EmptyState>
+            ) : (
+              <EmptyState
+                icon="sparkle"
+                title={hasActiveFilters ? 'ยังไม่มีผลงานที่ตรงกับตัวกรองนี้' : 'ยังไม่มีผลงานในชุมชน'}
+                description={
+                  hasActiveFilters
+                    ? 'ลองเอาตัวกรองบางอย่างออก แล้วดูดีไซน์อื่นในชุมชน'
+                    : 'เป็นคนแรกที่แชร์ดีไซน์ให้ชุมชนได้เลย'
+                }
+              >
+                {hasActiveFilters && (
+                  <button type="button" className="btn btn-ghost" onClick={reset}>ล้างตัวกรอง</button>
+                )}
+                <Link to="/projects" className="btn btn-primary">แชร์ผลงานของฉัน</Link>
+              </EmptyState>
+            )
+          )}
+
+          {items.length > 0 && (
+            state.view === 'grid' ? (
+              <div className="nc-tile-grid">
+                {items.map((template) => (
+                  <TemplateTile key={template.id} template={template} actions={actions} />
+                ))}
+              </div>
+            ) : (
+              <div className="nc-feed-list">
+                {items.map((template) => (
+                  <PostCard key={template.id} template={template} actions={actions} />
+                ))}
+              </div>
+            )
+          )}
+
+          {templates.isFetchingNextPage && (
+            <FeedSkeletonList variant={state.view === 'grid' ? 'tile' : 'post'} count={state.view === 'grid' ? 3 : 1} />
+          )}
+
+          <div ref={sentinelRef} aria-hidden="true" />
+
+          {templates.hasNextPage && !templates.isFetchingNextPage && (
+            <button
+              type="button"
+              className="btn btn-ghost nc-load-more"
+              onClick={() => void templates.fetchNextPage()}
+            >
+              โหลดผลงานเพิ่ม
+            </button>
+          )}
+
+          {!templates.hasNextPage && loaded.length > 0 && (
+            <p className="nc-feed-end">คุณดูครบทุกผลงานที่ตรงกับตัวกรองนี้แล้ว</p>
+          )}
         </main>
 
-        <aside className="community-sidebar">
-          <section className="community-sidebar-card">
-            <p className="eyebrow">NAIL STUDIO</p>
-            <h2>ชุมชนของเรา</h2>
-            <p>ค้นหาแรงบันดาลใจ แชร์ผลงาน และพูดคุยกับคนที่รักการออกแบบเล็บเหมือนกัน</p>
-            {currentUser && <Link to={`/users/${currentUser.id}`} className="sidebar-profile-link">ดูโปรไฟล์ของฉัน</Link>}
-          </section>
-          <section className="community-sidebar-card community-guidelines">
-            <h2>แนวทางชุมชน</h2>
-            <p>แชร์ผลงานของคุณด้วยความเคารพ และช่วยกันทำให้ Community น่าใช้งานสำหรับทุกคน</p>
-          </section>
-        </aside>
+        <CommunityRail items={loaded} buildHref={buildHref} currentUserId={currentUser?.id} />
       </div>
-    </section>
+    </div>
   )
 }

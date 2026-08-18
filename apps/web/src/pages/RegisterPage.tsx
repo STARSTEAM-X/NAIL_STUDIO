@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import { ApiRequestError } from '@/api/client.ts'
 import { AuthLayout, AuthPasswordField } from '@/components/AuthLayout.tsx'
 import { useRegister } from '@/features/auth/useAuth.ts'
+import { usePageTitle } from '@/lib/usePageTitle.ts'
 import { maskDdMmYyyyInput, parseDdMmYyyy } from '@/utils/dateFormat.ts'
 
 const MIN_PASSWORD_LENGTH = 12
 
 export function RegisterPage() {
+  usePageTitle('สมัครสมาชิก')
   const register = useRegister()
   const navigate = useNavigate()
   const [displayName, setDisplayName] = useState('')
@@ -48,10 +50,14 @@ export function RegisterPage() {
         : null)
 
   return (
-    <AuthLayout active="register">
+    <AuthLayout
+      active="register"
+      title="สร้างบัญชีใหม่"
+      subtitle="เริ่มออกแบบลายเล็บ 3 มิติ และแชร์ผลงานกับชุมชน"
+    >
       <form className="auth-form auth-form-register" onSubmit={handleSubmit}>
         <fieldset className="auth-role-fieldset">
-          <legend>Role</legend>
+          <legend>ประเภทบัญชี</legend>
           <label className="auth-radio">
             <input
               type="radio"
@@ -60,7 +66,10 @@ export function RegisterPage() {
               checked={role === 'user'}
               onChange={() => setRole('user')}
             />
-            <span>Customer</span>
+            <span>
+              <strong>ลูกค้า</strong>
+              <small>ออกแบบเล็บ แชร์ผลงาน และจองคิวกับร้าน</small>
+            </span>
           </label>
           <label className="auth-radio">
             <input
@@ -70,12 +79,15 @@ export function RegisterPage() {
               checked={role === 'shop'}
               onChange={() => setRole('shop')}
             />
-            <span>Shop</span>
+            <span>
+              <strong>ร้านทำเล็บ</strong>
+              <small>ทำได้ทุกอย่างเหมือนลูกค้า บวกหน้าจัดการร้าน บริการ และรีวิว</small>
+            </span>
           </label>
         </fieldset>
 
         <div className="auth-field">
-          <label htmlFor="displayName">Username</label>
+          <label htmlFor="displayName">ชื่อที่แสดง</label>
           <input
             id="displayName"
             required
@@ -87,7 +99,7 @@ export function RegisterPage() {
         </div>
 
         <div className="auth-field">
-          <label htmlFor="email">Email</label>
+          <label htmlFor="email">อีเมล</label>
           <input
             id="email"
             type="email"
@@ -100,7 +112,8 @@ export function RegisterPage() {
 
         <AuthPasswordField
           id="password"
-          label="Password"
+          label="รหัสผ่าน"
+          hint={`ต้องยาวอย่างน้อย ${MIN_PASSWORD_LENGTH} ตัวอักษร แนะนำให้ใช้วลีที่จำได้แทนการผสมสัญลักษณ์`}
           autoComplete="new-password"
           minLength={MIN_PASSWORD_LENGTH}
           value={password}
@@ -108,7 +121,7 @@ export function RegisterPage() {
         />
 
         <div className="auth-field">
-          <label htmlFor="dateOfBirth">Date of birth</label>
+          <label htmlFor="dateOfBirth">วันเกิด</label>
           <div className="auth-date-shell">
             <input
               id="dateOfBirth"
@@ -134,13 +147,13 @@ export function RegisterPage() {
             checked={termsAccepted}
             onChange={(event) => setTermsAccepted(event.target.checked)}
           />
-          <span>I agree to the Terms of Service and Privacy Policy</span>
+          <span>ฉันยอมรับเงื่อนไขการใช้งานและนโยบายความเป็นส่วนตัว</span>
         </label>
 
         {message && <p className="error auth-message" role="alert">{message}</p>}
 
         <button type="submit" className="auth-submit" disabled={register.isPending || dateOfBirthError}>
-          {register.isPending ? 'Submitting…' : 'Submit'}
+          {register.isPending ? 'กำลังสร้างบัญชี…' : 'สร้างบัญชี'}
         </button>
       </form>
     </AuthLayout>
