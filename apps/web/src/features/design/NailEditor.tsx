@@ -5,7 +5,7 @@ import type { CreateTemplateInput } from '@nail-studio/contracts'
 import { useCurrentUser, useLogout } from '@/features/auth/useAuth.ts'
 import { useCreateTemplate } from '@/features/community/useTemplates.ts'
 import { NotificationBell } from '@/components/NotificationBell.tsx'
-import { Icon } from '@/components/Icon.tsx'
+import { Icon, type IconName } from '@/components/Icon.tsx'
 import { usePageTitle } from '@/lib/usePageTitle.ts'
 import { NailScene } from '@/3d/scene/NailScene.tsx'
 import { ThumbnailCapture, type ThumbnailCaptureHandle } from '@/3d/scene/ThumbnailCapture.tsx'
@@ -40,12 +40,18 @@ import { NailStrip } from './NailStrip.tsx'
 import { PaintToolbar } from './PaintToolbar.tsx'
 import { DecorationPanel } from './DecorationPanel.tsx'
 import { HandPanel } from './HandPanel.tsx'
+import { NailShapePanel } from './NailShapePanel.tsx'
 import { HistoryControls } from './HistoryControls.tsx'
 import { EditorProfileDropdown } from './EditorProfileDropdown.tsx'
 import { EditorSaveMenu } from './EditorSaveMenu.tsx'
 import { ShareTemplateDialog } from './ShareTemplateDialog.tsx'
 import { VersionHistoryPanel } from './VersionHistoryPanel.tsx'
-import { EditorToolRail, type EditorPanelId } from './EditorToolRail.tsx'
+import { EditorToolRail, tabIdOf, type EditorPanelId } from './EditorToolRail.tsx'
+import { LayerPanel } from './LayerPanel.tsx'
+import { ViewportControls } from './ViewportControls.tsx'
+import { ShortcutsDialog } from './ShortcutsDialog.tsx'
+import { SIZE_STEP, toolShortcutFrom } from './toolShortcuts.ts'
+import { BRUSH_SIZE_MAX, BRUSH_SIZE_MIN } from '@/3d/painting/paintSettings.ts'
 import { useAutosave, type AutosaveStatus } from './useAutosave.ts'
 import { useOfflineDraft } from './useOfflineDraft.ts'
 import { downloadBlob, sanitizeFilename } from '@/utils/downloadBlob.ts'
@@ -65,11 +71,20 @@ const AUTOSAVE_LABELS: Record<AutosaveStatus, string> = {
 }
 
 const PANEL_TITLES: Record<EditorPanelId, { title: string; description: string }> = {
-  paint: { title: 'วาด', description: 'สี แปรง และรูปทรงเล็บ' },
-  decorate: { title: 'ตกแต่ง', description: 'เพิ่มและจัดวางของตกแต่ง' },
   hand: { title: 'มือ', description: 'ปรับสีผิวและสัดส่วนมือ' },
+  nail: { title: 'เล็บ', description: 'ทรง ความยาว และผิวเล็บ' },
+  paint: { title: 'วาด', description: 'แปรง สี และน้ำหนักเส้น' },
+  decorate: { title: 'ตกแต่ง', description: 'เพิ่มและจัดวางของตกแต่ง' },
   ai: { title: 'ผู้ช่วย AI', description: 'สร้างไอเดียและแก้ไขด้วยคำสั่ง' },
 }
+
+type RightPanelId = 'canvas' | 'layers' | 'history'
+
+const RIGHT_PANELS: Array<{ id: RightPanelId; icon: IconName; label: string }> = [
+  { id: 'canvas', icon: 'grid', label: 'แคนวาส' },
+  { id: 'layers', icon: 'layers', label: 'เลเยอร์' },
+  { id: 'history', icon: 'clock', label: 'ประวัติ' },
+]
 
 export function NailEditor({ projectId, detail }: Props) {
   const navigate = useNavigate()
@@ -79,7 +94,8 @@ export function NailEditor({ projectId, detail }: Props) {
   const logout = useLogout()
   const store = useDesignStoreApi()
   const [activePanel, setActivePanel] = useState<EditorPanelId>('paint')
-  const [rightPanel, setRightPanel] = useState<'canvas' | 'history'>('canvas')
+  const [rightPanel, setRightPanel] = useState<RightPanelId>('canvas')
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [projectName, setProjectName] = useState(detail.project.name)
   usePageTitle(projectName)
   const [editingProjectName, setEditingProjectName] = useState(false)
@@ -88,10 +104,19 @@ export function NailEditor({ projectId, detail }: Props) {
   const notice = useDesign((state) => state.notice)
   const dismissNotice = useDesign((state) => state.dismissNotice)
 
+  /**
+   * สลับกลุ่มเครื่องมือ
+   *
+   * เฉพาะสองแท็บที่เป็น "โหมดทำงานกับเล็บ" เท่านั้นที่แตะ mode — เดิมแท็บ "มือ" และ
+   * "AI" สั่ง setMode('paint') ไปด้วย ทำให้คนที่กำลังจัดของตกแต่งแล้วแวะไปปรับสัดส่วนมือ
+   * กลับมาเจอว่าโหมดตกแต่งหลุดไปเงียบ ๆ พร้อมกับของตกแต่งที่เลือกไว้
+   */
   const openPanel = (panel: EditorPanelId) => {
     setActivePanel(panel)
-    store.getState().setMode(panel === 'decorate' ? 'decorate' : 'paint')
+    if (panel === 'paint') store.getState().setMode('paint')
+    if (panel === 'decorate') store.getState().setMode('decorate')
   }
+
 
   // ชิ้นส่วนมือและชุดเท็กซ์เจอร์ถูกถือไว้ที่ระดับนี้ เพราะทั้งฉาก 3 มิติและแผงวาด
   // แบบแบนต้องใช้ชุดเดียวกัน — มีสองชุดเมื่อไร วาดในโหมดหนึ่งแล้วอีกโหมดจะไม่เห็น
@@ -133,6 +158,10 @@ export function NailEditor({ projectId, detail }: Props) {
     : detail.draft
       ? 'เปิดจากงานค้างล่าสุด'
       : 'บันทึกแล้ว'
+  const saveErrorMessage = autosave.message
+    ?? (saveVersion.error && !conflict
+      ? localizedTaskError(saveVersion.error, 'บันทึกเวอร์ชันไม่สำเร็จ กรุณาลองใหม่อีกครั้ง')
+      : null)
   const autosaveTone = autosave.status === 'error'
     ? 'error'
     : autosave.status === 'saving' || autosave.status === 'pending'
@@ -149,6 +178,47 @@ export function NailEditor({ projectId, detail }: Props) {
     explicitSaveUi.current.activate()
     return () => explicitSaveUi.current.dispose()
   }, [])
+
+  /* dialog ตัวไหนก็ตามที่เปิดอยู่ ต้องกลืนคีย์ลัดเครื่องมือไว้ทั้งหมด */
+  const modalOpen = shortcutsOpen
+    || shareDialogOpen
+    || conflict !== null
+    || offlineDraft.recoveryRecord !== null
+
+  // คีย์ลัดเครื่องมือ — ตัวแปลงเป็นฟังก์ชัน pure ใน toolShortcuts.ts จึงเทสต์ได้แยก
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const action = toolShortcutFrom(event)
+      if (!action) return
+
+      // มี dialog เปิดอยู่ = คีย์ลัดต้องเงียบ ไม่งั้นกด B ระหว่างอ่านตารางคีย์ลัด
+      // จะไปสลับเครื่องมือข้างหลัง dialog โดยที่ผู้ใช้มองไม่เห็นว่าอะไรเปลี่ยน
+      // ยกเว้น `?` ที่ต้องปิดตารางคีย์ลัดของตัวเองได้
+      if (modalOpen && !(shortcutsOpen && action.kind === 'help')) return
+
+      event.preventDefault()
+
+      if (action.kind === 'help') {
+        setShortcutsOpen((open) => !open)
+        return
+      }
+
+      const state = store.getState()
+      if (action.kind === 'tool') {
+        state.setSettings({ tool: action.tool })
+        // สลับเครื่องมือแล้วต้องเห็นแผงวาด ไม่งั้นกด B แล้วไม่มีอะไรบนจอเปลี่ยน
+        state.setMode('paint')
+        setActivePanel('paint')
+        return
+      }
+
+      const next = state.settings.size + action.direction * SIZE_STEP
+      state.setSettings({ size: Math.min(BRUSH_SIZE_MAX, Math.max(BRUSH_SIZE_MIN, next)) })
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [store, modalOpen, shortcutsOpen])
 
   useEffect(() => {
     if (!autosave.conflict) return
@@ -335,7 +405,7 @@ export function NailEditor({ projectId, detail }: Props) {
             type="button"
             className="editor-topbar-brand"
             aria-label="กลับไปหน้าโปรเจกต์ Nail Studio"
-            title="กลับไปหน้าโปรเจกต์ Nail Studio"
+            data-tooltip="กลับไปหน้าโปรเจกต์"
             onClick={() => navigate('/projects')}
           >
             <span className="editor-topbar-logo" aria-hidden="true">NS</span>
@@ -368,7 +438,7 @@ export function NailEditor({ projectId, detail }: Props) {
               <button
                 type="button"
                 className="editor-topbar-project-name"
-                title="คลิกเพื่อเปลี่ยนชื่อโปรเจกต์"
+                data-tooltip="คลิกเพื่อเปลี่ยนชื่อโปรเจกต์"
                 onClick={beginProjectRename}
               >
                 {projectName}
@@ -386,6 +456,15 @@ export function NailEditor({ projectId, detail }: Props) {
         <div className="editor-topbar-actions">
           <HistoryControls />
           <div className="editor-topbar-nav">
+            <button
+              type="button"
+              className="editor-topbar-icon-button"
+              aria-label="ดูคีย์ลัด"
+              data-tooltip="คีย์ลัด · ?"
+              onClick={() => setShortcutsOpen(true)}
+            >
+              <Icon name="keyboard" size={17} />
+            </button>
             <NotificationBell />
           </div>
           <EditorProfileDropdown
@@ -399,17 +478,6 @@ export function NailEditor({ projectId, detail }: Props) {
               store.setState({ notice: `${label}ยังไม่เปิดใช้งานในรุ่นนี้` })
             }}
           />
-          <div className="editor-topbar-feedback" aria-live="polite">
-            {autosave.message && <span className="error" role="alert">{autosave.message}</span>}
-            {saveVersion.error && !conflict && (
-              <span className="error" role="alert">
-                {localizedTaskError(
-                  saveVersion.error,
-                  'บันทึกเวอร์ชันไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
-                )}
-              </span>
-            )}
-          </div>
           <EditorSaveMenu
             saving={saveVersion.isPending || autosave.isVersionSavePending}
             shareDisabled={saveVersion.isPending || autosave.isVersionSavePending || createTemplate.isPending}
@@ -421,26 +489,45 @@ export function NailEditor({ projectId, detail }: Props) {
         </div>
       </header>
 
-      {notice && (
-        <p className="editor-notice" role="alert">
-          {notice}
-          <button type="button" className="btn btn-ghost" onClick={dismissNotice}>ปิด</button>
-        </p>
-      )}
+      {/*
+        ข้อความบันทึกล้มเหลวเคยอยู่ในกล่องกว้าง 13rem ในแถบบน ที่ตัดด้วย ellipsis
+        และถูกซ่อนทั้งก้อนที่จอ ≤900px — ข้อความสำคัญที่สุดจึงอ่านไม่จบหรือหายไปเลย
+        ย้ายมาใช้แถบเต็มความกว้างชุดเดียวกับ notice อื่น
+      */}
+      <div className="editor-notices">
+        {saveErrorMessage && (
+          <p className="editor-notice editor-notice-error" role="alert">
+            {saveErrorMessage}
+          </p>
+        )}
 
-      {offlineDraft.warning && (
-        <p className="editor-notice" role="alert">
-          {offlineDraft.warning}
-          <button type="button" className="btn btn-ghost" onClick={offlineDraft.dismissWarning}>ปิด</button>
-        </p>
-      )}
+        {notice && (
+          <p className="editor-notice" role="alert">
+            {notice}
+            <button type="button" className="btn btn-ghost" onClick={dismissNotice}>ปิด</button>
+          </p>
+        )}
+
+        {offlineDraft.warning && (
+          <p className="editor-notice" role="alert">
+            {offlineDraft.warning}
+            <button type="button" className="btn btn-ghost" onClick={offlineDraft.dismissWarning}>ปิด</button>
+          </p>
+        )}
+      </div>
 
       <h1 className="nc-visually-hidden">แก้ไขงานออกแบบ: {projectName}</h1>
 
       <div className="editor-body">
         <aside className="editor-sidebar">
           <EditorToolRail activePanel={activePanel} onChange={openPanel} />
-          <div className="editor-inspector">
+          <div
+            className="editor-inspector"
+            id="editor-inspector-panel"
+            role="tabpanel"
+            aria-labelledby={tabIdOf(activePanel)}
+            tabIndex={-1}
+          >
             <header className="editor-inspector-head">
               <div>
                 <p className="editor-inspector-kicker">เครื่องมือ</p>
@@ -449,6 +536,7 @@ export function NailEditor({ projectId, detail }: Props) {
               </div>
             </header>
             <div className="editor-inspector-scroll">
+              {activePanel === 'nail' && <NailShapePanel />}
               {activePanel === 'paint' && <PaintToolbar />}
               {activePanel === 'decorate' && <DecorationPanel />}
               {activePanel === 'hand' && <HandPanel />}
@@ -456,47 +544,75 @@ export function NailEditor({ projectId, detail }: Props) {
             </div>
           </div>
         </aside>
-        <div className="viewport">
-          <WebGlGuard>
-            <NailScene fallback={null}>
-              <DesignScene
-                scale={handScale}
-                parts={parts}
-                textures={textures}
-                onReady={handleReady}
-              />
-              <ThumbnailCapture ref={thumbnailRef} />
-              <SnapshotCapture ref={snapshotRef} />
-            </NailScene>
-          </WebGlGuard>
+
+        {/*
+          แถบเลือกนิ้วอยู่ใต้ฉากในคอลัมน์เดียวกัน ไม่ใช่ท้ายหน้า — ปุ่มที่กดบ่อยที่สุด
+          ต้องอยู่ติดกับสิ่งที่มันควบคุม min-width: 0 ย้ายมาไว้ที่คอลัมน์แทน .viewport
+          เพื่อให้ยังหดได้เหมือนเดิม (ดูคำอธิบายที่ .viewport ใน index.css)
+        */}
+        <div className="editor-stage">
+          <div className="viewport">
+            <WebGlGuard>
+              <NailScene fallback={null}>
+                <DesignScene
+                  scale={handScale}
+                  parts={parts}
+                  textures={textures}
+                  onReady={handleReady}
+                />
+                <ThumbnailCapture ref={thumbnailRef} />
+                <SnapshotCapture ref={snapshotRef} />
+              </NailScene>
+            </WebGlGuard>
+            <ViewportControls />
+          </div>
+          <NailStrip />
         </div>
+
         <aside className="editor-right-panel">
           <div className="editor-panel-tabs" role="tablist" aria-label="แผงด้านขวา">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={rightPanel === 'canvas'}
-              className={`editor-panel-tab ${rightPanel === 'canvas' ? 'editor-panel-tab-active' : ''}`}
-              onClick={() => setRightPanel('canvas')}
-            >
-              <Icon name="grid" size={15} /> แคนวาส
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={rightPanel === 'history'}
-              className={`editor-panel-tab ${rightPanel === 'history' ? 'editor-panel-tab-active' : ''}`}
-              onClick={() => setRightPanel('history')}
-            >
-              <Icon name="remix" size={15} /> ประวัติ
-            </button>
+            {RIGHT_PANELS.map((panel) => {
+              const active = rightPanel === panel.id
+              return (
+                <button
+                  key={panel.id}
+                  type="button"
+                  role="tab"
+                  id={`editor-right-tab-${panel.id}`}
+                  aria-selected={active}
+                  aria-controls="editor-right-panel-body"
+                  tabIndex={active ? 0 : -1}
+                  className={`editor-panel-tab ${active ? 'editor-panel-tab-active' : ''}`}
+                  onClick={() => setRightPanel(panel.id)}
+                  onKeyDown={(event) => {
+                    const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
+                    if (step === 0) return
+                    event.preventDefault()
+                    const index = RIGHT_PANELS.findIndex((item) => item.id === rightPanel)
+                    const next = RIGHT_PANELS[(index + step + RIGHT_PANELS.length) % RIGHT_PANELS.length]
+                    if (!next) return
+                    setRightPanel(next.id)
+                    document.getElementById(`editor-right-tab-${next.id}`)?.focus()
+                  }}
+                >
+                  <Icon name={panel.icon} size={15} /> {panel.label}
+                </button>
+              )
+            })}
           </div>
-          <div className="editor-right-panel-scroll">
+          <div
+            className="editor-right-panel-scroll"
+            id="editor-right-panel-body"
+            role="tabpanel"
+            aria-labelledby={`editor-right-tab-${rightPanel}`}
+            tabIndex={-1}
+          >
             {rightPanel === 'canvas' && (
               parts && textures
                 ? <NailCanvas2D parts={parts} textures={textures} />
                 : <p className="muted editor-panel-loading">กำลังเตรียมแคนวาส…</p>
             )}
+            {rightPanel === 'layers' && <LayerPanel />}
             {rightPanel === 'history' && (
               <VersionHistoryPanel
                 projectId={projectId}
@@ -508,8 +624,6 @@ export function NailEditor({ projectId, detail }: Props) {
           </div>
         </aside>
       </div>
-
-      <NailStrip />
 
       {conflict && (
         <ConflictDialog
@@ -528,6 +642,7 @@ export function NailEditor({ projectId, detail }: Props) {
           onUseServer={() => { void offlineDraft.useServerDocument() }}
         />
       )}
+      {shortcutsOpen && <ShortcutsDialog onClose={() => setShortcutsOpen(false)} />}
       {shareDialogOpen && (
         <ShareTemplateDialog
           defaultName={projectName}

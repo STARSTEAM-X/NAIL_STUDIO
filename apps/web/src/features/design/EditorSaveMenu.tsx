@@ -71,7 +71,7 @@ export function EditorSaveMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="เมนูส่งออกและแชร์"
-        title="ส่งออกและแชร์"
+        data-tooltip="ส่งออกและแชร์"
         onClick={() => setOpen((current) => !current)}
       >
         <Icon name="chevron-down" size={14} />
@@ -94,7 +94,7 @@ export function EditorSaveMenu({
             className="editor-save-menu-item"
             onClick={() => runAction(onExportJson)}
           >
-            <span className="editor-save-menu-icon" aria-hidden="true"><Icon name="layers" size={15} /></span>
+            <span className="editor-save-menu-icon" aria-hidden="true"><Icon name="download" size={15} /></span>
             <span>ส่งออกไฟล์งาน JSON</span>
           </button>
 
@@ -107,7 +107,7 @@ export function EditorSaveMenu({
             disabled={shareDisabled}
             onClick={() => runAction(onShare)}
           >
-            <span className="editor-save-menu-icon" aria-hidden="true"><Icon name="arrow-up-right" size={15} /></span>
+            <span className="editor-save-menu-icon" aria-hidden="true"><Icon name="share" size={15} /></span>
             <span>แชร์ลงชุมชน</span>
           </button>
         </div>

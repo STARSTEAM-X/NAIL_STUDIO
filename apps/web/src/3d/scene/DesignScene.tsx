@@ -8,6 +8,7 @@ import { DecorationInstances } from '@/3d/decorations/DecorationInstances.tsx'
 import { useHandProportions } from '@/3d/models/useHandProportions.ts'
 import { useDesign } from '@/features/design/DesignStoreProvider.tsx'
 import { NailFocus } from './NailFocus.tsx'
+import { CameraZoom } from './CameraZoom.tsx'
 
 interface Props {
   scale: number
@@ -36,6 +37,7 @@ export function DesignScene({ scale, parts, textures, onReady }: Props) {
     <>
       <HandModel scale={scale} onReady={onReady} />
       {parts && <NailFocus parts={parts} />}
+      <CameraZoom />
       {textures && <LiveTextureInvalidator textures={textures} />}
       {parts && textures && mode === 'paint' && <PaintController parts={parts} textures={textures} />}
       {parts && mode === 'decorate' && <TransformController parts={parts} />}

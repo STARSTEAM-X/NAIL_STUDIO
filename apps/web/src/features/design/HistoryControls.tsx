@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { Icon } from '@/components/Icon.tsx'
 import { useDesign } from './DesignStoreProvider.tsx'
 import { shouldHandleHistoryShortcut } from './historyShortcuts.ts'
 
@@ -30,9 +31,9 @@ export function HistoryControls() {
         disabled={!state.canUndo}
         onClick={undo}
         aria-label={state.undoLabel ? `เลิกทำ: ${state.undoLabel}` : 'เลิกทำ'}
-        title="Ctrl/Cmd + Z"
+        data-tooltip={state.undoLabel ? `เลิกทำ: ${state.undoLabel} · Ctrl+Z` : 'เลิกทำ · Ctrl+Z'}
       >
-        {state.undoLabel ? `เลิกทำ: ${state.undoLabel}` : 'เลิกทำ'}
+        <Icon name="undo" size={17} />
       </button>
       <button
         type="button"
@@ -40,9 +41,9 @@ export function HistoryControls() {
         disabled={!state.canRedo}
         onClick={redo}
         aria-label={state.redoLabel ? `ทำซ้ำ: ${state.redoLabel}` : 'ทำซ้ำ'}
-        title="Ctrl/Cmd + Y หรือ Ctrl/Cmd + Shift + Z"
+        data-tooltip={state.redoLabel ? `ทำซ้ำ: ${state.redoLabel} · Ctrl+Y` : 'ทำซ้ำ · Ctrl+Y'}
       >
-        {state.redoLabel ? `ทำซ้ำ: ${state.redoLabel}` : 'ทำซ้ำ'}
+        <Icon name="redo" size={17} />
       </button>
     </div>
   )

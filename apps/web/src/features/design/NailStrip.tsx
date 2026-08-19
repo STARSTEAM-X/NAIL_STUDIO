@@ -25,7 +25,6 @@ export function NailStrip() {
   const selectNail = useDesign((state) => state.selectNail)
   const selectAll = useDesign((state) => state.selectAll)
   const focusNail = useDesign((state) => state.focusNail)
-  const focusHome = useDesign((state) => state.focusHome)
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -57,7 +56,7 @@ export function NailStrip() {
               className={`chip ${on ? 'chip-on' : ''}`}
               aria-pressed={on}
               aria-keyshortcuts={String(index + 1)}
-              title={`${FINGER_LABELS[finger]} · กด ${index + 1}`}
+              data-tooltip={`${FINGER_LABELS[finger]} · กด ${index + 1}`}
               // คลิกธรรมดา = เลือกนิ้วเดียว, กด Shift หรือ Ctrl ค้าง = เลือกเพิ่ม
               // เป็นข้อตกลงเดียวกับการเลือกไฟล์ในระบบปฏิบัติการ จึงไม่ต้องสอน
               //
@@ -76,16 +75,14 @@ export function NailStrip() {
         })}
       </div>
 
+      {/* "ดูทั้งมือ" ย้ายไปอยู่กับปุ่มซูมที่มุมฉากแล้ว — ที่นี่เหลือเฉพาะเรื่องการเลือก */}
       <div className="strip-actions">
         <button type="button" className="btn btn-ghost" onClick={selectAll}>
-          ทุกนิ้ว
-        </button>
-        <button type="button" className="btn btn-ghost" onClick={focusHome}>
-          ดูทั้งมือ
+          เลือกทุกนิ้ว
         </button>
       </div>
 
-      <p className="hint">เลือกอยู่ {selection.size} นิ้ว · กด Shift ค้างเพื่อเลือกเพิ่ม</p>
+      <p className="hint">เลือกอยู่ {selection.size} นิ้ว · กด Shift ค้างเพื่อเลือกเพิ่ม · กด ? ดูคีย์ลัด</p>
     </section>
   )
 }

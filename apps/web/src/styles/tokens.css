@@ -16,7 +16,12 @@
   --paper: #fffdf9;
   --soft: #f4e7df;
   --ink: #3a3a3a;
-  --muted: #7d6f66;
+  /*
+    #7d6f66 เดิมให้ contrast 4.41:1 บน --ground ซึ่งต่ำกว่าเกณฑ์ WCAG AA (4.5:1)
+    และหน้า editor ใช้สีนี้กับตัวอักษร 0.63–0.7rem หลายจุด = เล็กและจางพร้อมกัน
+    ค่าใหม่ให้ 5.59:1 บน --ground และ 6.04:1 บน --surface
+  */
+  --muted: #6d5f56;
   --rule: #e3d6c6;
   --accent: #b5314c;
   --deep: #6b1e2b;
@@ -26,6 +31,30 @@
   --danger: #b3122e;
   --warn: #b25a0d;
   --info: #1f5d80;
+
+  /*
+    ---------- สีเฉพาะหน้า editor ----------
+
+    หน้า editor มีโครมของตัวเอง (แถบบนขาว + เวทีมืด) ซึ่งไม่ตรงกับพื้นครีมของหน้าอื่น
+    ก่อนหน้านี้จึงมี hex เขียนตรง 30 จุด/20 ค่าไม่ซ้ำใน index.css รวมถึงเทาอมชมพู
+    5 เฉด (#e9e3e4 #e8e0e1 #eee6e7 #eee7e8 #e4dcdd) ที่แยกด้วยตาไม่ออก — ยุบเหลือค่าเดียว
+  */
+  --editor-chrome: #ffffff;
+  --editor-line: #e8e2e3;
+  --editor-hover: #f7f1f2;
+  --editor-ink-strong: #2f2627;
+  --editor-chip: #fcfafb;
+  --editor-notice: #fbeef0;
+
+  /* เวทีมืดสามชั้น — ไล่จากลึกสุด (หลังโมเดล) ออกมาหาแถบเครื่องมือ */
+  --editor-shell-900: #17120f;
+  --editor-shell-800: #211916;
+  --editor-shell-700: #30201f;
+  --editor-shell-fg: #f9eee8;
+  --editor-shell-focus: #f6c4c9;
+
+  --editor-brand-2: #d76a7b;
+  --editor-avatar: linear-gradient(145deg, #482d35, #d8898f 58%, #f4c9bc);
 
   /* ---------- มุมโค้ง ---------- */
   --r-xs: 6px;
@@ -45,6 +74,8 @@
   --sp-7: 3rem;
 
   /* ---------- ขนาดตัวอักษร ---------- */
+  /* 2xs มีไว้สำหรับโครมหนาแน่นอย่างแถบบนของ editor เท่านั้น — ห้ามใช้กับเนื้อหา */
+  --fs-2xs: 0.65rem;
   --fs-xs: 0.72rem;
   --fs-sm: 0.82rem;
   --fs-base: 0.9rem;

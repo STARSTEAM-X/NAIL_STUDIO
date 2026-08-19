@@ -311,3 +311,35 @@
 @media (max-width: 640px) {
   .share-template-fields-row { grid-template-columns: minmax(0, 1fr); }
 }
+
+/*
+  ---------- Tooltip ----------
+
+  `title` ของเบราว์เซอร์ไม่ขึ้นตอนโฟกัสด้วยคีย์บอร์ด และไม่ขึ้นเลยบนอุปกรณ์สัมผัส
+  ปุ่มไอคอนล้วนจึงไม่มีคำอธิบายที่คนใช้คีย์บอร์ดเข้าถึงได้ (aria-label ช่วยเฉพาะ
+  screen reader) — ตัวนี้ขึ้นทั้ง hover และ :focus-visible
+
+  ใช้คู่กับ aria-label เสมอ ไม่ใช่แทนกัน: ฟองนี้เป็นเนื้อหาเชิงตกแต่ง
+
+  เดิมเป็น ::after ที่ position: absolute ในตัวปุ่ม ซึ่งกล่องที่เลื่อนได้ตัดขอบทิ้ง
+  (overflow-y: auto ดันแกน x ให้เป็น auto ตามไปด้วย) ตอนนี้ TooltipLayer เรนเดอร์
+  ฟองเดียวไว้นอกลำดับชั้นด้วย position: fixed จึงไม่มีใครตัดได้
+*/
+.tooltip-bubble {
+  position: fixed;
+  z-index: var(--z-popover);
+  max-width: min(18rem, 90vw);
+  padding: 0.3rem 0.5rem;
+  border-radius: var(--r-xs);
+  background: var(--editor-ink-strong);
+  color: var(--editor-chrome);
+  font-size: var(--fs-2xs);
+  font-weight: 500;
+  line-height: 1.3;
+  pointer-events: none;
+}
+
+.tooltip-bubble-bottom { transform: translateX(-50%); }
+.tooltip-bubble-top { transform: translate(-50%, -100%); }
+.tooltip-bubble-right { transform: translateY(-50%); }
+.tooltip-bubble-left { transform: translate(-100%, -50%); }

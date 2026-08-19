@@ -57,6 +57,10 @@ body {
 }
 
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
   font: inherit;
   font-size: 0.9rem;
   padding: 0.45rem 1rem;
@@ -65,6 +69,7 @@ body {
   cursor: pointer;
   transition: background-color 120ms, color 120ms;
 }
+.btn > svg { flex: 0 0 auto; }
 .btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
@@ -75,7 +80,15 @@ body {
 .btn-ghost:hover:not(:disabled) { background: var(--chip); }
 .btn-danger { color: var(--danger); }
 
-input {
+/*
+  กฎนี้เป็นของ "ช่องกรอก" เท่านั้น
+
+  เดิมเขียนเป็น `input` เปล่า จึงมีผลกับ range/checkbox/radio ไปด้วย ผลที่เห็นชัดที่สุด
+  คือตัวเลื่อน: มันได้ padding 0.45rem/0.7rem กับเส้นขอบมาด้วย รางจึงถูกบีบเข้ามา
+  จากขอบข้างละ ~12px พอลากจนสุดค่าสูงสุด หัวเลื่อนก็หยุดก่อนถึงขอบขวาของกล่อง
+  ทำให้ดูเหมือนเลื่อนไม่สุดทั้งที่ค่าเป็น 100 แล้ว
+*/
+input:not([type="range"], [type="checkbox"], [type="radio"]) {
   font: inherit;
   padding: 0.45rem 0.7rem;
   border: 1px solid var(--rule);
@@ -84,6 +97,20 @@ input {
   color: var(--ink);
 }
 input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* ตัวเลื่อนใช้การเรนเดอร์ของเบราว์เซอร์ (accent-color) — รางจึงกว้างเท่ากล่องพอดี */
+input[type="range"] {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+input[type="checkbox"],
+input[type="radio"] { accent-color: var(--accent); cursor: pointer; }
 
 /* ---------- หน้าเข้าสู่ระบบ ---------- */
 
@@ -426,7 +453,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   aspect-ratio: 16 / 9;
   border-radius: 0.65rem;
 }
-.project-thumbnail { object-fit: cover; background: #17120f; }
+.project-thumbnail { object-fit: cover; background: var(--editor-shell-900); }
 .project-thumbnail-placeholder {
   border: 1px solid color-mix(in srgb, var(--deep) 12%, transparent);
   background: linear-gradient(135deg, #f4e7df, #e6d0c3);
@@ -472,7 +499,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .project-card { position: relative; display: block; overflow: hidden; padding: 0; border-color: color-mix(in srgb, var(--rule) 86%, var(--accent)); border-radius: 0.9rem; background: var(--surface); box-shadow: 0 8px 22px rgb(80 45 30 / 5%); transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease; }
 .project-card:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--accent) 50%, var(--rule)); box-shadow: 0 14px 30px rgb(80 45 30 / 12%); }
 .project-link { gap: 0; }
-.project-card-preview { position: relative; overflow: hidden; aspect-ratio: 16 / 10; background: #17120f; }
+.project-card-preview { position: relative; overflow: hidden; aspect-ratio: 16 / 10; background: var(--editor-shell-900); }
 .project-card-preview::after { position: absolute; inset: 0; pointer-events: none; content: ''; background: linear-gradient(180deg, transparent 62%, rgb(23 18 15 / 20%)); }
 .project-card-preview .project-thumbnail { height: 100%; border-radius: 0; object-fit: cover; transition: transform 220ms ease; }
 .project-card:hover .project-thumbnail { transform: scale(1.03); }
@@ -559,7 +586,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   เนื้อหาข้างในคือแคนวาส WebGL ที่มีความกว้างจริงเป็นพันพิกเซล กล่องนี้จึงไม่ยอมหด
   แล้วดันแผงวาดแบนหลุดออกนอกจอไปทั้งใบ
 */
-.viewport { flex: 1; min-width: 0; min-height: 420px; background: #17120f; }
+.viewport { position: relative; flex: 1; min-width: 0; min-height: 420px; background: var(--editor-shell-900); }
 
 /* แคนวาสรับ pointer เอง การให้เบราว์เซอร์เลื่อนหน้าจอตามนิ้วจะขัดกับการลากเส้น */
 .viewport canvas { touch-action: none; }
@@ -579,22 +606,36 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
  * fixed ไม่กินพื้นที่ในสายการจัดวางเลย เนื้อหาจึงไม่ขยับตอนแถบโผล่หรือหายไป
  * และไม่ขึ้นกับว่าโครงหน้าจอรอบ ๆ จะถูกจัดใหม่อย่างไรในอนาคต
  */
-.editor-notice {
+.editor-notices {
   position: fixed;
   inset: 0 0 auto;
   z-index: 20;
+  display: flex;
+  flex-direction: column;
+}
+
+/*
+  แถบต้องซ้อนกันเป็นชั้น ไม่ใช่ทับกัน
+
+  เดิมแต่ละแถบเป็น `position: fixed; inset: 0 0 auto` ของตัวเอง — พอมีสองเรื่องพร้อมกัน
+  (เช่น งานสำรองในเครื่อง + บันทึกไม่สำเร็จ) แถบหลังจะทับแถบแรกจนอ่านไม่เห็น
+  ตอนนี้ตัวครอบเป็นตัวที่ fixed ส่วนแถบข้างในเรียงต่อกันตามปกติ
+*/
+.editor-notice {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
   margin: 0;
   padding: 0.5rem 1.5rem;
-  background: #fbeef0;
+  background: var(--editor-notice);
   color: var(--deep);
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   border-bottom: 1px solid var(--rule);
   box-shadow: 0 2px 8px rgb(0 0 0 / 8%);
 }
+
+.editor-notice-error { background: color-mix(in srgb, var(--danger) 12%, white); color: var(--danger); }
 
 /* ---------- แถบเครื่องมือวาด ---------- */
 
@@ -621,27 +662,117 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   background: #fff;
   color: var(--ink);
 }
-.field input[type="range"] { accent-color: var(--accent); width: 100%; }
 
 .tool-actions { display: flex; flex-direction: column; gap: 0.4rem; margin-top: auto; }
 
-.layer-panel { border-top: 1px solid var(--rule); padding-top: 0.8rem; display: flex; flex-direction: column; gap: 0.6rem; }
-.layer-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
-.layer-panel-head h2 { margin: 0; font-size: 0.95rem; color: var(--deep); }
-.layer-list { display: flex; flex-direction: column; gap: 0.5rem; }
-.layer-card { padding: 0.6rem; border: 1px solid var(--rule); border-radius: 8px; display: flex; flex-direction: column; gap: 0.45rem; }
-.layer-card-active { border-color: var(--accent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent); }
-.layer-select { align-self: flex-start; border: 0; padding: 0; background: transparent; color: var(--deep); font: inherit; font-weight: 700; cursor: pointer; }
-.layer-select { width: 100%; padding: 0.2rem 0.3rem; border-radius: 0.35rem; text-align: left; }
+.layer-panel { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-3); }
+.layer-panel-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); }
+.layer-panel-head h2 { margin: 0; color: var(--deep); font-size: var(--fs-md); }
+.layer-list { display: flex; flex-direction: column; gap: 0.2rem; }
+
+/*
+  การ์ดยุบเหลือแถวเดียวเมื่อไม่ได้ทำงานอยู่
+
+  เดิมทุกใบกาง 4 แถว (ชื่อ / แสดง+ผสม / ความทึบ / ปุ่ม) สูงราว 150px ต่อใบ
+  เล็บที่มีหลายเลเยอร์จึงยาวเกินจอทันที ทั้งที่ปรับได้ทีละใบอยู่แล้ว
+*/
+.layer-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid transparent;
+  border-radius: var(--r-xs);
+}
+
+.layer-card:hover { background: color-mix(in srgb, var(--chip) 45%, transparent); }
+.layer-card-active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.layer-card-active:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+
+.layer-card-head { display: flex; align-items: center; gap: 0.1rem; padding: 0.15rem 0.2rem; }
+
+.layer-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: 0.1rem 0.45rem 0.5rem;
+}
+
+.layer-select {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: baseline;
+  gap: 0.35rem;
+  overflow: hidden;
+  padding: 0.25rem 0.3rem;
+  border: 0;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--deep);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.layer-select-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.layer-select-meta { flex: 0 0 auto; color: var(--muted); font-size: var(--fs-2xs); font-weight: 500; }
+.layer-card-active .layer-select { font-weight: 800; }
 .layer-select:hover { background: var(--chip); }
-.layer-name-input { width: 100%; min-width: 0; padding: 0.35rem 0.45rem; border: 1px solid var(--accent); border-radius: 0.35rem; background: #fff; color: var(--ink); font: inherit; font-weight: 700; box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent); }
+.layer-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.layer-name-input {
+  min-width: 0;
+  flex: 1;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-xs);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent);
+}
 .layer-name-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.layer-card .field output { align-self: flex-end; margin-top: -1.25rem; color: var(--deep); font-size: 0.75rem; }
-.layer-row, .layer-actions { display: flex; align-items: end; gap: 0.4rem; }
-.layer-actions .btn { flex: 1; padding-inline: 0.45rem; }
+
+/*
+  ปุ่มจัดการเลเยอร์เป็นไอคอน ไม่ใช่ปุ่มข้อความเต็มความกว้าง
+
+  แผงนี้กว้างราว 290px การวางปุ่ม "ขึ้น/ลง/ลบ" เป็นข้อความสามปุ่มกินทั้งแถวโดยที่
+  ข้อความสั้นกว่าปุ่มมาก — ไอคอนสื่อความหมายเดียวกันในพื้นที่ที่เหลือให้เนื้อหาจริง
+*/
+.layer-icon-button,
+.layer-visibility {
+  display: grid;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.layer-icon-button:hover:not(:disabled),
+.layer-visibility:hover { background: var(--chip); color: var(--deep); }
+.layer-icon-button:focus-visible,
+.layer-visibility:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.layer-icon-button:disabled { cursor: not-allowed; opacity: 0.35; }
+.layer-icon-button-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
+.layer-visibility[aria-pressed="true"] { color: var(--deep); }
+
 .layer-blend { flex: 1; }
-.check-field { display: flex; gap: 0.35rem; align-items: center; color: var(--muted); font-size: 0.85rem; }
-.check-field input { padding: 0; }
+.layer-blend select { padding: 0.25rem 0.4rem; font-size: var(--fs-xs); }
+
+/* ปุ่มจัดการโผล่เมื่อชี้หรือโฟกัสเท่านั้น — รายการยาว ๆ จะได้ไม่เต็มไปด้วยไอคอน */
+.layer-card .layer-icon-button { opacity: 0; }
+.layer-card:hover .layer-icon-button,
+.layer-card:focus-within .layer-icon-button,
+.layer-card-active .layer-icon-button { opacity: 1; }
+
+@media (hover: none) {
+  .layer-card .layer-icon-button { opacity: 1; }
+}
 
 .chip {
   font: inherit;
@@ -675,7 +806,8 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 }
 .swatch-on { border-color: var(--ink); }
 .swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.swatch-picker { width: 30px; height: 26px; padding: 0; border-radius: 6px; }
+.swatch-picker { width: 30px; height: 26px; padding: 0; border-radius: var(--r-xs); }
+.swatch-picker-wide { width: 100%; height: 2.2rem; }
 
 /* ---------- แผงวาดแบบแบน ---------- */
 
@@ -841,8 +973,8 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.45rem 0.7rem;
-  background: #fff;
-  border-bottom: 1px solid #e9e3e4;
+  background: var(--editor-chrome);
+  border-bottom: 1px solid var(--editor-line);
   box-shadow: 0 1px 6px rgb(44 30 31 / 7%);
 }
 
@@ -877,13 +1009,13 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   height: 2rem;
   flex: 0 0 2rem;
   place-items: center;
-  border-radius: 0.45rem;
-  font-size: 1.25rem;
+  border-radius: var(--r-xs);
+  font-size: var(--fs-lg);
   line-height: 1;
 }
 
 .editor-topbar-icon-button:hover,
-.editor-topbar-brand:hover { background: #f7f1f2; color: var(--accent); }
+.editor-topbar-brand:hover { background: var(--editor-hover); color: var(--accent); }
 .editor-topbar-icon-button:focus-visible,
 .editor-topbar-user:focus-visible,
 .editor-topbar-brand:focus-visible,
@@ -896,7 +1028,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   gap: 0.4rem;
   padding: 0;
   color: var(--deep);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   font-weight: 800;
   text-align: left;
   white-space: nowrap;
@@ -907,10 +1039,10 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   width: 1.85rem;
   height: 1.85rem;
   place-items: center;
-  border-radius: 0.5rem;
-  background: linear-gradient(135deg, var(--accent), #d76a7b);
+  border-radius: var(--r-sm);
+  background: linear-gradient(135deg, var(--accent), var(--editor-brand-2));
   color: #fff;
-  font-size: 0.62rem;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.08em;
 }
 
@@ -918,7 +1050,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   width: 1px;
   height: 1.65rem;
   flex: 0 0 1px;
-  background: #e8e0e1;
+  background: var(--editor-line);
 }
 
 .editor-topbar-project {
@@ -931,8 +1063,8 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .editor-topbar-project strong {
   max-width: min(28vw, 280px);
   overflow: hidden;
-  color: #2f2627;
-  font-size: 0.82rem;
+  color: var(--editor-ink-strong);
+  font-size: var(--fs-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -944,11 +1076,11 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   margin: -0.15rem -0.25rem;
   padding: 0.15rem 0.25rem;
   border: 0;
-  border-radius: 0.35rem;
+  border-radius: var(--r-xs);
   background: transparent;
-  color: #2f2627;
+  color: var(--editor-ink-strong);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   font-weight: 800;
   text-align: left;
   text-overflow: ellipsis;
@@ -956,7 +1088,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   cursor: text;
 }
 
-.editor-topbar-project-name:hover { background: #f7f1f2; color: var(--accent); }
+.editor-topbar-project-name:hover { background: var(--editor-hover); color: var(--accent); }
 .editor-topbar-project-name:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .editor-topbar-project-input {
@@ -964,11 +1096,11 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   min-width: 8rem;
   padding: 0.15rem 0.3rem;
   border: 1px solid var(--accent);
-  border-radius: 0.35rem;
-  background: #fff;
-  color: #2f2627;
+  border-radius: var(--r-xs);
+  background: var(--editor-chrome);
+  color: var(--editor-ink-strong);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   font-weight: 800;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent);
 }
@@ -978,7 +1110,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .editor-topbar-project span {
   overflow: hidden;
   color: var(--muted);
-  font-size: 0.68rem;
+  font-size: var(--fs-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -988,11 +1120,11 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   gap: 0.4rem;
   min-width: 0;
   padding: 0.3rem 0.65rem;
-  border: 1px solid #eee6e7;
-  border-radius: 999px;
-  background: #fcfafb;
+  border: 1px solid var(--editor-line);
+  border-radius: var(--r-full);
+  background: var(--editor-chip);
   color: var(--muted);
-  font-size: 0.7rem;
+  font-size: var(--fs-xs);
   white-space: nowrap;
 }
 
@@ -1004,7 +1136,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   background: var(--ok);
 }
 
-.editor-save-dot-busy { background: #d58a34; box-shadow: 0 0 0 3px rgb(213 138 52 / 13%); }
+.editor-save-dot-busy { background: var(--warn); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 18%, transparent); }
 .editor-save-dot-error { background: var(--danger); box-shadow: 0 0 0 3px rgb(179 18 46 / 12%); }
 .editor-save-dot-saved { background: var(--ok); box-shadow: 0 0 0 3px rgb(47 125 79 / 12%); }
 
@@ -1015,6 +1147,12 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   min-width: 0;
 }
 
+/*
+  undo/redo เป็นปุ่มไอคอนล้วน — ไอคอนมาจาก <Icon> ไม่ใช่ CSS content
+
+  เดิมใช้ `font-size: 0` ซ่อนข้อความแล้ววาด '↶ ↷' ผ่าน ::before ซึ่งค้นหาไม่เจอ
+  เปลี่ยนยาก และหน้าตาขึ้นกับฟอนต์ของเครื่องผู้ใช้
+*/
 .editor-topbar .history-controls { gap: 0.05rem; }
 .editor-topbar .history-controls .btn {
   display: grid;
@@ -1025,17 +1163,13 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   border: 0;
   background: transparent;
   color: var(--deep);
-  font-size: 0;
 }
-.editor-topbar .history-controls .btn::before { font-size: 1.15rem; line-height: 1; }
-.editor-topbar .history-controls .btn:first-child::before { content: '↶'; }
-.editor-topbar .history-controls .btn:last-child::before { content: '↷'; }
-.editor-topbar .history-controls .btn:hover:not(:disabled) { background: #f7f1f2; color: var(--accent); }
+.editor-topbar .history-controls .btn:hover:not(:disabled) { background: var(--editor-hover); color: var(--accent); }
 .editor-topbar .history-controls .btn:disabled { opacity: 0.3; }
 
 .editor-topbar-nav { gap: 0.1rem; margin-left: 0.15rem; }
 .editor-topbar .notification-trigger { width: 2rem; height: 2rem; border: 0; background: transparent; }
-.editor-topbar .notification-trigger:hover { border: 0; background: #f7f1f2; }
+.editor-topbar .notification-trigger:hover { border: 0; background: var(--editor-hover); }
 
 .editor-profile {
   position: relative;
@@ -1048,9 +1182,9 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   gap: 0.4rem;
   min-width: 0;
   padding: 0.2rem 0.25rem 0.2rem 0.2rem;
-  border-radius: 0.55rem;
+  border-radius: var(--r-sm);
 }
-.editor-profile-trigger:hover { background: #f7f1f2; }
+.editor-profile-trigger:hover { background: var(--editor-hover); }
 .editor-profile-trigger-copy {
   display: flex;
   min-width: 0;
@@ -1061,13 +1195,13 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .editor-profile-trigger-copy strong {
   max-width: 8.5rem;
   overflow: hidden;
-  color: #2f2627;
-  font-size: 0.72rem;
+  color: var(--editor-ink-strong);
+  font-size: var(--fs-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.editor-profile-trigger-copy small { color: var(--muted); font-size: 0.63rem; }
-.editor-profile-chevron { margin-left: 0.05rem; color: var(--muted); font-size: 0.9rem; line-height: 1; }
+.editor-profile-trigger-copy small { color: var(--muted); font-size: var(--fs-2xs); }
+.editor-profile-chevron { margin-left: 0.05rem; color: var(--muted); font-size: var(--fs-base); line-height: 1; }
 
 .editor-profile-avatar {
   display: grid;
@@ -1075,11 +1209,11 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   height: 2rem;
   flex: 0 0 2rem;
   place-items: center;
-  border: 2px solid #fff;
+  border: 2px solid var(--editor-chrome);
   border-radius: 50%;
-  background: linear-gradient(145deg, #482d35, #d8898f 58%, #f4c9bc);
+  background: var(--editor-avatar);
   color: #fff;
-  font-size: 0.62rem;
+  font-size: var(--fs-2xs);
   font-weight: 800;
   letter-spacing: 0.04em;
   box-shadow: 0 1px 4px rgb(65 33 38 / 22%);
@@ -1093,9 +1227,9 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   width: min(300px, calc(100vw - 1rem));
   overflow: hidden;
   padding: 0.45rem 0;
-  border: 1px solid #e4dcdd;
-  border-radius: 0.65rem;
-  background: #fff;
+  border: 1px solid var(--editor-line);
+  border-radius: var(--r-sm);
+  background: var(--editor-chrome);
   box-shadow: 0 14px 36px rgb(49 28 31 / 16%), 0 2px 8px rgb(49 28 31 / 8%);
 }
 
@@ -1105,12 +1239,12 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   gap: 0.7rem;
   padding: 0.7rem 0.85rem 0.8rem;
 }
-.editor-profile-avatar-large { width: 2.65rem; height: 2.65rem; flex-basis: 2.65rem; font-size: 0.78rem; }
+.editor-profile-avatar-large { width: 2.65rem; height: 2.65rem; flex-basis: 2.65rem; font-size: var(--fs-sm); }
 .editor-profile-summary-copy { display: flex; min-width: 0; flex-direction: column; gap: 0.08rem; }
-.editor-profile-summary-copy strong { overflow: hidden; color: #2f2627; font-size: 0.82rem; text-overflow: ellipsis; white-space: nowrap; }
-.editor-profile-summary-copy span { color: var(--deep); font-size: 0.68rem; }
-.editor-profile-summary-copy small { overflow: hidden; color: var(--muted); font-size: 0.68rem; text-overflow: ellipsis; white-space: nowrap; }
-.editor-profile-divider { height: 1px; margin: 0.3rem 0; background: #eee7e8; }
+.editor-profile-summary-copy strong { overflow: hidden; color: var(--editor-ink-strong); font-size: var(--fs-sm); text-overflow: ellipsis; white-space: nowrap; }
+.editor-profile-summary-copy span { color: var(--deep); font-size: var(--fs-xs); }
+.editor-profile-summary-copy small { overflow: hidden; color: var(--muted); font-size: var(--fs-xs); text-overflow: ellipsis; white-space: nowrap; }
+.editor-profile-divider { height: 1px; margin: 0.3rem 0; background: var(--editor-line); }
 
 .editor-profile-menu-item {
   display: flex;
@@ -1120,22 +1254,20 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   padding: 0.55rem 0.85rem;
   border: 0;
   background: transparent;
-  color: #3c3334;
+  color: var(--editor-ink-strong);
   font: inherit;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   text-align: left;
   cursor: pointer;
 }
-.editor-profile-menu-item:hover { background: #f8f2f3; color: var(--deep); }
+.editor-profile-menu-item:hover { background: var(--editor-hover); color: var(--deep); }
 .editor-profile-menu-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .editor-profile-menu-item:disabled { cursor: wait; opacity: 0.6; }
-.editor-profile-menu-icon { display: grid; width: 1.15rem; place-items: center; color: var(--deep); font-size: 1rem; line-height: 1; }
-.editor-profile-menu-item kbd { margin-left: auto; color: var(--muted); font-family: inherit; font-size: 0.68rem; }
+.editor-profile-menu-icon { display: grid; width: 1.15rem; place-items: center; color: var(--deep); font-size: var(--fs-md); line-height: 1; }
+.editor-profile-menu-item kbd { margin-left: auto; color: var(--muted); font-family: inherit; font-size: var(--fs-xs); }
 .editor-profile-menu-item-danger { color: var(--danger); }
 .editor-profile-menu-item-danger .editor-profile-menu-icon { color: var(--danger); }
 
-.editor-topbar-feedback { display: flex; max-width: 13rem; flex-direction: column; gap: 0.05rem; }
-.editor-topbar-feedback .error { overflow: hidden; font-size: 0.68rem; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
 
 .editor-topbar-primary {
   display: inline-flex;
@@ -1144,11 +1276,11 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   min-height: 2.1rem;
   padding: 0.4rem 0.8rem;
   border: 0;
-  border-radius: 0.45rem;
+  border-radius: var(--r-xs);
   background: var(--accent);
   color: #fff;
   font: inherit;
-  font-size: 0.76rem;
+  font-size: var(--fs-xs);
   font-weight: 800;
   white-space: nowrap;
   cursor: pointer;
@@ -1187,7 +1319,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   flex-direction: column;
   padding: 0.3rem;
   border: 1px solid var(--rule);
-  border-radius: 0.6rem;
+  border-radius: var(--r-sm);
   background: var(--surface);
   box-shadow: 0 12px 28px rgb(44 30 31 / 16%);
 }
@@ -1198,16 +1330,16 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   gap: 0.55rem;
   padding: 0.5rem 0.6rem;
   border: 0;
-  border-radius: 0.45rem;
+  border-radius: var(--r-xs);
   background: transparent;
   color: var(--ink);
   font: inherit;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   text-align: left;
   cursor: pointer;
 }
-.editor-save-menu-item:hover:not(:disabled) { background: #f7f1f2; color: var(--accent); }
+.editor-save-menu-item:hover:not(:disabled) { background: var(--editor-hover); color: var(--accent); }
 .editor-save-menu-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .editor-save-menu-item:disabled { color: var(--muted); cursor: not-allowed; opacity: 0.55; }
 .editor-save-menu-icon { display: grid; flex: 0 0 auto; place-items: center; color: var(--muted); }
@@ -1216,7 +1348,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .editor-body {
   gap: 0;
-  background: #211916;
+  background: var(--editor-shell-800);
 }
 
 .editor-sidebar {
@@ -1232,43 +1364,34 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   display: flex;
   flex: 0 0 70px;
   flex-direction: column;
-  align-items: center;
-  gap: 1rem;
+  gap: 0.35rem;
   padding: 0.8rem 0.45rem;
-  background: #30201f;
-  color: #f9eee8;
-}
-
-.editor-tool-rail-items {
-  display: flex;
-  flex: 1;
-  width: 100%;
-  flex-direction: column;
-  gap: 0.4rem;
+  background: var(--editor-shell-700);
+  color: var(--editor-shell-fg);
 }
 
 .editor-tool-button {
   display: flex;
-  width: 100%;
+  min-width: 0;
+  flex: 0 0 auto;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 0.25rem;
   padding: 0.55rem 0.25rem;
   border: 1px solid transparent;
-  border-radius: 0.6rem;
+  border-radius: var(--r-sm);
   background: transparent;
-  color: rgb(255 255 255 / 68%);
+  color: rgb(255 255 255 / 78%);
   font: inherit;
-  font-size: 0.68rem;
+  font-size: var(--fs-2xs);
   cursor: pointer;
 }
 
 .editor-tool-button:hover { background: rgb(255 255 255 / 10%); color: #fff; }
-.editor-tool-button:focus-visible { outline: 2px solid #f6c4c9; outline-offset: 2px; }
+.editor-tool-button:focus-visible { outline: 2px solid var(--editor-shell-focus); outline-offset: 2px; }
 .editor-tool-button-active { border-color: rgb(255 255 255 / 24%); background: var(--accent); color: #fff; box-shadow: 0 5px 14px rgb(0 0 0 / 18%); }
-.editor-tool-icon { font-size: 1.25rem; line-height: 1; }
 .editor-tool-label { white-space: nowrap; }
-.editor-tool-rail-footer { margin: 0; color: rgb(255 255 255 / 38%); font-size: 0.55rem; letter-spacing: 0.14em; }
 
 .editor-inspector {
   display: flex;
@@ -1286,9 +1409,9 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   background: var(--surface);
 }
 
-.editor-inspector-head h2 { margin: 0.1rem 0 0.1rem; color: var(--deep); font-size: 1.05rem; }
-.editor-inspector-head .muted { font-size: 0.78rem; }
-.editor-inspector-kicker { margin: 0; color: var(--accent); font-size: 0.65rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+.editor-inspector-head h2 { margin: 0.1rem 0 0.1rem; color: var(--deep); font-size: var(--fs-md); }
+.editor-inspector-head .muted { font-size: var(--fs-sm); }
+.editor-inspector-kicker { margin: 0; color: var(--accent); font-size: var(--fs-2xs); font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
 .editor-inspector-scroll { min-height: 0; flex: 1; overflow-y: auto; }
 .editor-inspector-scroll > .toolbar { min-height: 100%; }
 .editor-inspector-scroll .toolbar { width: auto; border-right: 0; }
@@ -1297,14 +1420,184 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .toolbar-paint { padding: 0.9rem; gap: 0.8rem; }
 .toolbar-section { display: flex; flex-direction: column; gap: 0.65rem; padding-bottom: 0.85rem; border-bottom: 1px solid color-mix(in srgb, var(--rule) 75%, transparent); }
 .toolbar-section:last-of-type { border-bottom: 0; }
-.toolbar-section-title { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; color: var(--deep); font-size: 0.82rem; font-weight: 800; }
-.toolbar-section-kicker { color: var(--muted); font-size: 0.68rem; font-weight: 500; }
-.tool-choice { flex: 1; min-width: 0; padding: 0.45rem 0.55rem; border: 1px solid var(--rule); border-radius: 0.45rem; background: var(--surface); color: var(--ink); font: inherit; font-size: 0.8rem; cursor: pointer; }
+.toolbar-section-title { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; color: var(--deep); font-size: var(--fs-sm); font-weight: 800; }
+.toolbar-section-kicker { color: var(--muted); font-size: var(--fs-xs); font-weight: 500; }
+.choice-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr)); gap: 0.35rem; }
+.tool-choice {
+  display: inline-flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-xs);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tool-choice > svg { flex: 0 0 auto; }
 .tool-choice:hover { border-color: var(--accent); }
 .tool-choice-active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); color: var(--deep); box-shadow: inset 0 0 0 1px var(--accent); }
 .toolbar-paint .field { gap: 0.25rem; }
-.toolbar-paint .field output { align-self: flex-end; margin-top: -1.25rem; color: var(--deep); font-size: 0.75rem; }
 .toolbar-paint .tool-actions { margin-top: 0; }
+
+/*
+  ---------- สไลเดอร์ + ช่องตัวเลข ----------
+
+  เดิมค่าตัวเลขเป็น <output> ที่ถูกดึงขึ้นไปทับบรรทัด label ด้วย margin-top: -1.25rem
+  ซึ่งพังทันทีที่ label ยาวจนขึ้นบรรทัดใหม่ — ตอนนี้ label กับค่าอยู่แถวเดียวกันจริง ๆ
+*/
+.slider-field { display: flex; flex-direction: column; gap: 0.3rem; }
+
+.slider-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.slider-field-head label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.slider-field-value {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.15rem;
+  color: var(--deep);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+
+/*
+  ซ่อนลูกศรเพิ่ม/ลดของ number input
+
+  ลูกศรกินความกว้างราว 15px ในช่องที่กว้าง 3.4rem ทำให้เลข 3 หลัก (เช่น 100)
+  แสดงไม่ครบ และมันซ้ำซ้อนกับสไลเดอร์ที่อยู่ข้างล่างอยู่แล้ว
+*/
+.slider-field-number::-webkit-outer-spin-button,
+.slider-field-number::-webkit-inner-spin-button { margin: 0; appearance: none; }
+
+.slider-field-number {
+  width: 3.6rem;
+  appearance: textfield;
+  padding: 0.15rem 0.3rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-xs);
+  background: var(--surface);
+  color: var(--deep);
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  text-align: right;
+}
+
+.slider-field-number:focus-visible { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
+
+/* ---------- แผงว่าง ---------- */
+
+.panel-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-6) var(--sp-4);
+  color: var(--muted);
+  text-align: center;
+}
+
+.panel-empty > svg { color: var(--mauve); }
+.panel-empty p { margin: 0; }
+.panel-empty p:first-of-type { color: var(--deep); font-size: var(--fs-base); font-weight: 700; }
+.panel-empty .btn { margin-top: var(--sp-2); }
+
+/* ---------- ของตกแต่ง ---------- */
+
+.decoration-chip { display: inline-flex; align-items: center; gap: 0.35rem; }
+.decoration-chip-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  flex: 0 0 0.6rem;
+  border: 1px solid rgb(0 0 0 / 18%);
+  border-radius: var(--r-full);
+}
+
+/* ---------- ตารางคีย์ลัด ---------- */
+
+.shortcut-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: var(--sp-4); }
+.shortcut-group h3 { margin: 0 0 var(--sp-2); color: var(--accent); font-size: var(--fs-xs); font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+.shortcut-group dl { display: flex; flex-direction: column; gap: 0.35rem; margin: 0; }
+.shortcut-row { display: flex; align-items: center; gap: var(--sp-2); }
+.shortcut-row dt { display: flex; flex: 0 0 auto; align-items: center; gap: 0.15rem; }
+.shortcut-row dd { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
+.shortcut-join { color: var(--muted); font-size: var(--fs-xs); }
+.shortcut-row kbd {
+  display: inline-grid;
+  min-width: 1.5rem;
+  padding: 0.15rem 0.35rem;
+  place-items: center;
+  border: 1px solid var(--rule);
+  border-bottom-width: 2px;
+  border-radius: var(--r-xs);
+  background: var(--ground);
+  color: var(--deep);
+  font-family: inherit;
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+}
+
+/*
+  คอลัมน์กลาง = ฉาก 3 มิติ + แถบเลือกนิ้ว
+
+  min-width: 0 ย้ายมาอยู่ที่นี่ด้วย ไม่ใช่แค่ที่ .viewport — ตอนนี้ .editor-stage
+  คือ flex item ของ .editor-body แล้ว ถ้าไม่ตั้ง มันจะยึดความกว้างจริงของแคนวาส
+  WebGL (หลักพันพิกเซล) เป็นความกว้างต่ำสุด แล้วดันแผงข้างหลุดออกนอกจอเหมือนเดิม
+*/
+.editor-stage {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+/* ---------- ปุ่มควบคุมมุมมอง ---------- */
+
+.viewport-controls {
+  position: absolute;
+  right: var(--sp-3);
+  bottom: var(--sp-3);
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.2rem;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: var(--r-sm);
+  background: rgb(0 0 0 / 42%);
+  backdrop-filter: blur(6px);
+}
+
+.viewport-control {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: rgb(255 255 255 / 82%);
+  cursor: pointer;
+}
+
+.viewport-control:hover { background: rgb(255 255 255 / 14%); color: #fff; }
+.viewport-control:focus-visible { outline: 2px solid var(--editor-shell-focus); outline-offset: 1px; }
 
 .editor-right-panel {
   display: flex;
@@ -1317,16 +1610,39 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 }
 
 .editor-panel-tabs { display: flex; flex: 0 0 auto; gap: 0.2rem; padding: 0.55rem; border-bottom: 1px solid var(--rule); background: var(--surface); }
-.editor-panel-tab { flex: 1; padding: 0.45rem 0.35rem; border: 0; border-radius: 0.4rem; background: transparent; color: var(--muted); font: inherit; font-size: 0.78rem; cursor: pointer; }
+.editor-panel-tab {
+  display: inline-flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.45rem 0.3rem;
+  border: 0;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.editor-panel-tab > svg { flex: 0 0 auto; }
 .editor-panel-tab:hover { background: var(--chip); color: var(--deep); }
 .editor-panel-tab-active { background: var(--chip); color: var(--deep); font-weight: 700; }
 .editor-panel-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .editor-right-panel-scroll { min-height: 0; flex: 1; overflow-y: auto; }
-.editor-right-panel-scroll .canvas2d-panel, .editor-right-panel-scroll .version-panel { width: auto; min-height: 100%; border: 0; }
+.editor-right-panel-scroll .canvas2d-panel,
+.editor-right-panel-scroll .version-panel,
+.editor-right-panel-scroll .layer-panel { width: auto; min-height: 100%; border: 0; }
 .editor-right-panel-scroll .canvas2d { width: 100%; }
 .editor-panel-loading { padding: 1rem; }
 
-.nail-strip { position: sticky; bottom: 0; z-index: 5; box-shadow: 0 -4px 16px rgb(80 45 30 / 8%); }
+/*
+  แถบเลือกนิ้วอยู่ในคอลัมน์เดียวกับฉาก จึงไม่ต้อง sticky อีก — มันอยู่ท้ายคอลัมน์
+  ที่สูงเท่าจอพอดีอยู่แล้ว (เดิมอยู่ท้ายหน้าจึงต้องเกาะขอบล่างไว้เอง)
+*/
+.nail-strip { flex: 0 0 auto; z-index: 5; box-shadow: 0 -4px 16px rgb(80 45 30 / 8%); }
 .nail-strip .chip { min-width: 2.8rem; }
 .nail-strip .nail-buttons { align-items: center; }
 .nail-strip .nail-buttons .chip { display: inline-flex; align-items: center; gap: 0.35rem; }
@@ -1336,19 +1652,37 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   height: 1.15rem;
   place-items: center;
   border: 1px solid var(--rule);
-  border-radius: 0.35rem;
+  border-radius: var(--r-xs);
   background: var(--ground);
   color: var(--muted);
-  font-size: 0.68rem;
+  font-size: var(--fs-xs);
   font-weight: 800;
   line-height: 1;
 }
 .nail-strip .chip-on .nail-chip-key { border-color: rgb(255 255 255 / 45%); background: rgb(255 255 255 / 16%); color: #fff; }
 
+/* แถบนี้อยู่ขอบล่างของฉาก tooltip ใต้ปุ่มจะถูกตัด — ยกขึ้นไปด้านบนแทน */
+.nail-strip [data-tooltip]::after { top: auto; bottom: calc(100% + 0.35rem); }
+
+/* แถบบนอยู่ขอบขวาจอ tooltip ของปุ่มขวาสุดต้องไม่ล้นออกนอกหน้าจอ */
+.editor-topbar-actions > *:last-child [data-tooltip]::after { left: auto; right: 0; transform: none; }
+
 @media (max-width: 1080px) {
-  .editor-body { flex-wrap: wrap; overflow-y: auto; }
+  /*
+    ห้ามตั้ง flex-wrap ที่นี่
+
+    บล็อก @media (max-width: 720px) ด้านบนตั้ง `flex-wrap: nowrap` ไว้แล้วด้วยเหตุผล
+    ที่อธิบายไว้ตรงนั้น แต่บล็อกนี้อยู่ท้ายไฟล์กว่าและก็ match ที่ ≤720px ด้วย
+    การประกาศ `flex-wrap: wrap` ตรงนี้จึงทับ nowrap กลับมา — ผลคือ column + wrap
+    ดันฉาก 3 มิติออกไปเป็นคอลัมน์ใหม่นอกจอ (วัดที่ 652px: .editor-stage
+    กว้าง 637px เริ่มที่ x=320 ล้นขอบขวาไป 305px)
+
+    ค่าที่ต้องการสำหรับช่วง 721–1080px ถูกตั้งไว้แล้วที่บล็อก 1080px ด้านบน
+  */
+  .editor-body { overflow-y: auto; }
   .editor-sidebar { flex: 0 0 100%; max-height: 390px; }
   .editor-tool-rail { flex: 0 0 74px; }
+  .editor-stage { flex: 1 1 26rem; }
   .viewport { min-height: 520px; }
   .editor-right-panel { flex: 1 1 300px; min-height: 360px; }
 }
@@ -1356,12 +1690,20 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 @media (max-width: 720px) {
   .editor-sidebar { flex-direction: column; max-height: none; }
   .editor-tool-rail { flex: 0 0 auto; flex-direction: row; align-items: stretch; padding: 0.45rem 0.65rem; }
-  .editor-tool-rail-footer { display: none; }
-  .editor-tool-rail-items { flex-direction: row; }
-  .editor-tool-button { padding: 0.45rem 0.2rem; }
+  .editor-tool-button { flex: 1 1 0; padding: 0.45rem 0.2rem; }
+  /* แถบเรียงแนวนอนแล้ว tooltip ต้องกลับไปอยู่ใต้ปุ่ม ไม่ใช่ทางขวา */
+  .editor-tool-rail [data-tooltip-side="right"]::after {
+    top: calc(100% + 0.35rem);
+    left: 50%;
+    transform: translateX(-50%);
+  }
   .editor-inspector { max-height: 38vh; }
+  .editor-stage { flex: 0 0 auto; width: 100%; }
   .editor-right-panel { flex: 0 0 auto; width: 100%; min-height: 320px; }
   .viewport { min-height: 42vh; }
+  /* จอแคบ: ปุ่มควบคุมมุมมองต้องไม่ทับแถบเลือกนิ้วที่อยู่ใต้ฉากพอดี */
+  .viewport-controls { flex-direction: row; right: var(--sp-2); bottom: var(--sp-2); }
+  .nail-strip { padding: 0.6rem 0.75rem; gap: 0.5rem 0.75rem; }
 }
 
 @media (max-width: 1080px) {
@@ -1371,10 +1713,6 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .editor-topbar-project strong,
   .editor-topbar-project-name,
   .editor-topbar-project-input { max-width: min(24vw, 220px); }
-}
-
-@media (max-width: 900px) {
-  .editor-topbar-feedback { display: none; }
 }
 
 @media (max-width: 720px) {
@@ -1389,13 +1727,12 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
     flex: 1 1 100%;
     justify-content: center;
     border: 0;
-    border-top: 1px solid #eee6e7;
+    border-top: 1px solid var(--editor-line);
     border-radius: 0;
     padding: 0.3rem;
   }
   .editor-topbar-actions { gap: 0.05rem; }
-  .editor-topbar-actions > .editor-topbar-divider,
-  .editor-topbar-feedback { display: none; }
+  .editor-topbar-actions > .editor-topbar-divider { display: none; }
   /* ปุ่มบันทึกเหลือแค่ไอคอน แต่ caret ต้องยังกดได้ จึงคุมทีละปุ่มแทนกฎรวม */
   .editor-save-main { justify-content: center; padding: 0.4rem 0.5rem; }
   .editor-save-main span { display: none; }
@@ -1412,7 +1749,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 @media (max-width: 720px) {
   .navbar { align-items: flex-start; gap: 0.5rem; padding: 0.55rem 0.75rem; }
-  .brand { font-size: 0.92rem; }
+  .brand { font-size: var(--fs-base); }
   .brand-mark { width: 1.8rem; height: 1.8rem; }
   .navbar-right { flex-wrap: wrap; justify-content: flex-end; gap: 0.25rem; }
   .navbar-links .navbar-link { width: 2rem; height: 2rem; justify-content: center; padding: 0; font-size: 0; }

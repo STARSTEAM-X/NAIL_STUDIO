@@ -20,6 +20,14 @@ export interface PaintSettings {
   softness: number
 }
 
+/**
+ * ขอบเขตขนาดหัวแปรง — สไลเดอร์ในแผงวาดและคีย์ลัด [ ] ต้องใช้ค่าชุดเดียวกัน
+ * ไม่งั้นกดคีย์ลัดจะดันค่าออกนอกช่วงที่สไลเดอร์แสดงได้
+ */
+export const BRUSH_SIZE_MIN = 8
+export const BRUSH_SIZE_MAX = 400
+export const BRUSH_SIZE_STEP = 2
+
 export const DEFAULT_PAINT_SETTINGS: PaintSettings = {
   tool: 'brush',
   brush: 'round',

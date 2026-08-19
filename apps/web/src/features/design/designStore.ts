@@ -51,9 +51,18 @@ export const EDITABLE_NAILS: NailKey[] = nailKeysOfHand(EDITABLE_HAND)
 
 export type FocusTarget = { kind: 'nail'; key: NailKey } | { kind: 'home' } | null
 
+/**
+ * คำขอซูมจากปุ่มบนหน้าจอ
+ *
+ * ต้องมี nonce เพราะการกด "ซูมเข้า" สองครั้งติดกันคือคำขอคนละครั้งที่มีทิศทางเดียวกัน
+ * ถ้าเก็บแค่ทิศทาง ครั้งที่สองจะไม่เปลี่ยนค่าใน store แล้วฉาก 3 มิติจะไม่รู้ว่าถูกกดอีก
+ */
+export type ZoomRequest = { direction: 1 | -1; nonce: number } | null
+
 export interface DesignState {
   document: DesignDocument
   focus: FocusTarget
+  zoom: ZoomRequest
   selection: Set<NailKey>
   activeLayerIds: Partial<Record<NailKey, string>>
   settings: PaintSettings
@@ -71,6 +80,8 @@ export interface DesignActions {
   focusNail: (key: NailKey) => void
   focusHome: () => void
   clearFocus: () => void
+  zoomBy: (direction: 1 | -1) => void
+  clearZoom: () => void
   setSettings: (patch: Partial<PaintSettings>) => void
   activeLayerId: (key: NailKey) => string
   selectLayer: (key: NailKey, id: string) => void
@@ -230,6 +241,7 @@ export function createDesignStore(options: CreateDesignStoreOptions = {}): Desig
     return {
       document,
       focus: null,
+      zoom: null,
       selection: new Set<NailKey>([EDITABLE_NAILS[1] ?? 'right.index']),
       activeLayerIds: initialActiveLayerIds(document),
       settings: options.settings ?? DEFAULT_PAINT_SETTINGS,
@@ -271,6 +283,15 @@ export function createDesignStore(options: CreateDesignStoreOptions = {}): Desig
       focusHome: () => set({ focus: { kind: 'home' } }),
       clearFocus: () => {
         if (get().focus !== null) set({ focus: null })
+      },
+
+      // ซูมด้วยปุ่มยกเลิกการจ่อเล็บที่ค้างอยู่ ไม่งั้นกล้องจะถูกสองคำสั่งดึงคนละทาง
+      zoomBy: (direction) => set((state) => ({
+        focus: null,
+        zoom: { direction, nonce: (state.zoom?.nonce ?? 0) + 1 },
+      })),
+      clearZoom: () => {
+        if (get().zoom !== null) set({ zoom: null })
       },
       setSettings: (patch) => set((state) => ({ settings: { ...state.settings, ...patch } })),
 

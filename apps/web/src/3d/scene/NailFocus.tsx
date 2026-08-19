@@ -40,7 +40,12 @@ export function NailFocus({ parts }: Props) {
   const goal = useRef<{ position: Vector3; target: Vector3 } | null>(null)
 
   useEffect(() => {
-    if (!focus) return
+    // focus ถูกล้าง = มีคนอื่นขอคุมกล้อง (เช่นปุ่มซูม) ต้องหยุดเคลื่อนทันที
+    // ไม่งั้นสองคำสั่งจะลากกล้องคนละทางพร้อมกัน
+    if (!focus) {
+      goal.current = null
+      return
+    }
     if (focus.kind === 'home') {
       goal.current = {
         position: new Vector3(...HOME_POSITION),

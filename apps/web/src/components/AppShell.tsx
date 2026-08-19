@@ -6,6 +6,7 @@ import { isShop } from '@/lib/user.ts'
 import { NotificationBell } from './NotificationBell.tsx'
 import { Icon, type IconName } from './Icon.tsx'
 import { TopProgressBar } from './TopProgressBar.tsx'
+import { TooltipLayer } from './TooltipLayer.tsx'
 
 interface NavItem {
   to: string
@@ -46,6 +47,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className={`shell ${isEditor ? 'shell-editor' : ''}`}>
       <TopProgressBar />
+      <TooltipLayer />
       {!isEditor && (
         <>
           <a href="#main-content" className="ui-skip-link">ข้ามไปยังเนื้อหาหลัก</a>

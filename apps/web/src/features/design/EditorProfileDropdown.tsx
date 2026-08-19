@@ -57,7 +57,7 @@ export function EditorProfileDropdown({
         aria-label={user ? `เมนูโปรไฟล์ ${user.displayName}` : 'เมนูโปรไฟล์'}
         aria-haspopup="menu"
         aria-expanded={open}
-        title="เมนูโปรไฟล์"
+        data-tooltip="เมนูโปรไฟล์"
         onClick={() => setOpen((current) => !current)}
       >
         <span

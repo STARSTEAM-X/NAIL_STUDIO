@@ -1,22 +1,33 @@
 export type IconName =
   | 'alert'
+  | 'arrow-down'
   | 'arrow-left'
+  | 'arrow-up'
   | 'arrow-up-right'
   | 'bell'
+  | 'brush'
   | 'calendar'
   | 'check'
   | 'chevron-down'
   | 'clock'
   | 'comment'
   | 'compass'
+  | 'download'
+  | 'eraser'
+  | 'eye'
+  | 'eye-off'
   | 'flame'
   | 'folder'
   | 'grid'
+  | 'hand'
   | 'heart'
   | 'image'
+  | 'keyboard'
   | 'layers'
   | 'logout'
+  | 'nail'
   | 'palette'
+  | 'pencil'
   | 'plus'
   | 'remix'
   | 'rows'
@@ -26,9 +37,14 @@ export type IconName =
   | 'sparkle'
   | 'tag'
   | 'trash'
+  | 'undo'
+  | 'redo'
   | 'user'
   | 'users'
+  | 'wand'
   | 'x'
+  | 'zoom-in'
+  | 'zoom-out'
 
 interface IconProps {
   name: IconName
@@ -212,6 +228,111 @@ export function Icon({ name, size = 18, strokeWidth = 1.8, className }: IconProp
           <path d="M16 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 18.5V20" />
           <circle cx="10" cy="8" r="3" />
           <path d="M16 7.2a3 3 0 0 1 0 5.6M18 15.4a3.5 3.5 0 0 1 2 3.1V20" />
+        </>
+      )}
+      {name === 'hand' && (
+        <>
+          <path d="M18 11V6a2 2 0 0 0-4 0" />
+          <path d="M14 10V4a2 2 0 0 0-4 0v2" />
+          <path d="M10 10.5V6a2 2 0 0 0-4 0v8" />
+          <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.9-6-2.3l-3.6-3.6a2 2 0 0 1 2.8-2.8L7 15" />
+        </>
+      )}
+      {name === 'nail' && (
+        <>
+          <path d="M7.5 18.5V8a4.5 4.5 0 0 1 9 0v10.5a2 2 0 0 1-2 2h-5a2 2 0 0 1-2-2Z" />
+          <path d="M8 11.5c1.2 1 2.6 1.5 4 1.5s2.8-.5 4-1.5" />
+        </>
+      )}
+      {name === 'brush' && (
+        <>
+          <path d="M18.4 3.6a2.2 2.2 0 0 1 3.1 3.1l-9.4 9.4-4 .9.9-4 9.4-9.4Z" />
+          <path d="M7.5 16.5c-.7 1.3-1.8 2.2-3.5 2.7.9 1.2 2.4 1.8 3.8 1.4 1.3-.4 2-1.7 1.7-3" />
+        </>
+      )}
+      {name === 'pencil' && (
+        <>
+          <path d="M17 3.5a2.12 2.12 0 0 1 3 3L7.5 19l-4 1 1-4L17 3.5Z" />
+          <path d="m14.5 6 3 3" />
+        </>
+      )}
+      {name === 'eraser' && (
+        <>
+          <path d="m7 21-4.3-4.3a2 2 0 0 1 0-2.8l9.6-9.6a2 2 0 0 1 2.8 0l5.6 5.6a2 2 0 0 1 0 2.8L13 21" />
+          <path d="M22 21H7" />
+          <path d="m5.5 11.5 7 7" />
+        </>
+      )}
+      {name === 'wand' && (
+        <>
+          <path d="m14.5 4.5 5 5L9 20a1.8 1.8 0 0 1-2.5 0L4 17.5a1.8 1.8 0 0 1 0-2.5L14.5 4.5Z" />
+          <path d="m12.5 6.5 5 5" />
+          <path d="M5 4v3M3.5 5.5h3M19 14v3M17.5 15.5h3" />
+        </>
+      )}
+      {name === 'undo' && (
+        <>
+          <path d="M9 14 4 9l5-5" />
+          <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H8" />
+        </>
+      )}
+      {name === 'redo' && (
+        <>
+          <path d="m15 14 5-5-5-5" />
+          <path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H16" />
+        </>
+      )}
+      {name === 'eye' && (
+        <>
+          <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+          <circle cx="12" cy="12" r="3" />
+        </>
+      )}
+      {name === 'eye-off' && (
+        <>
+          <path d="m4 4 16 16" />
+          <path d="M9.9 5.9A9.6 9.6 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-3.2 4" />
+          <path d="M6.6 7.6A17 17 0 0 0 2.5 12S6 18.5 12 18.5c1.4 0 2.6-.3 3.7-.8" />
+          <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+        </>
+      )}
+      {name === 'download' && (
+        <>
+          <path d="M12 4v10" />
+          <path d="m8 10 4 4 4-4" />
+          <path d="M4.5 17v1.5A2.5 2.5 0 0 0 7 21h10a2.5 2.5 0 0 0 2.5-2.5V17" />
+        </>
+      )}
+      {name === 'arrow-up' && (
+        <>
+          <path d="M12 20V4" />
+          <path d="m6 10 6-6 6 6" />
+        </>
+      )}
+      {name === 'arrow-down' && (
+        <>
+          <path d="M12 4v16" />
+          <path d="m6 14 6 6 6-6" />
+        </>
+      )}
+      {name === 'zoom-in' && (
+        <>
+          <circle cx="11" cy="11" r="6.5" />
+          <path d="m16 16 4 4" />
+          <path d="M11 8.5v5M8.5 11h5" />
+        </>
+      )}
+      {name === 'zoom-out' && (
+        <>
+          <circle cx="11" cy="11" r="6.5" />
+          <path d="m16 16 4 4" />
+          <path d="M8.5 11h5" />
+        </>
+      )}
+      {name === 'keyboard' && (
+        <>
+          <rect x="2.5" y="6" width="19" height="12" rx="2" />
+          <path d="M6.5 10h.01M10 10h.01M13.5 10h.01M17 10h.01M6.5 13.5h.01M17 13.5h.01M9.5 13.5h5" />
         </>
       )}
     </svg>

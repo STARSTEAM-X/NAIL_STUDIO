@@ -1,16 +1,9 @@
+import { isEditableTarget } from './keyboardTarget.ts'
+
 type FingerShortcutEvent = Pick<
   KeyboardEvent,
   'key' | 'code' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey' | 'repeat' | 'target'
 >
-
-function isEditableTarget(target: EventTarget | null): boolean {
-  if (!target || typeof target !== 'object') return false
-  const element = target as { tagName?: string; isContentEditable?: boolean }
-  return element.isContentEditable === true
-    || element.tagName === 'INPUT'
-    || element.tagName === 'TEXTAREA'
-    || element.tagName === 'SELECT'
-}
 
 /** Returns the zero-based finger index for the 1–5 navigation shortcuts. */
 export function fingerIndexFromShortcut(event: FingerShortcutEvent): number | null {

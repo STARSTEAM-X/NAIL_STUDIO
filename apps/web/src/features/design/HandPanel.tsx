@@ -1,5 +1,6 @@
 import type { HandSettings } from '@nail-studio/contracts'
 import { useDesign } from './DesignStoreProvider.tsx'
+import { SliderField } from './SliderField.tsx'
 
 const PROPORTION_RANGES: Record<keyof HandSettings['proportions'], { min: number; max: number }> = {
   handScale: { min: 0.8, max: 1.2 },
@@ -26,37 +27,45 @@ export function HandPanel() {
   const setSkinTone = useDesign((state) => state.setSkinTone)
 
   return (
-    <aside className="toolbar" aria-label="สัดส่วนมือและสีผิว">
-      <h2>มือ</h2>
+    <aside className="toolbar toolbar-paint" aria-label="สัดส่วนมือและสีผิว">
+      <div className="toolbar-section">
+        <div className="toolbar-section-title">
+          <span>สีผิว</span>
+        </div>
+        <label className="field">
+          เลือกสีผิว
+          <input
+            type="color"
+            className="swatch-picker swatch-picker-wide"
+            value={skinTone}
+            onChange={(event) => setSkinTone(event.target.value)}
+          />
+        </label>
+      </div>
 
-      <label className="field">
-        สีผิว
-        <input
-          type="color"
-          value={skinTone}
-          onChange={(event) => setSkinTone(event.target.value)}
-        />
-      </label>
-
-      {PROPORTION_KEYS.map((key) => {
-        const range = PROPORTION_RANGES[key]
-        return (
-          <label className="field" key={key}>
-            {PROPORTION_LABELS[key]} {Math.round(proportions[key] * 100)}%
-            <input
-              type="range"
-              min={range.min}
-              max={range.max}
-              step={0.01}
-              value={proportions[key]}
-              onChange={(event) => setProportions(
-                { [key]: Number(event.target.value) },
+      <div className="toolbar-section">
+        <div className="toolbar-section-title">
+          <span>สัดส่วน</span>
+          <span className="toolbar-section-kicker">ทั้งมือ</span>
+        </div>
+        {PROPORTION_KEYS.map((key) => {
+          const range = PROPORTION_RANGES[key]
+          return (
+            <SliderField
+              key={key}
+              label={PROPORTION_LABELS[key]}
+              suffix="%"
+              min={Math.round(range.min * 100)}
+              max={Math.round(range.max * 100)}
+              value={Math.round(proportions[key] * 100)}
+              onChange={(percent) => setProportions(
+                { [key]: percent / 100 },
                 `hand-proportions:${key}`,
               )}
             />
-          </label>
-        )
-      })}
+          )
+        })}
+      </div>
     </aside>
   )
 }
