@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useCurrentUser, useLogout } from '@/features/auth/useAuth.ts'
 import { EditorProfileDropdown } from '@/features/design/EditorProfileDropdown.tsx'
 import { isShop } from '@/lib/user.ts'
+import { useConversations } from '@/features/chat/useChat.ts'
 import { NotificationBell } from './NotificationBell.tsx'
 import { Icon, type IconName } from './Icon.tsx'
 import { TopProgressBar } from './TopProgressBar.tsx'
@@ -22,6 +23,8 @@ interface NavItem {
  */
 export function AppShell({ children }: { children: ReactNode }) {
   const { data: user } = useCurrentUser()
+  const conversations = useConversations()
+  const unreadMessages = conversations.data?.reduce((total, item) => total + item.unreadCount, 0) ?? 0
   const logout = useLogout()
   const navigate = useNavigate()
   const location = useLocation()
@@ -38,6 +41,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       ? { to: '/shop/manage', label: 'จัดการร้าน', icon: 'palette' }
       : { to: '/shops', label: 'ร้านทำเล็บ', icon: 'compass' },
     { to: '/appointments', label: 'การนัดหมาย', icon: 'calendar' },
+    { to: '/chat', label: 'ข้อความ', icon: 'comment' },
   ]
 
   const handleLogout = () => {
@@ -66,6 +70,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 >
                   <Icon name={item.icon} size={16} />
                   <span>{item.label}</span>
+                  {item.to === '/chat' && unreadMessages > 0 && <span className="navbar-unread-badge">{unreadMessages > 99 ? '99+' : unreadMessages}</span>}
                 </NavLink>
               ))}
             </div>
@@ -103,6 +108,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               >
                 <Icon name={item.icon} size={17} />
                 <span>{item.label}</span>
+                {item.to === '/chat' && unreadMessages > 0 && <span className="navbar-unread-badge">{unreadMessages > 99 ? '99+' : unreadMessages}</span>}
               </NavLink>
             ))}
           </div>

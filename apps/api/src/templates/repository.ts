@@ -37,16 +37,30 @@ export interface TemplateReportMutationRow {
   visibility: 'public' | 'unlisted' | 'hidden'
 }
 
-export interface TemplateModerationReportRow {
-  id: string
-  targetId: string
-  reason: 'spam' | 'inappropriate' | 'copyright' | 'harassment' | 'other'
-  detail: string | null
-  status: 'pending' | 'reviewed' | 'dismissed'
-  createdAt: Date
-  reporter: { id: string; displayName: string }
-  template: { name: string; visibility: 'public' | 'unlisted' | 'hidden'; reportCount: number } | null
-}
+export type TemplateModerationReportRow =
+  | {
+      target: 'template'
+      id: string
+      targetId: string
+      reason: 'spam' | 'inappropriate' | 'copyright' | 'harassment' | 'other'
+      detail: string | null
+      status: 'pending' | 'reviewed' | 'dismissed'
+      createdAt: Date
+      reporter: { id: string; displayName: string }
+      template: { name: string; visibility: 'public' | 'unlisted' | 'hidden'; reportCount: number } | null
+    }
+  | {
+      target: 'message'
+      id: string
+      targetId: string
+      reason: 'spam' | 'inappropriate' | 'copyright' | 'harassment' | 'other'
+      detail: string | null
+      status: 'pending' | 'reviewed' | 'dismissed'
+      createdAt: Date
+      reporter: { id: string; displayName: string }
+      template: null
+      message: { excerpt: string; senderName: string; sentAt: string }
+    }
 
 export interface TemplateCommentMutationRow {
   comment: {
@@ -460,32 +474,44 @@ export function reportTemplate(
 }
 
 export async function listPendingTemplateReports(limit = 50): Promise<TemplateModerationReportRow[]> {
-  const reports = await prisma.contentReport.findMany({
+  const reportSelect = { id: true, targetType: true, targetId: true, reason: true, detail: true, status: true, createdAt: true, reporter: { select: { id: true, displayName: true } } } as const
+  const templateReports = await prisma.contentReport.findMany({
     where: { targetType: 'template', status: 'pending' },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     take: limit,
-    select: {
-      id: true,
-      targetId: true,
-      reason: true,
-      detail: true,
-      status: true,
-      createdAt: true,
-      reporter: { select: { id: true, displayName: true } },
-    },
+    select: reportSelect,
   })
-  const templates = await prisma.nailTemplate.findMany({
-    where: { id: { in: reports.map((report) => report.targetId) } },
-    select: { id: true, name: true, visibility: true, reportCount: true },
-  })
-  const byId = new Map(templates.map((template) => [template.id, template]))
+  let messageReports: typeof templateReports = []
+  try {
+    messageReports = await prisma.contentReport.findMany({
+      where: { targetType: 'message', status: 'pending' },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+      select: reportSelect,
+    })
+  } catch (error: unknown) {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError) || !error.message.includes('invalid input value')) throw error
+  }
+  const reports = [...templateReports, ...messageReports].sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime() || left.id.localeCompare(right.id)).slice(0, limit)
+  const templateIds = reports.filter((report) => report.targetType === 'template').map((report) => report.targetId)
+  const messageIds = reports.filter((report) => report.targetType === 'message').map((report) => report.targetId)
+  const templates = await prisma.nailTemplate.findMany({ where: { id: { in: templateIds } }, select: { id: true, name: true, visibility: true, reportCount: true } })
+  const messages = messageIds.length === 0
+    ? []
+    : await prisma.conversationMessage.findMany({ where: { id: { in: messageIds } }, select: { id: true, content: true, createdAt: true, sender: { select: { displayName: true } } } })
+  const templateById = new Map(templates.map((template) => [template.id, template]))
+  const messageById = new Map(messages.map((message) => [message.id, message]))
   return reports.map((report) => {
-    const template = byId.get(report.targetId)
+    if (report.targetType === 'template') {
+      const template = templateById.get(report.targetId)
+      return { ...report, target: 'template' as const, template: template ? { name: template.name, visibility: template.visibility, reportCount: template.reportCount } : null }
+    }
+    const message = messageById.get(report.targetId)
     return {
       ...report,
-      template: template
-        ? { name: template.name, visibility: template.visibility, reportCount: template.reportCount }
-        : null,
+      target: 'message' as const,
+      template: null,
+      message: { excerpt: message?.content.slice(0, 240) ?? '[ข้อความถูกลบแล้ว]', senderName: message?.sender?.displayName ?? 'ผู้ใช้ที่ถูกลบ', sentAt: message?.createdAt.toISOString() ?? report.createdAt.toISOString() },
     }
   })
 }

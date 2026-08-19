@@ -17,6 +17,7 @@ import { LoadingScreen } from '@/components/Loading.tsx'
 const CommunityPage = lazy(() => import('@/pages/CommunityPage.tsx').then((module) => ({ default: module.CommunityPage })))
 const TemplatePreviewPage = lazy(() => import('@/pages/TemplatePreviewPage.tsx').then((module) => ({ default: module.TemplatePreviewPage })))
 const EditorPage = lazy(() => import('@/pages/EditorPage.tsx').then((module) => ({ default: module.EditorPage })))
+const ChatPage = lazy(() => import('@/pages/ChatPage.tsx').then((module) => ({ default: module.ChatPage })))
 const AppointmentsPage = lazy(() => import('@/pages/AppointmentsPage.tsx').then((module) => ({ default: module.AppointmentsPage })))
 const AppointmentDetailPage = lazy(() => import('@/pages/AppointmentDetailPage.tsx').then((module) => ({ default: module.AppointmentDetailPage })))
 const ShopsPage = lazy(() => import('@/pages/ShopsPage.tsx').then((module) => ({ default: module.ShopsPage })))
@@ -86,6 +87,8 @@ export function AppRouter() {
         />
 
         <Route path="/appointments" element={<Page><AppointmentsPage /></Page>} />
+        <Route path="/chat" element={<Page><ChatPage /></Page>} />
+        <Route path="/chat/:conversationId" element={<Page><ChatPage /></Page>} />
         <Route path="/appointments/:appointmentId" element={<Page><AppointmentDetailPage /></Page>} />
 
         <Route

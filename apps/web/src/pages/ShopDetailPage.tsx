@@ -7,6 +7,7 @@ import { EmptyState, ErrorState, ListSkeleton } from '@/components/ui/States.tsx
 import { useToast } from '@/components/ui/Toast.tsx'
 import { useCurrentUser } from '@/features/auth/useAuth.ts'
 import { useCreateAppointment } from '@/features/appointments/useAppointments.ts'
+import { useStartConversation } from '@/features/chat/useChat.ts'
 import { useShop } from '@/features/shops/useShops.ts'
 import { formatBaht, formatDate, formatDuration, localInputToIso } from '@/lib/datetime.ts'
 import { usePageTitle } from '@/lib/usePageTitle.ts'
@@ -23,6 +24,7 @@ export function ShopDetailPage() {
   const shop = useShop(shopId)
   const { data: currentUser } = useCurrentUser()
   const createAppointment = useCreateAppointment()
+  const startChat = useStartConversation()
   const navigate = useNavigate()
   const toast = useToast()
 
@@ -42,6 +44,14 @@ export function ShopDetailPage() {
   const activeServices = detail?.services.filter((service) => service.isActive) ?? []
   const selectedService = activeServices.find((service) => service.id === serviceId)
   const isOwnShop = currentUser?.id === detail?.userId
+
+  const messageShop = () => {
+    if (!shopId) return
+    startChat.mutate(shopId, {
+      onSuccess: (conversation) => navigate('/chat/' + conversation.id),
+      onError: (error) => toast.error(error instanceof Error ? error.message : 'เปิดห้องแชทไม่สำเร็จ'),
+    })
+  }
 
   const book = () => {
     const iso = localInputToIso(startAt)
@@ -140,6 +150,9 @@ export function ShopDetailPage() {
                 <p className="muted">นี่คือร้านของคุณ — จัดการบริการและรีวิวได้ที่หน้าจัดการร้าน</p>
               ) : (
                 <>
+                  <Button variant="ghost" block loading={startChat.isPending} onClick={messageShop}>
+                    <Icon name="comment" size={16} /> ทักร้าน
+                  </Button>
                   <label className="ap-field">
                     <span>บริการที่ต้องการ</span>
                     <select value={serviceId} onChange={(event) => setServiceId(event.target.value)}>

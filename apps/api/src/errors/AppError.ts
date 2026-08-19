@@ -29,6 +29,10 @@ export class AppError extends Error {
     return new AppError('VALIDATION_ERROR', 400, message, details)
   }
 
+  static unprocessable(message: string): AppError {
+    return new AppError('VALIDATION_ERROR', 422, message)
+  }
+
   static unauthenticated(message = 'กรุณาเข้าสู่ระบบก่อน'): AppError {
     return new AppError('UNAUTHENTICATED', 401, message)
   }

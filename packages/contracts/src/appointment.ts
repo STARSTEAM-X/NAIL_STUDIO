@@ -36,10 +36,6 @@ export const reviewAppointmentSchema = z.object({
   comment: z.string().trim().max(2000).optional(),
 })
 
-export const appointmentMessageSchema = z.object({
-  content: z.string().trim().min(1).max(2000),
-})
-
 export const listAppointmentsQuerySchema = z.object({
   status: z.enum(APPOINTMENT_STATUSES).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20),
@@ -74,15 +70,6 @@ export const appointmentProposalSchema = z.object({
   createdAt: z.string().datetime({ offset: true }),
 })
 
-export const appointmentMessageResponseSchema = z.object({
-  id: z.string().uuid(),
-  appointmentId: z.string().uuid(),
-  senderId: z.string().uuid().nullable(),
-  content: z.string(),
-  readAt: z.string().datetime({ offset: true }).nullable(),
-  createdAt: z.string().datetime({ offset: true }),
-})
-
 export const shopReviewSchema = z.object({
   id: z.string().uuid(),
   appointmentId: z.string().uuid(),
@@ -96,7 +83,6 @@ export const shopReviewSchema = z.object({
 
 export const appointmentDetailSchema = appointmentSchema.extend({
   proposals: z.array(appointmentProposalSchema),
-  messages: z.array(appointmentMessageResponseSchema),
   review: shopReviewSchema.nullable(),
 })
 
@@ -149,10 +135,8 @@ export const shopDetailSchema = shopProfileSchema.extend({
 export type CreateAppointmentInput = z.infer<typeof createAppointmentSchema>
 export type ProposeAppointmentInput = z.infer<typeof proposeAppointmentSchema>
 export type ReviewAppointmentInput = z.infer<typeof reviewAppointmentSchema>
-export type AppointmentMessageInput = z.infer<typeof appointmentMessageSchema>
 export type Appointment = z.infer<typeof appointmentSchema>
 export type AppointmentProposal = z.infer<typeof appointmentProposalSchema>
-export type AppointmentMessage = z.infer<typeof appointmentMessageResponseSchema>
 export type ShopReview = z.infer<typeof shopReviewSchema>
 export type AppointmentDetail = z.infer<typeof appointmentDetailSchema>
 export type UpdateShopProfileInput = z.infer<typeof updateShopProfileSchema>

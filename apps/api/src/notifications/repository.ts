@@ -1,7 +1,7 @@
 import { Prisma } from '../generated/prisma/client.ts'
 import { prisma } from '../db.ts'
 
-export type NotificationKind = 'post_like' | 'post_comment' | 'template_remix' | 'appointment_status' | 'appointment_message'
+export type NotificationKind = 'post_like' | 'post_comment' | 'template_remix' | 'appointment_status' | 'appointment_message' | 'direct_message'
 
 export interface NotificationEvent {
   userId: string

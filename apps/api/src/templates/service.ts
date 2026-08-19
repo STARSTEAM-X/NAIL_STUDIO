@@ -167,16 +167,7 @@ export async function report(
 
 export async function moderationQueue(): Promise<TemplateModerationReport[]> {
   const rows = await repository.listPendingTemplateReports()
-  return rows.map((row) => ({
-    id: row.id,
-    targetId: row.targetId,
-    reason: row.reason,
-    detail: row.detail,
-    status: row.status,
-    createdAt: row.createdAt.toISOString(),
-    reporter: row.reporter,
-    template: row.template,
-  }))
+  return rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }))
 }
 
 export async function comment(

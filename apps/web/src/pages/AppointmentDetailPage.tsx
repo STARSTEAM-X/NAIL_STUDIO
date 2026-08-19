@@ -1,12 +1,11 @@
-import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Icon } from '@/components/Icon.tsx'
 import { BackLink } from '@/components/ui/BackLink.tsx'
 import { Button } from '@/components/ui/Button.tsx'
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/ui/States.tsx'
 import { useToast } from '@/components/ui/Toast.tsx'
 import { useCurrentUser } from '@/features/auth/useAuth.ts'
-import { AppointmentChat } from '@/features/appointments/components/AppointmentChat.tsx'
 import { AppointmentStatusBadge } from '@/features/appointments/components/AppointmentStatusBadge.tsx'
 import { ProposalTimeline } from '@/features/appointments/components/ProposalTimeline.tsx'
 import { ReviewSection } from '@/features/appointments/components/ReviewSection.tsx'
@@ -15,11 +14,9 @@ import {
   useAppointment,
   useAppointmentAction,
   useDeleteAppointmentReview,
-  useMarkMessagesRead,
   useProposeAppointment,
   useReviewAppointment,
   useSameDayAppointments,
-  useSendAppointmentMessage,
   type AppointmentActionName,
 } from '@/features/appointments/useAppointments.ts'
 import { usePageTitle } from '@/lib/usePageTitle.ts'
@@ -29,14 +26,13 @@ export function AppointmentDetailPage() {
   const { appointmentId } = useParams<{ appointmentId: string }>()
   const { data: currentUser } = useCurrentUser()
   const toast = useToast()
+  const navigate = useNavigate()
 
   const appointment = useAppointment(appointmentId)
   const action = useAppointmentAction(appointmentId)
   const propose = useProposeAppointment(appointmentId)
-  const sendMessage = useSendAppointmentMessage(appointmentId)
   const submitReview = useReviewAppointment(appointmentId)
   const removeReview = useDeleteAppointmentReview(appointmentId)
-  const markRead = useMarkMessagesRead()
 
   const [proposalTime, setProposalTime] = useState('')
   const [proposalNote, setProposalNote] = useState('')
@@ -46,12 +42,7 @@ export function AppointmentDetailPage() {
   const pendingProposal = detail?.proposals.find((item) => item.status === 'pending')
   const isShopSide = Boolean(detail && currentUser?.id === detail.shopId)
   const sameDay = useSameDayAppointments(appointmentId, Boolean(pendingProposal) && isShopSide)
-
-  // ทำเครื่องหมายว่าอ่านแล้วครั้งเดียวต่อการเปิดหน้า ไม่ใช่ทุกครั้งที่ refetch
-  const markReadMutate = markRead.mutate
-  useEffect(() => {
-    if (appointmentId) markReadMutate(appointmentId)
-  }, [appointmentId, markReadMutate])
+  const chatUserId = detail ? (currentUser?.id === detail.shopId ? detail.customerId : detail.shopId) : null
 
   if (!appointmentId) {
     return (
@@ -229,16 +220,10 @@ export function AppointmentDetailPage() {
 
             <section className="ui-card ap-panel" aria-labelledby="ap-chat-title">
               <h2 id="ap-chat-title"><Icon name="comment" size={16} /> ข้อความกับร้าน</h2>
-              <AppointmentChat
-                messages={detail.messages}
-                currentUserId={currentUser?.id}
-                pending={sendMessage.isPending}
-                onSend={(content) =>
-                  sendMessage.mutate(content, {
-                    onError: (error) => toast.error(error instanceof Error ? error.message : 'ส่งข้อความไม่สำเร็จ'),
-                  })
-                }
-              />
+              <p className="muted">บทสนทนาแยกจากรายการนัดหมายและใช้คุยกับร้านได้ทุกเวลา</p>
+              <Button variant="ghost" icon="comment" onClick={() => { if (chatUserId) navigate('/chat?userId=' + chatUserId) }}>
+                เปิดห้องแชทกับร้าน
+              </Button>
             </section>
           </div>
 

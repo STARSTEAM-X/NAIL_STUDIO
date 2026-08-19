@@ -1,6 +1,5 @@
 import { Router } from 'express'
 import {
-  appointmentMessageSchema,
   createAppointmentSchema,
   listAppointmentsQuerySchema,
   proposeAppointmentSchema,
@@ -71,21 +70,4 @@ appointmentsRouter.delete('/:id/review', async (request, response) => {
 appointmentsRouter.get('/:id/same-day', async (request, response) => {
   const { id } = idParam.parse(request.params)
   response.json({ success: true, data: await service.listSameDayConfirmed(currentUser(request).id, id) })
-})
-
-appointmentsRouter.get('/:id/messages', async (request, response) => {
-  const { id } = idParam.parse(request.params)
-  response.json({ success: true, data: await service.listMessages(currentUser(request).id, id) })
-})
-
-appointmentsRouter.post('/:id/messages', async (request, response) => {
-  const { id } = idParam.parse(request.params)
-  const input = appointmentMessageSchema.parse(request.body)
-  response.status(201).json({ success: true, data: await service.sendMessage(currentUser(request).id, id, input.content) })
-})
-
-appointmentsRouter.post('/:id/messages/read', async (request, response) => {
-  const { id } = idParam.parse(request.params)
-  await service.markMessagesRead(currentUser(request).id, id)
-  response.json({ success: true, data: { ok: true } })
 })

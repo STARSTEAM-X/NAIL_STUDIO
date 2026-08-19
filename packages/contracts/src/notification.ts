@@ -6,6 +6,7 @@ export const NOTIFICATION_KINDS = [
   'template_remix',
   'appointment_status',
   'appointment_message',
+  'direct_message',
 ] as const
 
 export const notificationSchema = z.object({

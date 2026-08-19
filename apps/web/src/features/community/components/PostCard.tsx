@@ -8,7 +8,7 @@ import type { TemplateActions } from '../useTemplateActions.ts'
 import { Avatar } from '@/components/ui/Avatar.tsx'
 import { useToast } from '@/components/ui/Toast.tsx'
 import { useReportTemplate } from '../useTemplates.ts'
-import { ReportDialog } from './ReportDialog.tsx'
+import { ReportDialog } from '@/components/ui/ReportDialog.tsx'
 import { TemplateThumb } from './TemplateThumb.tsx'
 
 interface PostCardProps {
@@ -131,7 +131,8 @@ export function PostCard({ template, actions }: PostCardProps) {
 
       {reportOpen && (
         <ReportDialog
-          templateName={template.name}
+          title="รายงานผลงานนี้"
+          description={`ทีมงานจะตรวจสอบ “${template.name}” ตามเหตุผลที่คุณเลือก`}
           pending={report.isPending}
           onClose={() => setReportOpen(false)}
           onSubmit={(input) =>

@@ -51,11 +51,3 @@ export function deleteAppointmentReview(id: string): Promise<{ ok: true }> {
 export function fetchSameDayConfirmed(id: string): Promise<SameDayAppointment[]> {
   return apiFetch<SameDayAppointment[]>(`/appointments/${id}/same-day`)
 }
-
-export function sendAppointmentMessage(id: string, content: string) {
-  return apiFetch<AppointmentDetail['messages'][number]>(`/appointments/${id}/messages`, { method: 'POST', body: { content } })
-}
-
-export function markAppointmentMessagesRead(id: string): Promise<{ ok: true }> {
-  return apiFetch<{ ok: true }>(`/appointments/${id}/messages/read`, { method: 'POST' })
-}

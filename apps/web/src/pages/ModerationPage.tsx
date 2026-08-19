@@ -72,18 +72,27 @@ export function ModerationPage() {
                 <time dateTime={report.createdAt}>{formatDateTime(report.createdAt)}</time>
               </div>
 
-              {report.template ? (
-                <div className="moderation-target">
-                  <Link to={`/community/templates/${report.targetId}`}>
-                    <Icon name="image" size={14} /> {report.template.name}
-                  </Link>
-                  <span className="ui-status ui-status-neutral">
-                    {VISIBILITY_LABELS[report.template.visibility] ?? report.template.visibility}
-                  </span>
-                  <span className="moderation-count">ถูกรายงาน {report.template.reportCount} ครั้ง</span>
-                </div>
+              {report.target === 'template' ? (
+                report.template ? (
+                  <div className="moderation-target">
+                    <Link to={'/community/templates/' + report.targetId}>
+                      <Icon name="image" size={14} /> {report.template.name}
+                    </Link>
+                    <span className="ui-status ui-status-neutral">
+                      {VISIBILITY_LABELS[report.template.visibility] ?? report.template.visibility}
+                    </span>
+                    <span className="moderation-count">ถูกรายงาน {report.template.reportCount} ครั้ง</span>
+                  </div>
+                ) : (
+                  <p className="muted">ผลงานที่ถูกรายงานถูกลบไปแล้ว</p>
+                )
               ) : (
-                <p className="muted">ผลงานที่ถูกรายงานถูกลบไปแล้ว</p>
+                <div className="moderation-target">
+                  <Icon name="comment" size={14} />
+                  <span>ข้อความจาก {report.message.senderName}</span>
+                  <time dateTime={report.message.sentAt}>{formatDateTime(report.message.sentAt)}</time>
+                  <blockquote>{report.message.excerpt}</blockquote>
+                </div>
               )}
 
               {report.detail && <p className="moderation-detail">{report.detail}</p>}

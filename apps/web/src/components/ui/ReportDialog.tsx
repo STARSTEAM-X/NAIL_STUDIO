@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { TEMPLATE_REPORT_REASONS, type TemplateReportInput } from '@nail-studio/contracts'
-import { Button } from '@/components/ui/Button.tsx'
-import { Dialog } from '@/components/ui/Dialog.tsx'
+import { Button } from './Button.tsx'
+import { Dialog } from './Dialog.tsx'
 
 const REASON_LABELS: Record<TemplateReportInput['reason'], string> = {
   spam: 'สแปมหรือโฆษณา',
@@ -12,26 +12,28 @@ const REASON_LABELS: Record<TemplateReportInput['reason'], string> = {
 }
 
 interface ReportDialogProps {
-  templateName: string
+  title: string
+  description: string
   pending: boolean
   onClose: () => void
   onSubmit: (input: TemplateReportInput) => void
 }
 
 /**
- * แจ้งรายงานผลงาน
+ * แจ้งรายงานเนื้อหา — ใช้ได้ทั้งผลงานในชุมชนและข้อความในห้องแชท
  *
- * POST /templates/:id/report มีมาตั้งแต่ต้นแต่ไม่เคยมีปุ่มใน UI
- * ชุมชนสาธารณะที่ไม่มีช่องทางรายงานเป็นความเสี่ยงด้านการกำกับดูแลเนื้อหา
+ * เดิมอยู่ใต้ features/community และผูกกับชื่อผลงานโดยตรง พอมีการรายงานข้อความ
+ * เพิ่มเข้ามาจึงย้ายมาไว้ที่ ui/ แล้วรับหัวข้อกับคำอธิบายจากผู้เรียกแทน —
+ * ชุดเหตุผลเป็นชุดเดียวกันทั้งสองที่ (ContentReportReason ใน schema) จึงไม่ควรมีสองฉบับ
  */
-export function ReportDialog({ templateName, pending, onClose, onSubmit }: ReportDialogProps) {
+export function ReportDialog({ title, description, pending, onClose, onSubmit }: ReportDialogProps) {
   const [reason, setReason] = useState<TemplateReportInput['reason']>('inappropriate')
   const [detail, setDetail] = useState('')
 
   return (
     <Dialog
-      title="รายงานผลงานนี้"
-      description={`ทีมงานจะตรวจสอบ “${templateName}” ตามเหตุผลที่คุณเลือก`}
+      title={title}
+      description={description}
       size="sm"
       onClose={pending ? undefined : onClose}
       dismissible={!pending}

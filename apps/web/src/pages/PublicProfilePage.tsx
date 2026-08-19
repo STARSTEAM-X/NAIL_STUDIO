@@ -11,6 +11,7 @@ import { useUpdateProfile } from '@/features/auth/useAuth.ts'
 import { TemplateTile } from '@/features/community/components/TemplateTile.tsx'
 import { useTemplateActions } from '@/features/community/useTemplateActions.ts'
 import { usePublicProfile } from '@/features/users/usePublicProfile.ts'
+import { useStartConversation } from '@/features/chat/useChat.ts'
 import { formatCount, formatLongDate } from '@/lib/datetime.ts'
 import { avatarGradient, getInitials, ROLE_LABELS } from '@/lib/user.ts'
 import { usePageTitle } from '@/lib/usePageTitle.ts'
@@ -29,6 +30,7 @@ export function PublicProfilePage() {
   const profile = usePublicProfile(userId)
   const { data: currentUser } = useCurrentUser()
   const actions = useTemplateActions()
+  const startChat = useStartConversation()
   const navigate = useNavigate()
   const toast = useToast()
 
@@ -45,6 +47,14 @@ export function PublicProfilePage() {
   useEffect(() => {
     if (currentUser) setDisplayName(currentUser.displayName)
   }, [currentUser])
+
+  const messageUser = () => {
+    if (!userId) return
+    startChat.mutate(userId, {
+      onSuccess: (conversation) => navigate('/chat/' + conversation.id),
+      onError: (error) => toast.error(error instanceof Error ? error.message : 'เปิดห้องแชทไม่สำเร็จ'),
+    })
+  }
 
   const setEditing = (next: boolean) => {
     const params = new URLSearchParams(searchParams)
@@ -126,6 +136,9 @@ export function PublicProfilePage() {
           <p className="profile-hero-role">{ROLE_LABELS[user.role]}</p>
           <p className="muted">สมาชิกตั้งแต่ {formatLongDate(user.createdAt)}</p>
         </div>
+        {!isOwnProfile && (
+          <Button variant="ghost" icon="comment" loading={startChat.isPending} onClick={messageUser}>ส่งข้อความ</Button>
+        )}
         {isOwnProfile && !editing && (
           <div className="profile-hero-actions">
             <Button variant="ghost" icon="user" onClick={() => setEditing(true)}>แก้ไขโปรไฟล์</Button>

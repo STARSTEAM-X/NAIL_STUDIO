@@ -95,11 +95,8 @@ describe('Slice 7 appointments', () => {
     expect((await shop.send('post', `/appointments/${cancelledId}/accept`)).status).toBe(409)
   })
 
-  it('scopes detail and chat to appointment participants', async () => {
-    expect((await stranger.send('get', `/appointments/${appointmentId}`)).status).toBe(404)
-    expect((await customer.send('post', `/appointments/${appointmentId}/messages`, { content: '<b>hello</b>' })).status).toBe(201)
-    expect((await shop.send('get', `/appointments/${appointmentId}/messages`)).body.data[0].content).toBe('<b>hello</b>')
-    expect((await shop.send('post', `/appointments/${appointmentId}/messages/read`)).status).toBe(200)
+  it('scopes appointment detail to appointment participants', async () => {
+    expect((await stranger.send('get', '/appointments/' + appointmentId)).status).toBe(404)
   })
 
   it('allows only completed appointments to receive one review', async () => {

@@ -15,6 +15,7 @@ import { InlineLoading } from './Loading.tsx'
 function notificationHref(notification: Notification): string | null {
   if (notification.sourceType === 'post') return `/community/templates/${notification.sourceId}`
   if (notification.sourceType === 'appointment') return `/appointments/${notification.sourceId}`
+  if (notification.sourceType === 'conversation') return '/chat/' + notification.sourceId
   return null
 }
 

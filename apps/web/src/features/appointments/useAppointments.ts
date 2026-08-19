@@ -8,10 +8,8 @@ import {
   fetchAppointments,
   fetchSameDayConfirmed,
   fetchShops,
-  markAppointmentMessagesRead,
   proposeAppointment,
   reviewAppointment,
-  sendAppointmentMessage,
 } from './client.ts'
 
 export const appointmentKeys = {
@@ -110,16 +108,6 @@ export function useProposeAppointment(id: string | undefined) {
   })
 }
 
-export function useSendAppointmentMessage(id: string | undefined) {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (content: string) => sendAppointmentMessage(id!, content),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: appointmentKeys.detail(id ?? '') })
-    },
-  })
-}
-
 export function useReviewAppointment(id: string | undefined) {
   const queryClient = useQueryClient()
   return useMutation({
@@ -134,17 +122,6 @@ export function useDeleteAppointmentReview(id: string | undefined) {
     mutationFn: () => deleteAppointmentReview(id!),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: appointmentKeys.detail(id ?? '') })
-    },
-  })
-}
-
-export function useMarkMessagesRead() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (id: string) => markAppointmentMessagesRead(id),
-    onSuccess: () => {
-      // จำนวนที่ยังไม่อ่านโชว์อยู่บนกระดิ่ง จึงต้องรีเฟรชด้วย
-      void queryClient.invalidateQueries({ queryKey: ['notifications'] })
     },
   })
 }

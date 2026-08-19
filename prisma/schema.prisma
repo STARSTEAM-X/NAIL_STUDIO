@@ -74,6 +74,7 @@ enum TemplateShareChannel {
 enum ContentReportTarget {
   template
   comment
+  message
 
   @@map("content_report_target")
 }
@@ -102,6 +103,7 @@ enum NotificationKind {
   template_remix
   appointment_status
   appointment_message
+  direct_message
 
   @@map("notification_kind")
 }
@@ -156,9 +158,14 @@ model User {
   contentReports          ContentReport[]
   notifications           Notification[]
   shopProfile             ShopProfile?
-  customerAppointments    Appointment[]        @relation("AppointmentCustomer")
-  authoredReviews         ShopReview[]         @relation("ReviewAuthor")
-  sentAppointmentMessages AppointmentMessage[] @relation("AppointmentMessageSender")
+  customerAppointments     Appointment[]         @relation("AppointmentCustomer")
+  authoredReviews           ShopReview[]          @relation("ReviewAuthor")
+  conversationsAsA         Conversation[]        @relation("ConversationA")
+  conversationsAsB         Conversation[]        @relation("ConversationB")
+  createdConversations     Conversation[]        @relation("ConversationCreator")
+  sentConversationMessages ConversationMessage[] @relation("ConversationMessageSender")
+  blocksCreated            UserBlock[]            @relation("BlockAuthor")
+  blocksReceived           UserBlock[]            @relation("BlockTarget")
 
   @@map("users")
 }
@@ -480,7 +487,6 @@ model Appointment {
   service       ShopService?          @relation(fields: [serviceId], references: [id], onDelete: SetNull)
   designVersion DesignVersion?        @relation(fields: [designVersionId], references: [id], onDelete: SetNull)
   proposals     AppointmentProposal[]
-  messages      AppointmentMessage[]
   review        ShopReview?
 
   @@index([customerId, createdAt(sort: Desc)], map: "appointments_customer_created_idx")
@@ -523,21 +529,54 @@ model ShopReview {
   @@map("shop_reviews")
 }
 
-model AppointmentMessage {
-  id            String    @id @default(uuid()) @db.Uuid
-  appointmentId String    @map("appointment_id") @db.Uuid
-  senderId      String?   @map("sender_id") @db.Uuid
-  content       String    @db.Text
-  readAt        DateTime? @map("read_at") @db.Timestamptz
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+model Conversation {
+  id             String   @id @default(uuid()) @db.Uuid
+  participantAId String   @map("participant_a_id") @db.Uuid
+  participantBId String   @map("participant_b_id") @db.Uuid
+  createdById    String   @map("created_by_id") @db.Uuid
+  lastMessageAt  DateTime @default(now()) @map("last_message_at") @db.Timestamptz
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
-  sender      User?       @relation("AppointmentMessageSender", fields: [senderId], references: [id], onDelete: SetNull)
+  participantA User                  @relation("ConversationA", fields: [participantAId], references: [id], onDelete: Cascade)
+  participantB User                  @relation("ConversationB", fields: [participantBId], references: [id], onDelete: Cascade)
+  createdBy    User                  @relation("ConversationCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  messages     ConversationMessage[]
 
-  @@index([appointmentId, createdAt(sort: Desc)], map: "appointment_messages_thread_idx")
-  @@index([appointmentId, readAt], map: "appointment_messages_unread_idx")
-  @@map("appointment_messages")
+  @@unique([participantAId, participantBId], map: "conversations_pair_key")
+  @@index([participantAId, lastMessageAt(sort: Desc)], map: "conversations_a_recent_idx")
+  @@index([participantBId, lastMessageAt(sort: Desc)], map: "conversations_b_recent_idx")
+  @@map("conversations")
 }
+
+model ConversationMessage {
+  id             String    @id @default(uuid()) @db.Uuid
+  conversationId String    @map("conversation_id") @db.Uuid
+  senderId       String?   @map("sender_id") @db.Uuid
+  content        String    @db.Text
+  readAt         DateTime? @map("read_at") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User?        @relation("ConversationMessageSender", fields: [senderId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt(sort: Desc), id(sort: Desc)], map: "conversation_messages_thread_idx")
+  @@index([conversationId, readAt], map: "conversation_messages_unread_idx")
+  @@map("conversation_messages")
+}
+
+model UserBlock {
+  blockerId String   @map("blocker_id") @db.Uuid
+  blockedId String   @map("blocked_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  blocker User @relation("BlockAuthor", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("BlockTarget", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@id([blockerId, blockedId])
+  @@index([blockedId], map: "user_blocks_target_idx")
+  @@map("user_blocks")
+}
+
 
 model KnowledgeEntry {
   id         String   @id @default(uuid()) @db.Uuid

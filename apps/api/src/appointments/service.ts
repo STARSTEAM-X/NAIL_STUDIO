@@ -13,7 +13,6 @@ const appointmentInclude: Prisma.AppointmentInclude = {
   shop: { select: { shopName: true } },
   service: { select: { name: true } },
   proposals: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
-  messages: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], take: 100 },
   review: true,
 }
 
@@ -52,17 +51,6 @@ function mapProposal(proposal: AppointmentRow['proposals'][number]) {
   }
 }
 
-function mapMessage(message: AppointmentRow['messages'][number]) {
-  return {
-    id: message.id,
-    appointmentId: message.appointmentId,
-    senderId: message.senderId,
-    content: message.content,
-    readAt: message.readAt?.toISOString() ?? null,
-    createdAt: message.createdAt.toISOString(),
-  }
-}
-
 function mapReview(review: AppointmentRow['review']) {
   if (!review || review.deletedAt) return null
   return {
@@ -77,9 +65,6 @@ function mapReview(review: AppointmentRow['review']) {
   }
 }
 
-function isParticipant(row: { customerId: string; shopId: string }, userId: string): boolean {
-  return row.customerId === userId || row.shopId === userId
-}
 
 async function findForParticipant(userId: string, appointmentId: string): Promise<AppointmentRow> {
   const row = await prisma.appointment.findFirst({ where: { id: appointmentId, OR: [{ customerId: userId }, { shopId: userId }] }, include: appointmentInclude })
@@ -173,7 +158,6 @@ function detailFromRow(row: AppointmentRow): AppointmentDetail {
   return {
     ...mapAppointment(row),
     proposals: row.proposals.map(mapProposal),
-    messages: row.messages.map(mapMessage),
     review: mapReview(row.review),
   }
 }
@@ -348,26 +332,4 @@ export async function review(userId: string, appointmentId: string, input: Revie
     throw error
   })
   return detailFromRow(updated)
-}
-
-export async function listMessages(userId: string, appointmentId: string) {
-  const row = await findForParticipant(userId, appointmentId)
-  return row.messages.map(mapMessage)
-}
-
-export async function sendMessage(userId: string, appointmentId: string, content: string) {
-  const row = await findForParticipant(userId, appointmentId)
-  const recipientId = row.customerId === userId ? row.shopId : row.customerId
-  const message = await prisma.$transaction(async (tx) => {
-    const created = await tx.appointmentMessage.create({ data: { appointmentId, senderId: userId, content } })
-    await createNotification(tx, { userId: recipientId, kind: 'appointment_message', title: 'มีข้อความใหม่ในการนัดหมาย', sourceType: 'appointment', sourceId: appointmentId })
-    return created
-  })
-  return mapMessage(message)
-}
-
-export async function markMessagesRead(userId: string, appointmentId: string): Promise<void> {
-  const row = await findForParticipant(userId, appointmentId)
-  if (!isParticipant(row, userId)) throw AppError.notFound('ไม่พบการนัดหมายที่ต้องการ')
-  await prisma.appointmentMessage.updateMany({ where: { appointmentId, senderId: { not: userId }, readAt: null }, data: { readAt: new Date() } })
 }

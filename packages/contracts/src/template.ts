@@ -105,7 +105,7 @@ export const templateReportResultSchema = z.object({
   visibility: z.enum(TEMPLATE_VISIBILITIES),
 })
 
-export const templateModerationReportSchema = z.object({
+const moderationReportBaseSchema = z.object({
   id: z.string().uuid(),
   targetId: z.string().uuid(),
   reason: z.enum(TEMPLATE_REPORT_REASONS),
@@ -113,12 +113,32 @@ export const templateModerationReportSchema = z.object({
   status: z.enum(['pending', 'reviewed', 'dismissed']),
   createdAt: z.string(),
   reporter: templateAuthorSchema,
-  template: z.object({
-    name: z.string(),
-    visibility: z.enum(TEMPLATE_VISIBILITIES),
-    reportCount: z.number().int().nonnegative(),
-  }).nullable(),
 })
+
+const moderationReportUnionSchema = z.discriminatedUnion('target', [
+  moderationReportBaseSchema.extend({
+    target: z.literal('template'),
+    template: z.object({
+      name: z.string(),
+      visibility: z.enum(TEMPLATE_VISIBILITIES),
+      reportCount: z.number().int().nonnegative(),
+    }).nullable(),
+  }),
+  moderationReportBaseSchema.extend({
+    target: z.literal('message'),
+    template: z.null(),
+    message: z.object({
+      excerpt: z.string(),
+      senderName: z.string(),
+      sentAt: z.string(),
+    }),
+  }),
+])
+
+export const templateModerationReportSchema = z.preprocess((value) => {
+  if (typeof value === 'object' && value !== null && !('target' in value)) return { ...value, target: 'template' }
+  return value
+}, moderationReportUnionSchema)
 
 export type ListTemplatesQuery = z.infer<typeof listTemplatesQuerySchema>
 export type CreateTemplateInput = z.infer<typeof createTemplateSchema>
