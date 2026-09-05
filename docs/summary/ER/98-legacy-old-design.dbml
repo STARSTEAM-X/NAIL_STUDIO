@@ -1,0 +1,435 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// [เอกสารอ้างอิง] ดีไซน์ชุดเดิม — รวม 6 ไฟล์ใน Olddesine/ เป็นแผ่นเดียว
+// ───────────────────────────────────────────────────────────────────────────
+// ใช้เพื่อ "เทียบ" เท่านั้น ไม่ใช่แบบที่จะสร้างจริง
+// แบบที่จะสร้างจริงอยู่ที่ 00-full-system.dbml
+//
+// แก้ให้ไฟล์รันได้โดยไม่เปลี่ยนเนื้อการออกแบบ:
+//   · ตาราง users ที่ประกาศซ้ำใน 6 ไฟล์ ยุบเหลือชุดเดียว
+//   · ทิศทาง Ref ที่กลับหัวในไฟล์ต้นฉบับ 3 จุด แก้ให้ชี้จากลูกไปหาแม่
+//     (template_category_map, template_tag_map, template_duplicate)
+//
+// 33 ตาราง — ที่มา: Olddesine/*.txt
+// ═══════════════════════════════════════════════════════════════════════════
+
+Project legacy_design {
+  database_type: 'PostgreSQL'
+  Note: 'ดีไซน์ฐานข้อมูลชุดแรกของโครงงาน ก่อนลงมือพัฒนา'
+}
+
+// ── 1. User & Login ───────────────────────────────────────────────────────
+
+Table users {
+  user_id uuid [pk]
+  username varchar [unique, not null]
+  email varchar [unique, not null]
+  password_hash text [not null]
+  full_name varchar
+  is_active boolean
+  is_verified boolean
+  created_at timestamp
+  updated_at timestamp
+  last_login_at timestamp
+}
+
+Table roles {
+  role_id uuid [pk]
+  role_name varchar [unique]
+}
+
+Table user_roles {
+  user_id uuid
+  role_id uuid
+
+  indexes {
+    (user_id, role_id) [pk]
+  }
+}
+
+Table login_sessions {
+  session_id uuid [pk]
+  user_id uuid
+  refresh_token text [note: 'เก็บ token ดิบ — ช่องโหว่ที่ฉบับใหม่แก้เป็น token_hash']
+  ip_address varchar
+  user_agent text
+  created_at timestamp
+  expires_at timestamp
+  revoked boolean
+}
+
+Table password_resets {
+  reset_id uuid [pk]
+  user_id uuid
+  token_hash text
+  expires_at timestamp
+  used boolean
+  created_at timestamp
+}
+
+Table login_history {
+  log_id uuid [pk]
+  user_id uuid
+  login_time timestamp
+  success boolean
+  ip_address varchar
+  user_agent text
+}
+
+// ── 2. Assets & Nail Template ─────────────────────────────────────────────
+
+Table user_assets {
+  asset_id uuid [pk]
+  owner_id uuid [not null]
+  asset_type varchar
+  file_url text [note: 'ผูก URL ตายตัว — ย้าย CDN ต้องแก้ทุกแถว']
+  width int
+  height int
+  created_at timestamp
+}
+
+Table nail_templates {
+  template_id uuid [pk]
+  owner_id uuid [not null]
+  template_name varchar [not null]
+  description text
+  style_type varchar
+  difficulty smallint
+  is_public boolean [note: 'boolean เดียวคุมการมองเห็น — ทำ unlisted ไม่ได้']
+  preview_image text
+  nail_layers jsonb [note: 'เก็บงานออกแบบไว้ในตัวเอง = ตารางเดียวทำทั้งงานส่วนตัวและโพสต์']
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table template_versions {
+  version_id uuid [pk]
+  template_id uuid [not null]
+  version_no int
+  snapshot_json jsonb
+  created_at timestamp
+
+  indexes {
+    (template_id, version_no) [unique]
+  }
+}
+
+Table template_categories {
+  category_id uuid [pk]
+  category_name varchar [unique]
+}
+
+Table template_category_map {
+  template_id uuid
+  category_id uuid
+
+  indexes {
+    (template_id, category_id) [pk]
+  }
+}
+
+Table template_tags {
+  tag_id uuid [pk]
+  tag_name varchar [unique]
+}
+
+Table template_tag_map {
+  template_id uuid
+  tag_id uuid
+  score float [note: 'น้ำหนักความเกี่ยวข้อง — แนวคิดที่ดี ฉบับใหม่รับมาใช้']
+
+  indexes {
+    (template_id, tag_id) [pk]
+  }
+}
+
+Table template_reviews {
+  review_id uuid [pk]
+  template_id uuid [not null]
+  user_id uuid [not null]
+  score smallint
+  comment text
+  image_url text
+  is_edited boolean
+  is_hidden boolean
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    (template_id, user_id) [unique, note: 'unique นี้ทำให้คอมเมนต์ได้คนละครั้งเดียว']
+  }
+}
+
+Table template_shares {
+  share_id uuid [pk]
+  template_id uuid
+  share_code varchar [unique]
+  visibility varchar
+  allow_copy boolean
+  expires_at timestamp
+  view_count int
+  copy_count int
+  created_by uuid
+  created_at timestamp
+}
+
+Table template_likes {
+  template_id uuid
+  user_id uuid
+  created_at timestamp
+
+  indexes {
+    (template_id, user_id) [pk]
+  }
+}
+
+Table template_duplicate {
+  duplicate_id uuid [pk]
+  source_template_id uuid
+  new_template_id uuid
+  duplicated_by uuid
+  created_at timestamp
+}
+
+// ── 3. Appointment ────────────────────────────────────────────────────────
+
+Table provider_availability {
+  availability_id uuid [pk]
+  provider_id uuid [not null]
+  day_of_week int [note: '0=Sun … 6=Sat']
+  start_time time
+  end_time time
+  is_active boolean
+}
+
+Table provider_time_off {
+  time_off_id uuid [pk]
+  provider_id uuid [not null]
+  start_datetime timestamp
+  end_datetime timestamp
+  reason varchar
+}
+
+Table appointment_requests {
+  request_id uuid [pk]
+  customer_id uuid [not null]
+  provider_id uuid [not null]
+  requested_start_time timestamp
+  requested_end_time timestamp
+  template_id uuid
+  image_url text
+  note text
+  status varchar [note: 'pending | priced | accepted | rejected | expired']
+  proposed_price decimal
+  currency varchar
+  expires_at timestamp
+  created_at timestamp
+  updated_at timestamp
+
+  Note: 'เก็บได้แค่ข้อเสนอล่าสุด — ต่อรองหลายรอบแล้วประวัติหาย'
+}
+
+Table appointments {
+  appointment_id uuid [pk]
+  request_id uuid [not null, unique]
+  customer_id uuid [not null]
+  provider_id uuid [not null]
+  start_time timestamp
+  end_time timestamp
+  status varchar [note: 'confirmed | completed | cancelled | no_show']
+  note text
+  template_id uuid
+  image_url text
+  total_price decimal
+  currency varchar
+  created_at timestamp
+  updated_at timestamp
+
+  Note: 'คัดลอก customer/provider/template/image จาก request มาซ้ำทั้งชุด'
+}
+
+// ── 4. Chat ───────────────────────────────────────────────────────────────
+
+Table conversations {
+  conversation_id uuid [pk]
+  is_group boolean
+  created_at timestamp
+  created_by uuid
+}
+
+Table conversation_members {
+  conversation_id uuid
+  user_id uuid
+  joined_at timestamp
+  last_read_message_id uuid
+
+  indexes {
+    (conversation_id, user_id) [pk]
+  }
+  Note: 'รองรับกลุ่มได้ แต่บังคับ "ห้อง 1:1 ห้ามซ้ำ" ในระดับฐานข้อมูลไม่ได้'
+}
+
+Table messages {
+  message_id uuid [pk]
+  conversation_id uuid
+  sender_id uuid
+  message_type varchar [note: 'text | image | file | system']
+  content text
+  is_deleted boolean
+  created_at timestamp
+  edited_at timestamp
+}
+
+Table message_reads {
+  message_id uuid
+  user_id uuid
+  read_at timestamp
+
+  indexes {
+    (message_id, user_id) [pk]
+  }
+}
+
+Table message_attachments {
+  attachment_id uuid [pk]
+  message_id uuid
+  file_url text
+  file_type varchar
+  file_size int
+  width int
+  height int
+
+  Note: 'เก็บข้อมูลไฟล์ซ้ำกับ user_assets — ฉบับใหม่ให้ชี้ไป assets แทน'
+}
+
+// ── 5. Notification ───────────────────────────────────────────────────────
+
+Table notifications {
+  notification_id uuid [pk]
+  user_id uuid
+  type varchar [note: 'chat | like | review | system']
+  title varchar
+  body text
+  data_json jsonb
+  source_type varchar
+  source_id uuid
+  is_read boolean
+  read_at timestamp
+  created_at timestamp
+}
+
+Table notification_deliveries {
+  delivery_id uuid [pk]
+  notification_id uuid
+  channel varchar [note: 'realtime | email']
+  status varchar
+  sent_at timestamp
+  error_text text
+}
+
+Table user_notification_settings {
+  user_id uuid [pk]
+  allow_chat boolean
+  allow_like boolean
+  allow_review boolean
+  allow_system boolean
+  push_enabled boolean
+  email_enabled boolean
+}
+
+// ── 6. Report ─────────────────────────────────────────────────────────────
+
+Table reports {
+  report_id uuid [pk]
+  reporter_id uuid
+  target_type varchar
+  target_id uuid
+  reason_code varchar
+  description text
+  evidence_url text
+  status varchar
+  reviewed_by uuid
+  reviewed_at timestamp
+  created_at timestamp
+}
+
+// ── 7. AI Chatbot ─────────────────────────────────────────────────────────
+
+Table chat_sessions_ai {
+  id uuid [pk]
+  user_id uuid
+  title varchar
+  model_name varchar [note: 'llama3.1:8b']
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table messages_ai {
+  id uuid [pk]
+  session_id uuid
+  sender varchar [note: 'user | assistant | system']
+  content text
+  created_at timestamp
+}
+
+Table knowledge {
+  id uuid [pk]
+  question text
+  answer text
+  embedding vector [note: 'ค้นด้วยความหมาย — แนวคิดที่ดี ฉบับใหม่รับมาใช้']
+  created_by uuid
+  created_at timestamp
+  is_active boolean
+}
+
+// ── ความสัมพันธ์ ─────────────────────────────────────────────────────────
+
+Ref: user_roles.user_id > users.user_id
+Ref: user_roles.role_id > roles.role_id
+Ref: login_sessions.user_id > users.user_id
+Ref: password_resets.user_id > users.user_id
+Ref: login_history.user_id > users.user_id
+
+Ref: user_assets.owner_id > users.user_id
+Ref: nail_templates.owner_id > users.user_id
+Ref: template_versions.template_id > nail_templates.template_id
+Ref: template_category_map.template_id > nail_templates.template_id
+Ref: template_category_map.category_id > template_categories.category_id
+Ref: template_tag_map.template_id > nail_templates.template_id
+Ref: template_tag_map.tag_id > template_tags.tag_id
+Ref: template_reviews.template_id > nail_templates.template_id
+Ref: template_reviews.user_id > users.user_id
+Ref: template_shares.template_id > nail_templates.template_id
+Ref: template_shares.created_by > users.user_id
+Ref: template_likes.template_id > nail_templates.template_id
+Ref: template_likes.user_id > users.user_id
+Ref: template_duplicate.source_template_id > nail_templates.template_id
+Ref: template_duplicate.new_template_id > nail_templates.template_id
+Ref: template_duplicate.duplicated_by > users.user_id
+
+Ref: provider_availability.provider_id > users.user_id
+Ref: provider_time_off.provider_id > users.user_id
+Ref: appointment_requests.customer_id > users.user_id
+Ref: appointment_requests.provider_id > users.user_id
+Ref: appointments.customer_id > users.user_id
+Ref: appointments.provider_id > users.user_id
+Ref: appointments.request_id - appointment_requests.request_id
+
+Ref: conversations.created_by > users.user_id
+Ref: conversation_members.conversation_id > conversations.conversation_id
+Ref: conversation_members.user_id > users.user_id
+Ref: messages.conversation_id > conversations.conversation_id
+Ref: messages.sender_id > users.user_id
+Ref: message_reads.message_id > messages.message_id
+Ref: message_reads.user_id > users.user_id
+Ref: message_attachments.message_id > messages.message_id
+
+Ref: notifications.user_id > users.user_id
+Ref: notification_deliveries.notification_id > notifications.notification_id
+Ref: user_notification_settings.user_id - users.user_id
+
+Ref: reports.reporter_id > users.user_id
+Ref: reports.reviewed_by > users.user_id
+
+Ref: chat_sessions_ai.user_id > users.user_id
+Ref: messages_ai.session_id > chat_sessions_ai.id
+Ref: knowledge.created_by > users.user_id

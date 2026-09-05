@@ -1,0 +1,635 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// [เอกสารอ้างอิง] สคีมาที่ใช้งานจริงตอนนี้ — generate จาก prisma/schema.prisma
+// ───────────────────────────────────────────────────────────────────────────
+// ใช้เพื่อ "เทียบ" เท่านั้น — แบบที่จะสร้างต่อไปอยู่ที่ 00-full-system.dbml
+// 25 ตาราง / 14 enum — PostgreSQL
+// คัดลอกทั้งไฟล์ไปวางที่ https://dbdiagram.io/d
+// ═══════════════════════════════════════════════════════════════════════════
+
+Project nail_studio_3d {
+  database_type: 'PostgreSQL'
+  Note: 'ระบบออกแบบเล็บ 3 มิติ + ชุมชนแชร์แม่แบบ + จองร้าน + แชท + ผู้ช่วย AI'
+}
+
+// ----------------------------------------------------------------------------
+// Enums
+// ----------------------------------------------------------------------------
+
+Enum user_role {
+  user
+  shop
+  admin
+}
+
+Enum project_status {
+  draft
+  published
+  archived
+}
+
+Enum palette_harmony {
+  analogous
+  complementary
+  triadic
+  monochrome
+}
+
+Enum palette_source {
+  curated
+  extracted
+}
+
+Enum template_origin {
+  original
+  ai
+  remix
+}
+
+Enum template_visibility {
+  public
+  unlisted
+  hidden
+}
+
+Enum template_share_channel {
+  link
+  facebook
+  line
+  instagram
+  copy
+}
+
+Enum content_report_target {
+  template
+  comment
+  message
+}
+
+Enum content_report_reason {
+  spam
+  inappropriate
+  copyright
+  harassment
+  other
+}
+
+Enum content_report_status {
+  pending
+  reviewed
+  dismissed
+}
+
+Enum notification_kind {
+  post_like
+  post_comment
+  template_remix
+  appointment_status
+  appointment_message
+  direct_message
+}
+
+Enum appointment_status {
+  pending
+  counter_offered
+  confirmed
+  declined
+  cancelled
+  completed
+  no_show
+}
+
+Enum proposal_actor {
+  customer
+  shop
+}
+
+Enum proposal_status {
+  pending
+  accepted
+  rejected
+  superseded
+}
+
+// ----------------------------------------------------------------------------
+// 1. Identity & Auth
+// ----------------------------------------------------------------------------
+
+Table users {
+  id uuid [pk]
+  email text [unique, not null]
+  password_hash text [not null]
+  role user_role [not null, default: 'user']
+  display_name text [not null]
+  date_of_birth date [null]
+  terms_accepted_at timestamptz [null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  Note: 'บัญชีเดียวใช้ได้ทั้งลูกค้า/ร้าน/แอดมิน แยกด้วย role'
+}
+
+Table sessions {
+  id uuid [pk]
+  user_id uuid [not null]
+  token_hash bytea [unique, not null, note: 'SHA-256 ของ token ไม่ใช่ token ดิบ']
+  expires_at timestamptz [not null]
+  last_seen_at timestamptz [not null]
+  created_at timestamptz [not null]
+  user_agent text [null]
+
+  indexes {
+    user_id
+    expires_at
+  }
+}
+
+Table user_blocks {
+  blocker_id uuid [not null]
+  blocked_id uuid [not null]
+  created_at timestamptz [not null]
+
+  indexes {
+    (blocker_id, blocked_id) [pk]
+    blocked_id [name: 'user_blocks_target_idx']
+  }
+}
+
+// ----------------------------------------------------------------------------
+// 2. งานออกแบบ (Project -> DesignVersion) + ไฟล์
+// ----------------------------------------------------------------------------
+
+Table projects {
+  id uuid [pk]
+  user_id uuid [not null]
+  name text [not null]
+  status project_status [not null, default: 'draft']
+  version_count int [not null, default: 0]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+  deleted_at timestamptz [null, note: 'soft delete']
+  thumbnail_asset_id uuid [null]
+  draft_document jsonb [null, note: 'ปลายทางของ autosave — ยังไม่เป็นเวอร์ชัน']
+  draft_updated_at timestamptz [null]
+  draft_base_version int [null, note: 'เวอร์ชันที่ draft ต่อยอดมา ใช้ตรวจว่า draft ล้าสมัยหรือยัง']
+
+  indexes {
+    (user_id, updated_at, id) [note: 'partial index WHERE deleted_at IS NULL — keyset pagination']
+  }
+}
+
+Table design_versions {
+  id uuid [pk]
+  project_id uuid [not null]
+  version_number int [not null]
+  schema_version int [not null, default: 2]
+  document jsonb [not null]
+  label text [null]
+  created_at timestamptz [not null]
+
+  indexes {
+    (project_id, version_number) [unique, note: 'รากฐานของ optimistic concurrency']
+  }
+  Note: 'snapshot ที่ผู้ใช้ตั้งใจบันทึก — เปลี่ยนแปลงไม่ได้'
+}
+
+Table assets {
+  id uuid [pk]
+  owner_id uuid [null]
+  kind text [not null]
+  storage_key text [unique, not null]
+  mime_type text [not null]
+  size_bytes bigint [not null]
+  checksum_sha256 bytea [not null, note: 'ใช้ dedupe ไฟล์ซ้ำ']
+  metadata jsonb [not null]
+  created_at timestamptz [not null]
+
+  indexes {
+    (owner_id, kind, created_at)
+    checksum_sha256
+  }
+}
+
+// ----------------------------------------------------------------------------
+// 3. แคตตาล็อกดีไซน์ (ข้อมูล seed — ไม่มี FK)
+// ----------------------------------------------------------------------------
+
+Table brand_colors {
+  id uuid [pk]
+  brand text [not null]
+  name text [not null]
+  hex varchar(7) [not null]
+  is_available boolean [not null, default: true]
+
+  indexes {
+    (brand, hex) [unique]
+    (brand, is_available)
+  }
+}
+
+Table color_palettes {
+  id uuid [pk]
+  code text [unique, not null]
+  name_th text [not null]
+  colors jsonb [not null]
+  harmony palette_harmony [not null]
+  source palette_source [not null, default: 'curated']
+  popularity int [not null, default: 0]
+  is_active boolean [not null, default: true]
+
+  indexes {
+    (is_active, popularity)
+  }
+}
+
+Table design_archetypes {
+  id uuid [pk]
+  code text [unique, not null]
+  name_th text [not null]
+  composer_key text [not null]
+  default_params jsonb [not null]
+  supported_zones "text[]" [not null]
+  popularity int [not null, default: 0]
+  is_active boolean [not null, default: true]
+
+  indexes {
+    (is_active, popularity)
+  }
+}
+
+// ----------------------------------------------------------------------------
+// 4. ชุมชนแม่แบบ
+// ----------------------------------------------------------------------------
+
+Table nail_templates {
+  id uuid [pk]
+  author_id uuid [not null]
+  design_version_id uuid [not null, note: 'ไม่เก็บ layer เอง — ชี้ไปที่ design_versions']
+  name text [not null]
+  caption text [null]
+  category text [null, note: 'ฟรีเท็กซ์ ยังไม่ normalize เป็นตาราง']
+  primary_color text [null]
+  origin template_origin [not null, default: 'original']
+  source_template_id uuid [null, note: 'self-reference: remix มาจากแม่แบบไหน']
+  thumbnail_asset_id uuid [null]
+  visibility template_visibility [not null, default: 'public']
+  like_count int [not null, default: 0]
+  share_count int [not null, default: 0]
+  remix_count int [not null, default: 0]
+  view_count int [not null, default: 0]
+  comment_count int [not null, default: 0]
+  report_count int [not null, default: 0]
+  recipe jsonb [null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+  deleted_at timestamptz [null]
+
+  indexes {
+    (author_id, created_at)
+    source_template_id
+  }
+  Note: 'โพสต์สาธารณะ — แยกจาก projects เพื่อให้ลบโพสต์ไม่กระทบงานต้นฉบับ'
+}
+
+Table template_likes {
+  template_id uuid [not null]
+  user_id uuid [not null]
+  created_at timestamptz [not null]
+
+  indexes {
+    (template_id, user_id) [pk]
+    (user_id, created_at)
+  }
+}
+
+Table template_shares {
+  id uuid [pk]
+  template_id uuid [not null]
+  user_id uuid [null]
+  channel template_share_channel [not null]
+  created_at timestamptz [not null]
+
+  indexes {
+    (template_id, created_at)
+    (user_id, created_at)
+  }
+  Note: 'log เหตุการณ์แชร์ ไม่ใช่ลิงก์แชร์ (ยังไม่มี share_code / expires_at)'
+}
+
+Table template_remixes {
+  id uuid [pk]
+  template_id uuid [not null]
+  user_id uuid [not null]
+  project_id uuid [not null, note: 'remix แล้วได้โปรเจกต์ใหม่ ไม่ใช่แม่แบบใหม่']
+  created_at timestamptz [not null]
+
+  indexes {
+    (template_id, project_id) [unique]
+    (user_id, created_at)
+  }
+}
+
+Table template_comments {
+  id uuid [pk]
+  template_id uuid [not null]
+  user_id uuid [not null]
+  content text [not null]
+  created_at timestamptz [not null]
+  deleted_at timestamptz [null]
+
+  indexes {
+    (template_id, created_at)
+  }
+  Note: 'คอมเมนต์ล้วน — ยังไม่มี rating / รูปประกอบ'
+}
+
+Table content_reports {
+  id uuid [pk]
+  target_type content_report_target [not null]
+  target_id uuid [not null, note: 'polymorphic — ไม่มี FK']
+  reporter_id uuid [not null]
+  reason content_report_reason [not null]
+  detail text [null]
+  status content_report_status [not null, default: 'pending']
+  created_at timestamptz [not null]
+
+  indexes {
+    (target_type, target_id, reporter_id) [unique, note: 'รายงานซ้ำไม่ได้']
+    (status, created_at)
+  }
+}
+
+Table notifications {
+  id uuid [pk]
+  user_id uuid [not null]
+  kind notification_kind [not null]
+  title text [not null]
+  source_type text [not null]
+  source_id uuid [not null, note: 'polymorphic — ไม่มี FK']
+  is_read boolean [not null, default: false]
+  created_at timestamptz [not null]
+
+  indexes {
+    (user_id, created_at)
+  }
+}
+
+// ----------------------------------------------------------------------------
+// 5. ร้าน & การจอง
+// ----------------------------------------------------------------------------
+
+Table shop_profiles {
+  user_id uuid [pk, note: '1:1 กับ users — PK = FK']
+  shop_name text [not null]
+  description text [null]
+  location_text text [null]
+  phone_numbers "text[]" [not null]
+  opening_hours jsonb [null]
+  is_verified boolean [not null, default: false]
+  rating_avg "decimal(3,2)" [not null, default: 0]
+  rating_count int [not null, default: 0]
+
+  indexes {
+    (is_verified, rating_avg, rating_count) [name: 'shop_profiles_recommendation_idx']
+  }
+}
+
+Table shop_services {
+  id uuid [pk]
+  shop_id uuid [not null]
+  name text [not null]
+  description text [null]
+  price_thb "decimal(10,2)" [not null]
+  duration_minutes int [not null]
+  is_active boolean [not null, default: true]
+  sort_order int [not null, default: 0]
+
+  indexes {
+    (shop_id, sort_order) [name: 'shop_services_active_idx']
+  }
+}
+
+Table appointments {
+  id uuid [pk]
+  customer_id uuid [not null]
+  shop_id uuid [not null]
+  service_id uuid [null]
+  design_version_id uuid [null, note: 'ลูกค้าแนบแบบเล็บที่อยากทำ']
+  status appointment_status [not null, default: 'pending']
+  agreed_start_at timestamptz [null, note: 'ว่างจนกว่าทั้งสองฝ่ายจะตกลงเวลา']
+  duration_minutes int [not null]
+  price_quoted_thb "decimal(10,2)" [null]
+  customer_note text [null]
+  shop_note text [null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (customer_id, created_at) [name: 'appointments_customer_created_idx']
+    (shop_id, status, created_at) [name: 'appointments_shop_status_created_idx']
+  }
+}
+
+Table appointment_proposals {
+  id uuid [pk]
+  appointment_id uuid [not null]
+  proposed_by proposal_actor [not null]
+  proposed_start_at timestamptz [not null]
+  duration_minutes int [not null]
+  message text [null]
+  status proposal_status [not null, default: 'pending']
+  created_at timestamptz [not null]
+
+  indexes {
+    (appointment_id, created_at) [name: 'appointment_proposals_timeline_idx']
+  }
+  Note: 'ประวัติการต่อรองเวลา — ฝั่งไหนเสนอ เวลาไหน ผลเป็นอย่างไร'
+}
+
+Table shop_reviews {
+  id uuid [pk]
+  appointment_id uuid [unique, not null, note: '1 การจอง = รีวิวได้ 1 ครั้ง']
+  shop_id uuid [not null]
+  author_id uuid [not null]
+  rating smallint [not null]
+  comment text [null]
+  shop_reply text [null]
+  created_at timestamptz [not null]
+  deleted_at timestamptz [null]
+
+  indexes {
+    (shop_id, created_at) [name: 'shop_reviews_shop_created_idx']
+  }
+}
+
+// ----------------------------------------------------------------------------
+// 6. แชท 1:1
+// ----------------------------------------------------------------------------
+
+Table conversations {
+  id uuid [pk]
+  participant_a_id uuid [not null]
+  participant_b_id uuid [not null]
+  created_by_id uuid [not null]
+  last_message_at timestamptz [not null]
+  created_at timestamptz [not null]
+
+  indexes {
+    (participant_a_id, participant_b_id) [unique, name: 'conversations_pair_key']
+    (participant_a_id, last_message_at) [name: 'conversations_a_recent_idx']
+    (participant_b_id, last_message_at) [name: 'conversations_b_recent_idx']
+  }
+  Note: 'คู่สนทนาเรียง a < b เสมอ เพื่อให้ unique key กันห้องซ้ำได้'
+}
+
+Table conversation_messages {
+  id uuid [pk]
+  conversation_id uuid [not null]
+  sender_id uuid [null, note: 'null เมื่อผู้ส่งถูกลบบัญชี']
+  content text [not null]
+  read_at timestamptz [null]
+  created_at timestamptz [not null]
+
+  indexes {
+    (conversation_id, created_at, id) [name: 'conversation_messages_thread_idx']
+    (conversation_id, read_at) [name: 'conversation_messages_unread_idx']
+  }
+}
+
+// ----------------------------------------------------------------------------
+// 7. ผู้ช่วย AI (ไม่มี FK — ฝั่ง Python เข้าถึงด้วย)
+// ----------------------------------------------------------------------------
+
+Table knowledge_entries {
+  id uuid [pk]
+  question text [not null]
+  answer text [not null]
+  source_type text [null]
+  source_id uuid [null]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null]
+
+  indexes {
+    (is_active, created_at) [name: 'knowledge_entries_active_idx']
+  }
+}
+
+Table ai_chat_messages {
+  id uuid [pk]
+  session_id uuid [not null, note: 'ไม่ใช่ FK ของ sessions — เป็น id ของบทสนทนา AI']
+  role text [not null]
+  content text [not null]
+  created_at timestamptz [not null]
+
+  indexes {
+    (session_id, created_at) [name: 'ai_chat_messages_session_idx']
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Relationships
+// ----------------------------------------------------------------------------
+
+// Identity
+Ref: sessions.user_id > users.id [delete: cascade]
+Ref: user_blocks.blocker_id > users.id [delete: cascade]
+Ref: user_blocks.blocked_id > users.id [delete: cascade]
+
+// งานออกแบบ
+Ref: projects.user_id > users.id [delete: cascade]
+Ref: projects.thumbnail_asset_id > assets.id [delete: set null]
+Ref: design_versions.project_id > projects.id [delete: cascade]
+Ref: assets.owner_id > users.id [delete: cascade]
+
+// ชุมชน
+Ref: nail_templates.author_id > users.id [delete: cascade]
+Ref: nail_templates.design_version_id > design_versions.id [delete: restrict]
+Ref: nail_templates.source_template_id > nail_templates.id [delete: set null]
+Ref: nail_templates.thumbnail_asset_id > assets.id [delete: set null]
+
+Ref: template_likes.template_id > nail_templates.id [delete: cascade]
+Ref: template_likes.user_id > users.id [delete: cascade]
+
+Ref: template_shares.template_id > nail_templates.id [delete: cascade]
+Ref: template_shares.user_id > users.id [delete: set null]
+
+Ref: template_remixes.template_id > nail_templates.id [delete: cascade]
+Ref: template_remixes.user_id > users.id [delete: cascade]
+Ref: template_remixes.project_id > projects.id [delete: cascade]
+
+Ref: template_comments.template_id > nail_templates.id [delete: cascade]
+Ref: template_comments.user_id > users.id [delete: cascade]
+
+Ref: content_reports.reporter_id > users.id [delete: cascade]
+Ref: notifications.user_id > users.id [delete: cascade]
+
+// ร้าน & การจอง
+Ref: shop_profiles.user_id - users.id [delete: cascade]
+Ref: shop_services.shop_id > shop_profiles.user_id [delete: cascade]
+
+Ref: appointments.customer_id > users.id [delete: cascade]
+Ref: appointments.shop_id > shop_profiles.user_id [delete: cascade]
+Ref: appointments.service_id > shop_services.id [delete: set null]
+Ref: appointments.design_version_id > design_versions.id [delete: set null]
+
+Ref: appointment_proposals.appointment_id > appointments.id [delete: cascade]
+
+Ref: shop_reviews.appointment_id - appointments.id [delete: cascade]
+Ref: shop_reviews.shop_id > shop_profiles.user_id [delete: cascade]
+Ref: shop_reviews.author_id > users.id [delete: cascade]
+
+// แชท
+Ref: conversations.participant_a_id > users.id [delete: cascade]
+Ref: conversations.participant_b_id > users.id [delete: cascade]
+Ref: conversations.created_by_id > users.id [delete: cascade]
+Ref: conversation_messages.conversation_id > conversations.id [delete: cascade]
+Ref: conversation_messages.sender_id > users.id [delete: set null]
+
+// ----------------------------------------------------------------------------
+// Table groups (dbdiagram จะจัดกลุ่มสีให้)
+// ----------------------------------------------------------------------------
+
+TableGroup identity_auth {
+  users
+  sessions
+  user_blocks
+}
+
+TableGroup design_workspace {
+  projects
+  design_versions
+  assets
+}
+
+TableGroup design_catalog {
+  brand_colors
+  color_palettes
+  design_archetypes
+}
+
+TableGroup community {
+  nail_templates
+  template_likes
+  template_shares
+  template_remixes
+  template_comments
+  content_reports
+  notifications
+}
+
+TableGroup shop_booking {
+  shop_profiles
+  shop_services
+  appointments
+  appointment_proposals
+  shop_reviews
+}
+
+TableGroup messaging {
+  conversations
+  conversation_messages
+}
+
+TableGroup ai_assistant {
+  knowledge_entries
+  ai_chat_messages
+}

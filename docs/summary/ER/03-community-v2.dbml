@@ -1,0 +1,209 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// Nail Studio 3D — Community (post-centric)
+// คัดลอกทั้งไฟล์ไปวางที่ https://dbdiagram.io/d
+// ═══════════════════════════════════════════════════════════════════════════
+
+Project nail_studio_community {
+  database_type: 'PostgreSQL'
+  Note: 'โพสต์คือหน่วยสังคม แม่แบบคือทรัพยากรออกแบบที่นำกลับมาใช้ได้'
+}
+
+Enum user_role {
+  user
+  shop
+  admin
+}
+
+Enum post_visibility {
+  public
+  unlisted
+  hidden
+}
+
+Enum share_channel {
+  link
+  facebook
+  line
+  instagram
+  copy
+}
+
+Table users {
+  id uuid [pk, default: `gen_random_uuid()`]
+  email text [unique, not null]
+  password_hash text [not null]
+  role user_role [not null, default: 'user']
+  display_name text [not null]
+  date_of_birth date [null]
+  is_active boolean [not null, default: true]
+  is_verified boolean [not null, default: false]
+  terms_accepted_at timestamptz [null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: 'บัญชีเดียวใช้ได้ทั้งลูกค้า ร้าน และแอดมิน แยกด้วย role'
+}
+
+// ── โพสต์ = หน่วยสังคม ────────────────────────────────────────────────────
+
+Table community_posts {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  template_id uuid [null, note: 'null = โพสต์ข้อความ/รูปล้วน']
+  description text [null]
+  visibility post_visibility [not null, default: 'public']
+
+  like_count int [not null, default: 0]
+  comment_count int [not null, default: 0]
+  share_count int [not null, default: 0]
+
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz [null]
+
+  indexes {
+    (visibility, created_at) [name: 'community_posts_feed_idx', note: 'ฟีดล่าสุด — ตอนเขียน SQL จริงให้ created_at DESC']
+    (user_id, created_at) [name: 'community_posts_author_idx']
+    template_id [name: 'community_posts_template_idx']
+  }
+  Note: 'ตัวนับเก็บซ้ำโดยตั้งใจ — ฟีด 20 โพสต์ไม่ต้อง COUNT 3 ตาราง 20 รอบ'
+}
+
+Table community_post_attachments {
+  id uuid [pk, default: `gen_random_uuid()`]
+  post_id uuid [not null]
+  file_url text [not null]
+  file_name text [null]
+  mime_type text [null]
+  file_size bigint [null, note: 'CHECK (file_size > 0) — เพิ่มตอนเขียน migration จริง']
+  width int [null]
+  height int [null]
+  sort_order int [not null, default: 0, note: 'ไม่มีตัวนี้รูปจะสลับลำดับทุกครั้งที่ query']
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (post_id, sort_order) [name: 'post_attachments_post_idx']
+  }
+  Note: 'ไฟล์แนบของโพสต์ — ไม่เก็บ user_id ซ้ำ เพราะหาได้จาก community_posts.user_id'
+}
+
+Table post_likes {
+  post_id uuid [not null]
+  user_id uuid [not null]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (post_id, user_id) [pk]
+    (user_id, created_at) [name: 'post_likes_user_idx']
+  }
+  Note: 'PK คู่ = กันไลก์ซ้ำในตัว ไม่ต้องมี surrogate id และไม่มี updated_at'
+}
+
+Table post_comments {
+  id uuid [pk, default: `gen_random_uuid()`]
+  post_id uuid [not null]
+  user_id uuid [not null]
+  parent_comment_id uuid [null, note: 'ตอบกลับ 1 ชั้น']
+  content text [not null]
+  edited_at timestamptz [null]
+  created_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz [null]
+
+  indexes {
+    (post_id, created_at) [name: 'post_comments_post_idx']
+    parent_comment_id [name: 'post_comments_parent_idx']
+    (user_id, created_at) [name: 'post_comments_user_idx']
+  }
+}
+
+Table post_shares {
+  id uuid [pk, default: `gen_random_uuid()`]
+  post_id uuid [not null]
+  user_id uuid [null, note: 'null = ผู้เยี่ยมชมที่ไม่ได้ล็อกอิน']
+  channel share_channel [not null]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (post_id, created_at) [name: 'post_shares_post_idx']
+  }
+  Note: 'ตารางเหตุการณ์ append-only — ไม่มี updated_at'
+}
+
+// ── แม่แบบ = ทรัพยากร ไม่ใช่หน่วยสังคม ────────────────────────────────────
+
+Table design_versions {
+  id uuid [pk, default: `gen_random_uuid()`]
+  project_id uuid [not null]
+  version_number int [not null, note: 'CHECK (version_number > 0)']
+  schema_version int [not null, default: 2, note: 'CHECK (schema_version > 0)']
+  document jsonb [not null]
+  label text [null]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (project_id, version_number) [unique, name: 'design_versions_project_version_key', note: 'กันเลขเวอร์ชันซ้ำ รองรับ optimistic concurrency']
+  }
+  Note: 'snapshot ที่ผู้ใช้ตั้งใจบันทึกและไม่ควรถูกแก้ไขภายหลัง'
+}
+
+Table nail_templates {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  design_version_id uuid [not null, note: 'ชี้ snapshot ที่ตายตัว ไม่เก็บลายเอง']
+  name text [not null]
+  thumbnail_url text [null]
+  is_public boolean [not null, default: true]
+  use_count int [not null, default: 0, note: 'ถูกนำไปใช้/โพสต์กี่ครั้ง']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz [null]
+
+  indexes {
+    (user_id, created_at) [name: 'nail_templates_author_idx']
+    design_version_id [name: 'nail_templates_version_idx']
+  }
+}
+
+Table template_categories {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code text [unique, not null, note: 'french, minimal, ombre, glitter …']
+  name text [not null]
+  sort_order int [not null, default: 0]
+  is_active boolean [not null, default: true]
+
+  Note: 'ตารางแม่ของหมวดหมู่ — code เป็น unique กัน "มินิมอล" กับ "Minimal" กลายเป็นสองหมวด'
+}
+
+Table template_category_map {
+  template_id uuid [not null]
+  category_id uuid [not null]
+
+  indexes {
+    (template_id, category_id) [pk]
+    category_id [name: 'template_category_map_category_idx']
+  }
+  Note: 'ตารางเชื่อม N:M — PK คู่กันแม่แบบติดหมวดเดิมซ้ำ'
+}
+
+// ── ความสัมพันธ์ ──────────────────────────────────────────────────────────
+
+Ref: community_posts.user_id     > users.id           [delete: cascade]
+Ref: community_posts.template_id > nail_templates.id  [delete: set null]
+
+Ref: community_post_attachments.post_id > community_posts.id [delete: cascade]
+
+Ref: post_likes.post_id    > community_posts.id [delete: cascade]
+Ref: post_likes.user_id    > users.id           [delete: cascade]
+
+Ref: post_comments.post_id           > community_posts.id [delete: cascade]
+Ref: post_comments.user_id           > users.id           [delete: cascade]
+Ref: post_comments.parent_comment_id > post_comments.id   [delete: cascade]
+
+Ref: post_shares.post_id   > community_posts.id [delete: cascade]
+Ref: post_shares.user_id   > users.id           [delete: set null]
+
+Ref: nail_templates.user_id           > users.id           [delete: cascade]
+Ref: nail_templates.design_version_id > design_versions.id [delete: restrict]
+
+Ref: template_category_map.template_id > nail_templates.id      [delete: cascade]
+Ref: template_category_map.category_id > template_categories.id [delete: cascade]

@@ -1,0 +1,145 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// โดเมน 2 — Design Workspace (งานออกแบบส่วนตัว + เวอร์ชัน + ไฟล์ + แคตตาล็อก)
+// ไฟล์นี้ใช้ได้ด้วยตัวเอง — คัดลอกทั้งไฟล์ไปวางที่ https://dbdiagram.io/d
+// ═══════════════════════════════════════════════════════════════════════════
+
+Project design_workspace {
+  database_type: 'PostgreSQL'
+  Note: '''
+  หัวใจของโดเมนนี้คือการแยก 3 ชั้น
+
+    projects        พื้นที่ทำงานที่แก้ได้ตลอดเวลา + autosave
+    design_versions snapshot ที่ผู้ใช้ตั้งใจบันทึก เปลี่ยนแปลงไม่ได้
+    nail_templates  การเผยแพร่ (อยู่ในโดเมน 4)
+
+  ดีไซน์เดิมยุบทั้งสามอย่างเป็น nail_templates ตารางเดียว ทำให้
+  "กดไม่เผยแพร่" กับ "ลบงานตัวเอง" กลายเป็นการกระทำเดียวกัน
+  '''
+}
+
+Enum project_status {
+  draft
+  published
+  archived
+}
+
+Enum palette_harmony {
+  analogous
+  complementary
+  triadic
+  monochrome
+}
+
+Enum palette_source {
+  curated
+  extracted
+}
+
+Table projects {
+  id uuid [pk]
+  user_id uuid [not null]
+  name text [not null]
+  status project_status [not null, default: 'draft']
+  version_count int [not null, default: 0]
+  thumbnail_asset_id uuid [null]
+  draft_document jsonb [null, note: 'ปลายทางของ autosave ทุก 3 วิ — ยังไม่นับเป็นเวอร์ชัน']
+  draft_updated_at timestamptz [null]
+  draft_base_version int [null, note: 'draft นี้ต่อยอดจากเวอร์ชันไหน ใช้ตรวจว่าล้าสมัยหรือยัง']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+  deleted_at timestamptz [null]
+
+  indexes {
+    (user_id, updated_at, id) [note: 'partial WHERE deleted_at IS NULL — keyset pagination']
+  }
+}
+
+Table design_versions {
+  id uuid [pk]
+  project_id uuid [not null]
+  version_number int [not null]
+  schema_version int [not null, default: 2, note: 'เวอร์ชันของโครงสร้าง document ใช้ตอน migrate']
+  document jsonb [not null, note: 'ทั้งชั้นสี ลาย อัญมณี พิกัด 3 มิติ — schemaless โดยตั้งใจ']
+  label text [null]
+  created_at timestamptz [not null]
+
+  indexes {
+    (project_id, version_number) [unique, note: 'รากฐานของ optimistic concurrency']
+  }
+}
+
+Table assets {
+  id uuid [pk]
+  owner_id uuid [null, note: 'null = ไฟล์ระบบ ไม่มีเจ้าของ']
+  kind text [not null, note: 'thumbnail | reference | avatar | attachment | evidence']
+  storage_key text [unique, not null, note: 'ที่อยู่ใน object storage — ย้าย CDN ไม่ต้องแก้ทุกแถว']
+  mime_type text [not null]
+  size_bytes bigint [not null]
+  width int [null, note: 'ยกจาก metadata ขึ้นมาเป็นคอลัมน์ เพราะต้องตรวจขนาดตอนอัปโหลดทุกครั้ง']
+  height int [null]
+  checksum_sha256 bytea [not null, note: 'ไฟล์เดิมอัปซ้ำ ใช้แถวเดิมได้']
+  metadata jsonb [not null]
+  created_at timestamptz [not null]
+
+  indexes {
+    (owner_id, kind, created_at)
+    checksum_sha256
+  }
+}
+
+Table brand_colors {
+  id uuid [pk]
+  brand text [not null]
+  name text [not null]
+  hex varchar(7) [not null]
+  is_available boolean [not null, default: true]
+
+  indexes {
+    (brand, hex) [unique]
+    (brand, is_available)
+  }
+  Note: 'สีจริงจากยี่ห้อยาทาเล็บ ใช้เทียบว่าสีที่ออกแบบซื้อได้จริงไหม'
+}
+
+Table color_palettes {
+  id uuid [pk]
+  code text [unique, not null]
+  name_th text [not null]
+  colors jsonb [not null]
+  harmony palette_harmony [not null]
+  source palette_source [not null, default: 'curated']
+  popularity int [not null, default: 0]
+  is_active boolean [not null, default: true]
+
+  indexes {
+    (is_active, popularity)
+  }
+}
+
+Table design_archetypes {
+  id uuid [pk]
+  code text [unique, not null]
+  name_th text [not null]
+  composer_key text [not null]
+  default_params jsonb [not null]
+  supported_zones "text[]" [not null, note: 'ค่าคงที่ของระบบ ไม่ใช่ข้อมูลผู้ใช้ จึงยอมให้เป็น array ได้']
+  popularity int [not null, default: 0]
+  is_active boolean [not null, default: true]
+
+  indexes {
+    (is_active, popularity)
+  }
+}
+
+Table users {
+  id uuid [pk]
+  username varchar(32) [unique, not null]
+  display_name text [not null]
+
+  Note: '[อ้างอิง] โดเมน 1 — Identity & Auth'
+}
+
+Ref: projects.user_id > users.id [delete: cascade]
+Ref: projects.thumbnail_asset_id > assets.id [delete: set null]
+Ref: design_versions.project_id > projects.id [delete: cascade]
+Ref: assets.owner_id > users.id [delete: cascade]

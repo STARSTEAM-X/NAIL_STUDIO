@@ -1,0 +1,220 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// โดเมน 5 — Shop & Booking (โปรไฟล์ร้าน เวลาทำการ บริการ การจอง รีวิว)
+// ไฟล์นี้ใช้ได้ด้วยตัวเอง — คัดลอกทั้งไฟล์ไปวางที่ https://dbdiagram.io/d
+// ═══════════════════════════════════════════════════════════════════════════
+
+Project shop_booking {
+  database_type: 'PostgreSQL'
+  Note: '''
+  การตัดสินใจหลักของโดเมนนี้
+
+  1. ใช้ appointments แถวเดียวตลอดวงจร แทนที่จะแยก appointment_requests
+     กับ appointments เป็นสองตารางแบบดีไซน์เดิม — ไม่ต้องคัดลอกลูกค้า/ร้าน/
+     ราคา/รูปแนบไปไว้สองที่ และไม่มีทางที่สองตารางจะไม่ตรงกัน
+
+  2. ประวัติการต่อรองย้ายไปอยู่ appointment_proposals ซึ่งเก็บได้ทุกรอบ
+     ไม่ใช่แค่ข้อเสนอล่าสุดแบบดีไซน์เดิม
+
+  3. เวลาทำการเป็นตาราง ไม่ใช่ jsonb — ถามด้วย SQL ได้ว่าร้านไหนเปิดตอนไหน
+  '''
+}
+
+Enum appointment_status {
+  pending         [note: 'ลูกค้าส่งคำขอ รอร้านตอบ']
+  counter_offered [note: 'ฝ่ายใดฝ่ายหนึ่งเสนอเวลา/ราคาใหม่']
+  confirmed
+  declined
+  cancelled
+  completed
+  no_show
+  expired         [note: 'เลย expires_at โดยไม่มีใครตอบ']
+}
+
+Enum proposal_actor {
+  customer
+  shop
+}
+
+Enum proposal_status {
+  pending
+  accepted
+  rejected
+  superseded
+}
+
+Table shop_profiles {
+  user_id uuid [pk, note: '1:1 กับ users — ใช้ PK เดียวกันเป็น FK ไม่ต้องมี id ซ้ำซ้อน']
+  shop_name text [not null]
+  description text [null]
+  location_text text [null]
+  latitude decimal(9,6) [null, note: 'ค้นหาร้านใกล้ฉัน']
+  longitude decimal(9,6) [null]
+  is_verified boolean [not null, default: false]
+  rating_avg decimal(3,2) [not null, default: 0]
+  rating_count int [not null, default: 0]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (is_verified, rating_avg, rating_count)
+    (latitude, longitude)
+  }
+}
+
+Table shop_phones {
+  id uuid [pk]
+  shop_id uuid [not null]
+  phone_number varchar(20) [not null]
+  label text [null, note: 'สาขา / มือถือ / LINE']
+  sort_order int [not null, default: 0]
+
+  indexes {
+    (shop_id, sort_order)
+    phone_number
+  }
+  Note: 'แยกออกจาก array phone_numbers[] เดิม เพื่อให้อยู่ในรูปแบบ 1NF และค้นด้วยเบอร์ได้'
+}
+
+Table shop_opening_hours {
+  id uuid [pk]
+  shop_id uuid [not null]
+  day_of_week smallint [not null, note: '0=อาทิตย์ … 6=เสาร์']
+  open_time time [not null]
+  close_time time [not null]
+  is_active boolean [not null, default: true]
+
+  indexes {
+    (shop_id, day_of_week)
+  }
+  Note: 'แทน opening_hours jsonb — รับแนวคิดมาจาก provider_availability ของดีไซน์เดิม'
+}
+
+Table shop_time_off {
+  id uuid [pk]
+  shop_id uuid [not null]
+  start_at timestamptz [not null]
+  end_at timestamptz [not null]
+  reason text [null]
+
+  indexes {
+    (shop_id, start_at)
+  }
+  Note: 'วันหยุด/ลาพัก — ใช้กันไม่ให้จองทับ ทั้งสองอย่างนี้ระบบปัจจุบันไม่มีเลย'
+}
+
+Table shop_services {
+  id uuid [pk]
+  shop_id uuid [not null]
+  name text [not null]
+  description text [null]
+  price_thb decimal(10,2) [not null]
+  duration_minutes int [not null]
+  is_active boolean [not null, default: true]
+  sort_order int [not null, default: 0]
+
+  indexes {
+    (shop_id, sort_order)
+  }
+}
+
+Table appointments {
+  id uuid [pk]
+  customer_id uuid [not null]
+  shop_id uuid [not null]
+  service_id uuid [null, note: 'null = นัดคุยก่อน ยังไม่เลือกบริการ']
+  design_version_id uuid [null, note: 'แนบแบบที่ออกแบบในระบบ']
+  reference_asset_id uuid [null, note: 'หรือแนบรูปจากที่อื่น — รับมาจาก image_url เดิม']
+  status appointment_status [not null, default: 'pending']
+  agreed_start_at timestamptz [null, note: 'ว่างจนกว่าทั้งสองฝ่ายตกลง']
+  duration_minutes int [not null]
+  price_quoted_thb decimal(10,2) [null]
+  expires_at timestamptz [null, note: 'คำขอหมดอายุถ้าร้านไม่ตอบ — รับมาจากดีไซน์เดิม']
+  customer_note text [null]
+  shop_note text [null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (customer_id, created_at)
+    (shop_id, status, created_at)
+    (shop_id, agreed_start_at) [note: 'ปฏิทินของร้าน + ตรวจเวลาทับซ้อน']
+  }
+}
+
+Table appointment_proposals {
+  id uuid [pk]
+  appointment_id uuid [not null]
+  proposed_by proposal_actor [not null]
+  proposed_start_at timestamptz [not null]
+  duration_minutes int [not null]
+  price_thb decimal(10,2) [null]
+  message text [null]
+  status proposal_status [not null, default: 'pending']
+  created_at timestamptz [not null]
+
+  indexes {
+    (appointment_id, created_at)
+  }
+  Note: 'ประวัติการต่อรองครบทุกรอบ — ใครเสนอ เวลาไหน ราคาเท่าไร ผลเป็นอย่างไร'
+}
+
+Table shop_reviews {
+  id uuid [pk]
+  appointment_id uuid [unique, not null, note: 'รีวิวได้ก็ต่อเมื่อเคยจองจริง — กันรีวิวปลอม']
+  shop_id uuid [not null]
+  author_id uuid [not null]
+  rating smallint [not null, note: '1–5']
+  comment text [null]
+  image_asset_id uuid [null, note: 'รูปผลงานที่ได้จริง']
+  shop_reply text [null]
+  shop_replied_at timestamptz [null]
+  is_hidden boolean [not null, default: false]
+  created_at timestamptz [not null]
+  deleted_at timestamptz [null]
+
+  indexes {
+    (shop_id, created_at)
+    (author_id, created_at)
+  }
+}
+
+Table users {
+  id uuid [pk]
+  username varchar(32) [unique, not null]
+  role text [not null]
+
+  Note: '[อ้างอิง] โดเมน 1'
+}
+
+Table design_versions {
+  id uuid [pk]
+  project_id uuid [not null]
+  document jsonb [not null]
+
+  Note: '[อ้างอิง] โดเมน 2'
+}
+
+Table assets {
+  id uuid [pk]
+  storage_key text [unique, not null]
+
+  Note: '[อ้างอิง] โดเมน 2'
+}
+
+Ref: shop_profiles.user_id - users.id [delete: cascade]
+Ref: shop_phones.shop_id > shop_profiles.user_id [delete: cascade]
+Ref: shop_opening_hours.shop_id > shop_profiles.user_id [delete: cascade]
+Ref: shop_time_off.shop_id > shop_profiles.user_id [delete: cascade]
+Ref: shop_services.shop_id > shop_profiles.user_id [delete: cascade]
+
+Ref: appointments.customer_id > users.id [delete: cascade]
+Ref: appointments.shop_id > shop_profiles.user_id [delete: cascade]
+Ref: appointments.service_id > shop_services.id [delete: set null]
+Ref: appointments.design_version_id > design_versions.id [delete: set null]
+Ref: appointments.reference_asset_id > assets.id [delete: set null]
+Ref: appointment_proposals.appointment_id > appointments.id [delete: cascade]
+
+Ref: shop_reviews.appointment_id - appointments.id [delete: cascade]
+Ref: shop_reviews.shop_id > shop_profiles.user_id [delete: cascade]
+Ref: shop_reviews.author_id > users.id [delete: cascade]
+Ref: shop_reviews.image_asset_id > assets.id [delete: set null]

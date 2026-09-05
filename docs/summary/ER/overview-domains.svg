@@ -1,0 +1,188 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1220 810" width="1220" height="810" font-family="'Noto Sans Thai','Leelawadee UI',Tahoma,'Segoe UI',sans-serif">
+  <defs>
+    <marker id="aId" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4A6FA5"/>
+    </marker>
+    <marker id="aWs" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3F8F6F"/>
+    </marker>
+    <marker id="aGy" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A8A8A"/>
+    </marker>
+  </defs>
+
+  <rect width="1220" height="810" fill="#FFFFFF"/>
+
+  <text x="610" y="42" text-anchor="middle" font-size="23" font-weight="700" fill="#1B2733">แผนภาพระดับโดเมน — Nail Studio 3D</text>
+  <text x="610" y="68" text-anchor="middle" font-size="13" fill="#5B6B7B">39 ตาราง · 8 โดเมน · 65 ความสัมพันธ์ (ภายในโดเมน 32 · ข้ามโดเมน 33)</text>
+
+  <!-- ═══ เส้นเชื่อม (วาดก่อนกล่อง เพื่อให้กล่องทับเส้น) ═══ -->
+
+  <!-- ชี้ไป Identity & Auth -->
+  <g stroke="#4A6FA5" stroke-width="1.8" fill="none" marker-end="url(#aId)">
+    <line x1="160.5" y1="220" x2="200" y2="428"/>
+    <line x1="385.5" y1="220" x2="280" y2="428"/>
+    <line x1="610.5" y1="220" x2="360" y2="428"/>
+    <line x1="835.5" y1="220" x2="440" y2="428"/>
+    <line x1="1060.5" y1="220" x2="520" y2="428"/>
+  </g>
+
+  <!-- ชี้ไป Design Workspace -->
+  <g stroke="#3F8F6F" stroke-width="1.8" fill="none" marker-end="url(#aWs)">
+    <line x1="385.5" y1="220" x2="720" y2="428"/>
+    <line x1="610.5" y1="220" x2="810" y2="428"/>
+    <line x1="835.5" y1="220" x2="900" y2="428"/>
+    <line x1="1060.5" y1="220" x2="990" y2="428"/>
+  </g>
+
+  <!-- Messaging → Shop & Booking (โค้งข้างบน) -->
+  <path d="M 835 110 C 835 88, 611 88, 611 108" stroke="#8A8A8A" stroke-width="1.8" fill="none" marker-end="url(#aGy)"/>
+
+  <!-- Identity → Design Workspace (users.avatar_asset_id) -->
+  <line x1="560" y1="480" x2="656" y2="480" stroke="#3F8F6F" stroke-width="1.8" marker-end="url(#aWs)"/>
+
+  <!-- Design Workspace → Identity (projects.user_id, assets.owner_id) -->
+  <line x1="660" y1="518" x2="564" y2="518" stroke="#4A6FA5" stroke-width="1.8" marker-end="url(#aId)"/>
+
+  <!-- ป้ายจำนวน FK บนเส้น -->
+  <g font-size="11.5" font-weight="700" text-anchor="middle">
+    <g fill="#4A6FA5">
+      <rect x="176" y="352" width="23" height="18" rx="9" fill="#FFFFFF" stroke="#4A6FA5" stroke-width="1"/>
+      <text x="187.5" y="365" fill="#4A6FA5">2</text>
+      <rect x="302" y="352" width="23" height="18" rx="9" fill="#FFFFFF" stroke="#4A6FA5" stroke-width="1"/>
+      <text x="313.5" y="365" fill="#4A6FA5">7</text>
+      <rect x="429" y="352" width="23" height="18" rx="9" fill="#FFFFFF" stroke="#4A6FA5" stroke-width="1"/>
+      <text x="440.5" y="365" fill="#4A6FA5">3</text>
+      <rect x="555" y="352" width="23" height="18" rx="9" fill="#FFFFFF" stroke="#4A6FA5" stroke-width="1"/>
+      <text x="566.5" y="365" fill="#4A6FA5">4</text>
+      <rect x="681" y="352" width="23" height="18" rx="9" fill="#FFFFFF" stroke="#4A6FA5" stroke-width="1"/>
+      <text x="692.5" y="365" fill="#4A6FA5">4</text>
+    </g>
+    <g fill="#3F8F6F">
+      <rect x="658" y="390" width="23" height="18" rx="9" fill="#FFFFFF" stroke="#3F8F6F" stroke-width="1"/>
+      <text x="669.5" y="403" fill="#3F8F6F">4</text>
+      <rect x="769" y="390" width="23" height="18" rx="9" fill="#FFFFFF" stroke="#3F8F6F" stroke-width="1"/>
+      <text x="780.5" y="403" fill="#3F8F6F">3</text>
+      <rect x="879" y="390" width="23" height="18" rx="9" fill="#FFFFFF" stroke="#3F8F6F" stroke-width="1"/>
+      <text x="890.5" y="403" fill="#3F8F6F">1</text>
+      <rect x="989" y="390" width="23" height="18" rx="9" fill="#FFFFFF" stroke="#3F8F6F" stroke-width="1"/>
+      <text x="1000.5" y="403" fill="#3F8F6F">1</text>
+      <rect x="597" y="471" width="23" height="18" rx="9" fill="#FFFFFF" stroke="#3F8F6F" stroke-width="1"/>
+      <text x="608.5" y="484" fill="#3F8F6F">1</text>
+    </g>
+    <rect x="597" y="509" width="23" height="18" rx="9" fill="#FFFFFF" stroke="#4A6FA5" stroke-width="1"/>
+    <text x="608.5" y="522" fill="#4A6FA5">2</text>
+    <rect x="711" y="84" width="23" height="18" rx="9" fill="#FFFFFF" stroke="#8A8A8A" stroke-width="1"/>
+    <text x="722.5" y="97" fill="#6B6B6B">1</text>
+  </g>
+
+  <!-- ═══ แถวบน — โดเมนที่ใช้งาน ═══ -->
+
+  <!-- 8 · AI Assistant -->
+  <g>
+    <rect x="58" y="110" width="205" height="110" rx="8" fill="#FFFFFF" stroke="#C9D3DE" stroke-width="1.2"/>
+    <path d="M58 118 a8 8 0 0 1 8 -8 h189 a8 8 0 0 1 8 8 v20 h-205 z" fill="#7A6A4F"/>
+    <text x="70" y="132" font-size="13.5" font-weight="700" fill="#FFFFFF">8 · AI Assistant</text>
+    <text x="243" y="132" font-size="11" text-anchor="end" fill="#E8E2D6">3 ตาราง</text>
+    <text x="70" y="160" font-size="10.5" fill="#41505E">ai_chat_sessions</text>
+    <text x="70" y="177" font-size="10.5" fill="#41505E">ai_chat_messages</text>
+    <text x="70" y="194" font-size="10.5" fill="#41505E">knowledge_entries</text>
+  </g>
+
+  <!-- 4 · Community -->
+  <g>
+    <rect x="283" y="110" width="205" height="110" rx="8" fill="#FFFFFF" stroke="#C9D3DE" stroke-width="1.2"/>
+    <path d="M283 118 a8 8 0 0 1 8 -8 h189 a8 8 0 0 1 8 8 v20 h-205 z" fill="#C4693F"/>
+    <text x="295" y="132" font-size="13.5" font-weight="700" fill="#FFFFFF">4 · Community</text>
+    <text x="468" y="132" font-size="11" text-anchor="end" fill="#F6E2D6">11 ตาราง</text>
+    <text x="295" y="158" font-size="10.5" fill="#41505E">nail_templates · categories · tags</text>
+    <text x="295" y="175" font-size="10.5" fill="#41505E">likes · ratings · comments</text>
+    <text x="295" y="192" font-size="10.5" fill="#41505E">share_links · share_events · remixes</text>
+    <text x="295" y="209" font-size="10.5" fill="#8595A5">ศูนย์กลางของฟีดชุมชน</text>
+  </g>
+
+  <!-- 6 · Shop &amp; Booking -->
+  <g>
+    <rect x="508" y="110" width="205" height="110" rx="8" fill="#FFFFFF" stroke="#C9D3DE" stroke-width="1.2"/>
+    <path d="M508 118 a8 8 0 0 1 8 -8 h189 a8 8 0 0 1 8 8 v20 h-205 z" fill="#3E7CB1"/>
+    <text x="520" y="132" font-size="13.5" font-weight="700" fill="#FFFFFF">6 · Shop &amp; Booking</text>
+    <text x="693" y="132" font-size="11" text-anchor="end" fill="#DCE9F4">8 ตาราง</text>
+    <text x="520" y="158" font-size="10.5" fill="#41505E">shop_profiles · phones</text>
+    <text x="520" y="175" font-size="10.5" fill="#41505E">opening_hours · time_off · services</text>
+    <text x="520" y="192" font-size="10.5" fill="#41505E">appointments · proposals · reviews</text>
+  </g>
+
+  <!-- 7 · Messaging -->
+  <g>
+    <rect x="733" y="110" width="205" height="110" rx="8" fill="#FFFFFF" stroke="#C9D3DE" stroke-width="1.2"/>
+    <path d="M733 118 a8 8 0 0 1 8 -8 h189 a8 8 0 0 1 8 8 v20 h-205 z" fill="#5B8C5A"/>
+    <text x="745" y="132" font-size="13.5" font-weight="700" fill="#FFFFFF">7 · Messaging</text>
+    <text x="918" y="132" font-size="11" text-anchor="end" fill="#E0EDDF">3 ตาราง</text>
+    <text x="745" y="160" font-size="10.5" fill="#41505E">conversations</text>
+    <text x="745" y="177" font-size="10.5" fill="#41505E">conversation_messages</text>
+    <text x="745" y="194" font-size="10.5" fill="#41505E">message_attachments</text>
+  </g>
+
+  <!-- 5 · Moderation &amp; Notification -->
+  <g>
+    <rect x="958" y="110" width="205" height="110" rx="8" fill="#FFFFFF" stroke="#C9D3DE" stroke-width="1.2"/>
+    <path d="M958 118 a8 8 0 0 1 8 -8 h189 a8 8 0 0 1 8 8 v20 h-205 z" fill="#A94F4F"/>
+    <text x="970" y="132" font-size="13" font-weight="700" fill="#FFFFFF">5 · Moderation &amp; Notif.</text>
+    <text x="1143" y="132" font-size="11" text-anchor="end" fill="#F2DCDC">3 ตาราง</text>
+    <text x="970" y="160" font-size="10.5" fill="#41505E">content_reports</text>
+    <text x="970" y="177" font-size="10.5" fill="#41505E">notifications</text>
+    <text x="970" y="194" font-size="10.5" fill="#41505E">user_notification_settings</text>
+  </g>
+
+  <!-- ═══ แถวกลาง — โดเมนฐาน ═══ -->
+
+  <!-- 1 · Identity &amp; Auth -->
+  <g>
+    <rect x="140" y="430" width="420" height="115" rx="8" fill="#F4F7FA" stroke="#4A6FA5" stroke-width="2"/>
+    <path d="M140 438 a8 8 0 0 1 8 -8 h404 a8 8 0 0 1 8 8 v22 h-420 z" fill="#4A6FA5"/>
+    <text x="154" y="454" font-size="14.5" font-weight="700" fill="#FFFFFF">1 · Identity &amp; Auth</text>
+    <text x="546" y="454" font-size="11" text-anchor="end" fill="#DCE5F1">5 ตาราง</text>
+    <text x="154" y="482" font-size="11" fill="#41505E">users · sessions · password_resets · login_history · user_blocks</text>
+    <text x="154" y="504" font-size="10.5" fill="#4A6FA5" font-weight="700">users ถูกอ้างจาก 27 foreign key ใน 7 โดเมน</text>
+    <text x="154" y="524" font-size="10.5" fill="#7A8899">แก้โครงตารางนี้เมื่อไร กระทบทั้งระบบ — จึงต้องออกแบบให้นิ่งที่สุด</text>
+  </g>
+
+  <!-- 2 · Design Workspace -->
+  <g>
+    <rect x="660" y="430" width="420" height="115" rx="8" fill="#F2F8F5" stroke="#3F8F6F" stroke-width="2"/>
+    <path d="M660 438 a8 8 0 0 1 8 -8 h404 a8 8 0 0 1 8 8 v22 h-420 z" fill="#3F8F6F"/>
+    <text x="674" y="454" font-size="14.5" font-weight="700" fill="#FFFFFF">2 · Design Workspace</text>
+    <text x="1066" y="454" font-size="11" text-anchor="end" fill="#D9EDE3">3 ตาราง</text>
+    <text x="674" y="482" font-size="11" fill="#41505E">projects · design_versions · assets</text>
+    <text x="674" y="504" font-size="10.5" fill="#3F8F6F" font-weight="700">assets ถูกอ้างจาก 8 foreign key · design_versions จาก 2</text>
+    <text x="674" y="524" font-size="10.5" fill="#7A8899">งานออกแบบถูกใช้ซ้ำได้ทั้งในชุมชนและในการจองร้าน</text>
+  </g>
+
+  <text x="610" y="578" text-anchor="middle" font-size="11.5" font-weight="700" fill="#8595A5">โดเมนฐาน — ทุกโดเมนด้านบนพึ่งสองกล่องนี้</text>
+
+  <!-- ═══ แถวล่าง — แคตตาล็อก ═══ -->
+
+  <g>
+    <rect x="440" y="620" width="340" height="92" rx="8" fill="#FAF8FC" stroke="#8A7BA8" stroke-width="1.5" stroke-dasharray="6 4"/>
+    <path d="M440 628 a8 8 0 0 1 8 -8 h324 a8 8 0 0 1 8 8 v20 h-340 z" fill="#8A7BA8"/>
+    <text x="454" y="642" font-size="13.5" font-weight="700" fill="#FFFFFF">3 · Design Catalog</text>
+    <text x="766" y="642" font-size="11" text-anchor="end" fill="#EAE4F0">3 ตาราง</text>
+    <text x="454" y="670" font-size="10.5" fill="#41505E">brand_colors · color_palettes · design_archetypes</text>
+    <text x="454" y="692" font-size="10.5" fill="#8A7BA8">ไม่มีความสัมพันธ์กับโดเมนอื่น — เป็นข้อมูลตั้งต้นที่ระบบอ่านอย่างเดียว</text>
+  </g>
+
+  <!-- ═══ คำอธิบายสัญลักษณ์ ═══ -->
+
+  <g>
+    <line x1="58" y1="620" x2="410" y2="620" stroke="#E2E8EE" stroke-width="1"/>
+    <text x="58" y="644" font-size="11.5" font-weight="700" fill="#41505E">วิธีอ่านแผนภาพ</text>
+    <line x1="60" y1="664" x2="96" y2="664" stroke="#4A6FA5" stroke-width="1.8" marker-end="url(#aId)"/>
+    <text x="106" y="668" font-size="10.5" fill="#5B6B7B">A → B หมายถึง A มี foreign key ชี้ไป B (A พึ่ง B)</text>
+    <circle cx="70" cy="686" r="8" fill="#FFFFFF" stroke="#4A6FA5" stroke-width="1"/>
+    <text x="70" y="690" font-size="10" font-weight="700" text-anchor="middle" fill="#4A6FA5">n</text>
+    <text x="106" y="690" font-size="10.5" fill="#5B6B7B">ตัวเลขบนเส้น = จำนวน foreign key ที่เชื่อมสองโดเมนนั้น</text>
+    <text x="58" y="712" font-size="10.5" fill="#8595A5">รายละเอียดแต่ละโดเมน: ไฟล์ 01–07</text>
+  </g>
+
+  <text x="1163" y="780" text-anchor="end" font-size="10" fill="#A8B4C0">สร้างจาก docs/summary/ER/00-full-system.dbml</text>
+</svg>

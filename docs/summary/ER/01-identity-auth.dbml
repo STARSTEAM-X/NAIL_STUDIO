@@ -1,0 +1,114 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// โดเมน 1 — Identity & Auth (สมัคร / เข้าสู่ระบบ / ความปลอดภัยบัญชี)
+// ไฟล์นี้ใช้ได้ด้วยตัวเอง — คัดลอกทั้งไฟล์ไปวางที่ https://dbdiagram.io/d
+// ตารางที่ขึ้นต้นด้วย [อ้างอิง] คือตารางของโดเมนอื่น แสดงเฉพาะคอลัมน์ที่ใช้เชื่อม
+// ═══════════════════════════════════════════════════════════════════════════
+
+Project identity_auth {
+  database_type: 'PostgreSQL'
+  Note: 'Nail Studio 3D — โดเมนบัญชีผู้ใช้'
+}
+
+Enum user_role {
+  user  [note: 'ลูกค้าทั่วไป']
+  shop  [note: 'ร้าน/ช่างทำเล็บ']
+  admin [note: 'ผู้ดูแลระบบ']
+}
+
+Table users {
+  id uuid [pk]
+  username varchar(32) [unique, not null, note: 'ชื่อเฉพาะสำหรับ URL โปรไฟล์และการ mention']
+  email text [unique, not null]
+  password_hash text [not null, note: 'Argon2id — ไม่เก็บรหัสผ่านดิบ']
+  role user_role [not null, default: 'user']
+  display_name text [not null, note: 'ชื่อที่แสดง เปลี่ยนได้ ไม่ต้องไม่ซ้ำ']
+  avatar_asset_id uuid [null]
+  bio text [null]
+  date_of_birth date [null]
+  terms_accepted_at timestamptz [null]
+  is_email_verified boolean [not null, default: false]
+  is_active boolean [not null, default: true, note: 'false = แอดมินปิดบัญชีถาวร']
+  suspended_until timestamptz [null, note: 'ระงับชั่วคราวจากผลการตรวจรายงาน']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (role, is_active)
+  }
+  Note: 'บัญชีเดียวใช้ได้ทุกบทบาท — ร้านก็จองร้านอื่นได้ เพราะ role คุมแค่สิทธิ์เพิ่มเติม'
+}
+
+Table sessions {
+  id uuid [pk]
+  user_id uuid [not null]
+  token_hash bytea [unique, not null, note: 'SHA-256 ของ token — ฐานข้อมูลรั่วก็ปลอม cookie ไม่ได้']
+  ip_address inet [null]
+  user_agent text [null]
+  expires_at timestamptz [not null]
+  last_seen_at timestamptz [not null]
+  revoked_at timestamptz [null]
+  created_at timestamptz [not null]
+
+  indexes {
+    user_id
+    expires_at
+  }
+}
+
+Table password_resets {
+  id uuid [pk]
+  user_id uuid [not null]
+  token_hash bytea [unique, not null]
+  expires_at timestamptz [not null]
+  used_at timestamptz [null]
+  created_at timestamptz [not null]
+
+  indexes {
+    (user_id, created_at)
+  }
+  Note: 'รับมาจากดีไซน์เดิม — สคีมาปัจจุบันไม่มี ทำให้ "ลืมรหัสผ่าน" ทำไม่ได้เลย'
+}
+
+Table login_history {
+  id uuid [pk]
+  user_id uuid [null, note: 'null เมื่อกรอกอีเมลที่ไม่มีในระบบ']
+  email_attempted text [not null]
+  is_success boolean [not null]
+  ip_address inet [null]
+  user_agent text [null]
+  created_at timestamptz [not null]
+
+  indexes {
+    (user_id, created_at)
+    (ip_address, created_at) [note: 'ใช้ตรวจจับการเดารหัสผ่าน']
+  }
+}
+
+Table user_blocks {
+  blocker_id uuid [not null]
+  blocked_id uuid [not null]
+  created_at timestamptz [not null]
+
+  indexes {
+    (blocker_id, blocked_id) [pk]
+    blocked_id
+  }
+  Note: 'บล็อกแล้วส่งข้อความหากันไม่ได้ และไม่เห็นโพสต์ของกันและกัน'
+}
+
+Table assets {
+  id uuid [pk]
+  owner_id uuid [null]
+  kind text [not null]
+  storage_key text [unique, not null]
+
+  Note: '[อ้างอิง] โดเมน 2 — Design Workspace'
+}
+
+Ref: users.avatar_asset_id > assets.id [delete: set null]
+Ref: assets.owner_id > users.id [delete: cascade]
+Ref: sessions.user_id > users.id [delete: cascade]
+Ref: password_resets.user_id > users.id [delete: cascade]
+Ref: login_history.user_id > users.id [delete: set null]
+Ref: user_blocks.blocker_id > users.id [delete: cascade]
+Ref: user_blocks.blocked_id > users.id [delete: cascade]

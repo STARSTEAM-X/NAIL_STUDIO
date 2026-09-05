@@ -1,0 +1,78 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// โดเมน 7 — AI Assistant (บทสนทนากับผู้ช่วย + คลังความรู้)
+// ไฟล์นี้ใช้ได้ด้วยตัวเอง — คัดลอกทั้งไฟล์ไปวางที่ https://dbdiagram.io/d
+// ต้องเปิดส่วนขยาย pgvector: CREATE EXTENSION vector;
+// ═══════════════════════════════════════════════════════════════════════════
+
+Project ai_assistant {
+  database_type: 'PostgreSQL'
+  Note: '''
+  โดเมนนี้รับของจากดีไซน์เดิมมาเกือบทั้งหมด เพราะสคีมาปัจจุบันมีปัญหาจริง 2 ข้อ
+
+  1. ai_chat_messages.session_id ไม่ได้ชี้ไปตารางไหนเลย — ไม่รู้ว่าบทสนทนา
+     เป็นของใคร ลบผู้ใช้แล้วข้อความค้างเป็นขยะ และบังคับความถูกต้องไม่ได้
+  2. knowledge_entries ไม่มี embedding — ค้นได้แค่คำที่ตรงตัวเป๊ะ
+     ถามว่า "เล็บสีหวาน ๆ" จะไม่เจอบทความที่เขียนว่า "โทนพาสเทล"
+  '''
+}
+
+Enum ai_message_role {
+  user
+  assistant
+  system
+}
+
+Table ai_chat_sessions {
+  id uuid [pk]
+  user_id uuid [not null]
+  title text [null, note: 'สรุปจากข้อความแรก']
+  model_name text [not null, note: 'llama3.1:8b …']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (user_id, updated_at)
+  }
+  Note: 'ตารางที่หายไปจากสคีมาปัจจุบัน — รับกลับมาจากดีไซน์เดิม (chat_sessions_ai)'
+}
+
+Table ai_chat_messages {
+  id uuid [pk]
+  session_id uuid [not null]
+  role ai_message_role [not null, note: 'ดีไซน์เดิมเป็น varchar อิสระ ฉบับนี้บังคับด้วย enum']
+  content text [not null]
+  token_count int [null, note: 'ใช้ตัดบริบทเก่าเมื่อเกินหน้าต่างของโมเดล']
+  created_at timestamptz [not null]
+
+  indexes {
+    (session_id, created_at)
+  }
+}
+
+Table knowledge_entries {
+  id uuid [pk]
+  question text [not null]
+  answer text [not null]
+  embedding "vector(768)" [null, note: 'pgvector — ค้นด้วยความหมาย ไม่ใช่แค่คำตรงตัว']
+  source_type text [null, note: 'template | faq | manual']
+  source_id uuid [null]
+  created_by uuid [null]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null]
+
+  indexes {
+    (is_active, created_at)
+    embedding [note: 'ดัชนี HNSW ของ pgvector — เพื่อนบ้านใกล้สุดโดยประมาณ']
+  }
+}
+
+Table users {
+  id uuid [pk]
+  username varchar(32) [unique, not null]
+
+  Note: '[อ้างอิง] โดเมน 1'
+}
+
+Ref: ai_chat_sessions.user_id > users.id [delete: cascade]
+Ref: ai_chat_messages.session_id > ai_chat_sessions.id [delete: cascade]
+Ref: knowledge_entries.created_by > users.id [delete: set null]

@@ -1,0 +1,275 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// โดเมน 3 — Community (แม่แบบ หมวดหมู่ แท็ก ถูกใจ ดาว คอมเมนต์ แชร์ remix)
+// ไฟล์นี้ใช้ได้ด้วยตัวเอง — คัดลอกทั้งไฟล์ไปวางที่ https://dbdiagram.io/d
+// เป็นโดเมนที่รับของจากดีไซน์เดิมมามากที่สุด (หมวดหมู่ แท็ก ดาว ลิงก์แชร์)
+// ═══════════════════════════════════════════════════════════════════════════
+
+Project community {
+  database_type: 'PostgreSQL'
+  Note: 'Nail Studio 3D — ชุมชนแชร์แม่แบบเล็บ'
+}
+
+Enum template_origin {
+  original [note: 'ผู้ใช้ออกแบบเอง']
+  ai       [note: 'ผู้ช่วย AI สร้างให้']
+  remix    [note: 'ต่อยอดจากแม่แบบอื่น']
+}
+
+Enum template_visibility {
+  public   [note: 'เห็นในฟีดชุมชน']
+  unlisted [note: 'เข้าถึงได้เฉพาะคนมีลิงก์']
+  hidden   [note: 'เจ้าของเท่านั้น']
+}
+
+Enum share_channel {
+  link
+  facebook
+  line
+  instagram
+  copy
+}
+
+Table nail_templates {
+  id uuid [pk]
+  author_id uuid [not null]
+  design_version_id uuid [not null, note: 'ไม่เก็บชั้นลายเอง — ชี้ไปที่ snapshot ที่ตายตัวแล้ว']
+  name text [not null]
+  caption text [null]
+  primary_color varchar(7) [null, note: 'สีเด่น ใช้ทำ color filter ในฟีด']
+  difficulty smallint [null, note: '1–5 รับมาจากดีไซน์เดิม']
+  origin template_origin [not null, default: 'original']
+  source_template_id uuid [null, note: 'อ้างตัวเอง — remix มาจากแม่แบบไหน']
+  thumbnail_asset_id uuid [null]
+  visibility template_visibility [not null, default: 'public']
+  like_count int [not null, default: 0]
+  comment_count int [not null, default: 0]
+  remix_count int [not null, default: 0]
+  share_count int [not null, default: 0]
+  view_count int [not null, default: 0]
+  report_count int [not null, default: 0]
+  rating_avg decimal(3,2) [not null, default: 0]
+  rating_count int [not null, default: 0]
+  recipe jsonb [null, note: 'ขั้นตอนทำจริง สำหรับช่างอ่านตาม']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+  deleted_at timestamptz [null]
+
+  indexes {
+    (author_id, created_at)
+    source_template_id
+    (visibility, created_at) [note: 'ฟีดล่าสุด']
+    (visibility, like_count) [note: 'ฟีดยอดนิยม']
+  }
+  Note: 'ตัวนับทั้ง 8 ตัวเก็บซ้ำไว้บนแถวโดยตั้งใจ — ฟีดหนึ่งหน้าไม่ต้อง COUNT 8 ตาราง'
+}
+
+// ── หมวดหมู่: N:M ─────────────────────────────────────────────────────────
+
+Table template_categories {
+  id uuid [pk]
+  code text [unique, not null, note: 'french, minimal, ombre, glitter, nail_art …']
+  name_th text [not null]
+  sort_order int [not null, default: 0]
+  is_active boolean [not null, default: true]
+
+  Note: 'แทนคอลัมน์ category ที่เดิมเป็นข้อความอิสระ — พิมพ์ผิดกลายเป็นหมวดใหม่'
+}
+
+Table template_category_map {
+  template_id uuid [not null]
+  category_id uuid [not null]
+
+  indexes {
+    (template_id, category_id) [pk]
+    category_id
+  }
+}
+
+// ── แท็ก: N:M พร้อมน้ำหนัก ────────────────────────────────────────────────
+
+Table template_tags {
+  id uuid [pk]
+  name text [unique, not null]
+  usage_count int [not null, default: 0]
+  is_blocked boolean [not null, default: false, note: 'แอดมินปิดแท็กที่ไม่เหมาะสม']
+
+  indexes {
+    usage_count
+  }
+}
+
+Table template_tag_map {
+  template_id uuid [not null]
+  tag_id uuid [not null]
+  score real [not null, default: 1, note: 'ผู้ใช้ติดเอง = 1, AI เดาให้ = 0–1 ตามความมั่นใจ']
+  created_at timestamptz [not null]
+
+  indexes {
+    (template_id, tag_id) [pk]
+    (tag_id, score) [note: 'ค้นด้วยแท็ก เรียงตามความเกี่ยวข้อง']
+  }
+  Note: 'คอลัมน์ score บนตารางเชื่อมคือของดีจากดีไซน์เดิม — ใช้ทำระบบแนะนำได้'
+}
+
+// ── ปฏิสัมพันธ์ 3 ระดับ ──────────────────────────────────────────────────
+
+Table template_likes {
+  template_id uuid [not null]
+  user_id uuid [not null]
+  created_at timestamptz [not null]
+
+  indexes {
+    (template_id, user_id) [pk]
+    (user_id, created_at)
+  }
+  Note: 'ระดับ 1 · สัญญาณเบา กดได้ทันทีไม่ต้องคิด'
+}
+
+Table template_ratings {
+  template_id uuid [not null]
+  user_id uuid [not null]
+  score smallint [not null, note: '1–5 ดาว']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (template_id, user_id) [pk, note: '1 คนให้คะแนนได้ครั้งเดียว แก้ได้']
+    (template_id, score)
+  }
+  Note: 'ระดับ 2 · สัญญาณคุณภาพ — แยกจากคอมเมนต์เพราะให้ดาวโดยไม่พิมพ์ก็ได้'
+}
+
+Table template_comments {
+  id uuid [pk]
+  template_id uuid [not null]
+  user_id uuid [not null]
+  parent_comment_id uuid [null, note: 'ตอบกลับคอมเมนต์ — อ้างตัวเอง 1 ชั้น']
+  content text [not null]
+  image_asset_id uuid [null, note: 'แนบรูปเล็บที่ทำตามจริง — รับมาจากดีไซน์เดิม']
+  is_hidden boolean [not null, default: false]
+  edited_at timestamptz [null]
+  created_at timestamptz [not null]
+  deleted_at timestamptz [null]
+
+  indexes {
+    (template_id, created_at)
+    parent_comment_id
+    (user_id, created_at)
+  }
+  Note: 'ระดับ 3 · บทสนทนา — คนเดิมคอมเมนต์ได้หลายครั้ง ต่างจากดาวที่ให้ได้ครั้งเดียว'
+}
+
+// ── การกระจายต่อ ─────────────────────────────────────────────────────────
+
+Table template_share_links {
+  id uuid [pk]
+  template_id uuid [not null]
+  created_by uuid [not null]
+  share_code varchar(16) [unique, not null, note: 'รหัสสั้นในลิงก์ /s/{share_code}']
+  allow_copy boolean [not null, default: true]
+  expires_at timestamptz [null, note: 'null = ไม่หมดอายุ']
+  revoked_at timestamptz [null]
+  view_count int [not null, default: 0]
+  copy_count int [not null, default: 0]
+  created_at timestamptz [not null]
+
+  indexes {
+    (template_id, created_at)
+  }
+  Note: 'ลิงก์แชร์ของจริง (ทรัพยากร) — คนไม่มีบัญชีเปิดดูได้ รับมาจากดีไซน์เดิมทั้งก้อน'
+}
+
+Table template_share_events {
+  id uuid [pk]
+  template_id uuid [not null]
+  user_id uuid [null, note: 'null = ผู้เยี่ยมชมที่ไม่ได้ล็อกอิน']
+  share_link_id uuid [null]
+  channel share_channel [not null]
+  created_at timestamptz [not null]
+
+  indexes {
+    (template_id, created_at)
+    (user_id, created_at)
+  }
+  Note: 'บันทึกพฤติกรรม "กดปุ่มแชร์" (เหตุการณ์) — คนละเรื่องกับตารางลิงก์ด้านบน'
+}
+
+Table template_remixes {
+  id uuid [pk]
+  template_id uuid [not null]
+  user_id uuid [not null]
+  project_id uuid [not null, note: 'remix แล้วได้โปรเจกต์ส่วนตัว ไม่ใช่โพสต์ใหม่ทันที']
+  created_at timestamptz [not null]
+
+  indexes {
+    (template_id, project_id) [unique]
+    (user_id, created_at)
+  }
+  Note: 'ถ้าเผยแพร่ผลลัพธ์ทีหลัง โพสต์ใหม่จะตั้ง source_template_id เป็นต้นฉบับ'
+}
+
+// ── ตารางอ้างอิงจากโดเมนอื่น ─────────────────────────────────────────────
+
+Table users {
+  id uuid [pk]
+  username varchar(32) [unique, not null]
+  display_name text [not null]
+
+  Note: '[อ้างอิง] โดเมน 1'
+}
+
+Table design_versions {
+  id uuid [pk]
+  project_id uuid [not null]
+  version_number int [not null]
+  document jsonb [not null]
+
+  Note: '[อ้างอิง] โดเมน 2'
+}
+
+Table projects {
+  id uuid [pk]
+  user_id uuid [not null]
+  name text [not null]
+
+  Note: '[อ้างอิง] โดเมน 2'
+}
+
+Table assets {
+  id uuid [pk]
+  storage_key text [unique, not null]
+
+  Note: '[อ้างอิง] โดเมน 2'
+}
+
+// ── ความสัมพันธ์ ─────────────────────────────────────────────────────────
+
+Ref: nail_templates.author_id > users.id [delete: cascade]
+Ref: nail_templates.design_version_id > design_versions.id [delete: restrict]
+Ref: nail_templates.source_template_id > nail_templates.id [delete: set null]
+Ref: nail_templates.thumbnail_asset_id > assets.id [delete: set null]
+
+Ref: template_category_map.template_id > nail_templates.id [delete: cascade]
+Ref: template_category_map.category_id > template_categories.id [delete: cascade]
+Ref: template_tag_map.template_id > nail_templates.id [delete: cascade]
+Ref: template_tag_map.tag_id > template_tags.id [delete: cascade]
+
+Ref: template_likes.template_id > nail_templates.id [delete: cascade]
+Ref: template_likes.user_id > users.id [delete: cascade]
+Ref: template_ratings.template_id > nail_templates.id [delete: cascade]
+Ref: template_ratings.user_id > users.id [delete: cascade]
+
+Ref: template_comments.template_id > nail_templates.id [delete: cascade]
+Ref: template_comments.user_id > users.id [delete: cascade]
+Ref: template_comments.parent_comment_id > template_comments.id [delete: cascade]
+Ref: template_comments.image_asset_id > assets.id [delete: set null]
+
+Ref: template_share_links.template_id > nail_templates.id [delete: cascade]
+Ref: template_share_links.created_by > users.id [delete: cascade]
+Ref: template_share_events.template_id > nail_templates.id [delete: cascade]
+Ref: template_share_events.user_id > users.id [delete: set null]
+Ref: template_share_events.share_link_id > template_share_links.id [delete: set null]
+
+Ref: template_remixes.template_id > nail_templates.id [delete: cascade]
+Ref: template_remixes.user_id > users.id [delete: cascade]
+Ref: template_remixes.project_id > projects.id [delete: cascade]

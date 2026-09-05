@@ -1,0 +1,123 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// โดเมน 4 — Moderation & Notification (รายงานเนื้อหา / การแจ้งเตือน)
+// ไฟล์นี้ใช้ได้ด้วยตัวเอง — คัดลอกทั้งไฟล์ไปวางที่ https://dbdiagram.io/d
+// ═══════════════════════════════════════════════════════════════════════════
+
+Project moderation_notification {
+  database_type: 'PostgreSQL'
+  Note: '''
+  จุดที่ทั้งสองดีไซน์เดิมพลาดเหมือนกัน: มีที่ "รับ" รายงานแต่ไม่มีที่ "ตัดสิน"
+  ฉบับนี้ปิดวงจรด้วย reviewed_by / reviewed_at / resolution_note
+  แล้วต่อไปยัง users.is_active และ users.suspended_until (โดเมน 1)
+  '''
+}
+
+Enum report_target {
+  template
+  comment
+  message
+  user
+  shop
+}
+
+Enum report_reason {
+  spam
+  inappropriate
+  copyright
+  harassment
+  impersonation
+  other
+}
+
+Enum report_status {
+  pending
+  reviewing
+  resolved
+  dismissed
+}
+
+Enum notification_kind {
+  post_like
+  post_comment
+  post_rating
+  template_remix
+  appointment_status
+  appointment_message
+  direct_message
+  system
+}
+
+Table content_reports {
+  id uuid [pk]
+  target_type report_target [not null]
+  target_id uuid [not null, note: 'polymorphic โดยตั้งใจ — คอลัมน์เดียวชี้ได้ 5 ตาราง จึงไม่มี FK']
+  reporter_id uuid [not null]
+  reason report_reason [not null]
+  detail text [null]
+  evidence_asset_id uuid [null, note: 'ภาพหลักฐาน — รับมาจากดีไซน์เดิม']
+  status report_status [not null, default: 'pending']
+  reviewed_by uuid [null, note: 'แอดมินที่ตรวจ — ดีไซน์เดิมมี ปัจจุบันไม่มี']
+  reviewed_at timestamptz [null]
+  resolution_note text [null]
+  created_at timestamptz [not null]
+
+  indexes {
+    (target_type, target_id, reporter_id) [unique, note: 'คนเดิมรายงานเป้าเดิมซ้ำไม่ได้']
+    (status, created_at) [note: 'คิวงานแอดมิน']
+    (target_type, target_id) [note: 'นับว่าถูกรายงานกี่ครั้ง']
+  }
+}
+
+Table notifications {
+  id uuid [pk]
+  user_id uuid [not null]
+  kind notification_kind [not null]
+  title text [not null]
+  body text [null, note: 'รับมาจากดีไซน์เดิม — ของปัจจุบันมีแต่หัวข้อ']
+  data_json jsonb [null, note: 'payload สำหรับ deep link ในแอป']
+  source_type text [not null]
+  source_id uuid [not null]
+  is_read boolean [not null, default: false]
+  read_at timestamptz [null]
+  created_at timestamptz [not null]
+
+  indexes {
+    (user_id, created_at)
+    (user_id, is_read) [note: 'นับป้ายแดง']
+  }
+}
+
+Table user_notification_settings {
+  user_id uuid [pk]
+  allow_social boolean [not null, default: true, note: 'ถูกใจ/คอมเมนต์/ให้ดาว/remix']
+  allow_appointment boolean [not null, default: true]
+  allow_direct_message boolean [not null, default: true]
+  allow_system boolean [not null, default: true]
+  email_enabled boolean [not null, default: false]
+  updated_at timestamptz [not null]
+
+  Note: 'รับมาจากดีไซน์เดิม — ปัจจุบันปิดการแจ้งเตือนไม่ได้เลย'
+}
+
+Table users {
+  id uuid [pk]
+  username varchar(32) [unique, not null]
+  role text [not null]
+  is_active boolean [not null]
+  suspended_until timestamptz [null]
+
+  Note: '[อ้างอิง] โดเมน 1 — ปลายทางของบทลงโทษจากการตรวจรายงาน'
+}
+
+Table assets {
+  id uuid [pk]
+  storage_key text [unique, not null]
+
+  Note: '[อ้างอิง] โดเมน 2'
+}
+
+Ref: content_reports.reporter_id > users.id [delete: cascade]
+Ref: content_reports.reviewed_by > users.id [delete: set null]
+Ref: content_reports.evidence_asset_id > assets.id [delete: set null]
+Ref: notifications.user_id > users.id [delete: cascade]
+Ref: user_notification_settings.user_id - users.id [delete: cascade]

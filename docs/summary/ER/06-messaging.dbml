@@ -1,0 +1,119 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// โดเมน 6 — Messaging (แชท 1:1 ระหว่างลูกค้ากับร้าน)
+// ไฟล์นี้ใช้ได้ด้วยตัวเอง — คัดลอกทั้งไฟล์ไปวางที่ https://dbdiagram.io/d
+// ═══════════════════════════════════════════════════════════════════════════
+
+Project messaging {
+  database_type: 'PostgreSQL'
+  Note: '''
+  ทำไมจึงเลือกโครงแบบ 1:1 แทนตาราง conversation_members ของดีไซน์เดิม
+
+  ความต้องการของระบบคือ "ลูกค้าคุยกับร้าน" ซึ่งเป็นคู่เสมอ
+  การเก็บคู่สนทนาไว้บนแถวเดียว (a, b โดยบังคับ a < b) ทำให้ตั้ง
+  UNIQUE(a, b) ได้ตรง ๆ จึงเปิดห้องซ้ำกับคนเดิมไม่ได้เลยในระดับฐานข้อมูล
+
+  ถ้าใช้ตาราง members ตามดีไซน์เดิม ฐานข้อมูลจะบังคับเรื่องนี้ไม่ได้
+  ต้องไปเขียนตรวจในโค้ด ซึ่งพลาดเมื่อไรก็เกิดห้องซ้ำทันที
+
+  ราคาที่ต้องจ่าย: ทำแชทกลุ่มไม่ได้ ถ้าอนาคตต้องการ ต้องย้ายไป members
+  '''
+}
+
+Enum message_kind {
+  text
+  image
+  system
+}
+
+Table conversations {
+  id uuid [pk]
+  participant_a_id uuid [not null, note: 'บังคับให้ a < b เสมอตอนสร้าง']
+  participant_b_id uuid [not null]
+  created_by_id uuid [not null]
+  appointment_id uuid [null, note: 'ห้องที่เกิดจากการจอง']
+  last_message_at timestamptz [not null, note: 'เก็บซ้ำเพื่อเรียงรายการห้องโดยไม่ต้อง join']
+  created_at timestamptz [not null]
+
+  indexes {
+    (participant_a_id, participant_b_id) [unique, note: 'กันห้องซ้ำระหว่างคนคู่เดิม']
+    (participant_a_id, last_message_at)
+    (participant_b_id, last_message_at)
+  }
+}
+
+Table conversation_messages {
+  id uuid [pk]
+  conversation_id uuid [not null]
+  sender_id uuid [null, note: 'null เมื่อผู้ส่งลบบัญชี — ข้อความยังอยู่ให้อีกฝ่ายอ่าน']
+  kind message_kind [not null, default: 'text']
+  content text [not null]
+  read_at timestamptz [null, note: 'ห้อง 1:1 มีผู้รับคนเดียว จึงไม่ต้องมีตาราง message_reads']
+  edited_at timestamptz [null]
+  created_at timestamptz [not null]
+  deleted_at timestamptz [null]
+
+  indexes {
+    (conversation_id, created_at, id) [note: 'keyset pagination ย้อนประวัติ']
+    (conversation_id, read_at) [note: 'นับข้อความที่ยังไม่อ่าน']
+  }
+}
+
+Table message_attachments {
+  id uuid [pk]
+  message_id uuid [not null]
+  asset_id uuid [not null, note: 'ชี้ไป assets ไม่เก็บ file_url/ขนาดไฟล์ซ้ำเหมือนดีไซน์เดิม']
+  sort_order int [not null, default: 0]
+
+  indexes {
+    message_id
+  }
+  Note: 'รับมาจากดีไซน์เดิม — ส่งรูปแบบเล็บให้ร้านดูคือฟีเจอร์ที่ขาดไม่ได้'
+}
+
+Table user_blocks {
+  blocker_id uuid [not null]
+  blocked_id uuid [not null]
+  created_at timestamptz [not null]
+
+  indexes {
+    (blocker_id, blocked_id) [pk]
+    blocked_id
+  }
+  Note: 'ดีไซน์เดิมคอมเมนต์ตารางนี้ทิ้งไว้ — ฉบับนี้เปิดใช้จริง'
+}
+
+Table users {
+  id uuid [pk]
+  username varchar(32) [unique, not null]
+  display_name text [not null]
+
+  Note: '[อ้างอิง] โดเมน 1'
+}
+
+Table assets {
+  id uuid [pk]
+  storage_key text [unique, not null]
+  mime_type text [not null]
+  size_bytes bigint [not null]
+
+  Note: '[อ้างอิง] โดเมน 2'
+}
+
+Table appointments {
+  id uuid [pk]
+  customer_id uuid [not null]
+  shop_id uuid [not null]
+
+  Note: '[อ้างอิง] โดเมน 5'
+}
+
+Ref: conversations.participant_a_id > users.id [delete: cascade]
+Ref: conversations.participant_b_id > users.id [delete: cascade]
+Ref: conversations.created_by_id > users.id [delete: cascade]
+Ref: conversations.appointment_id > appointments.id [delete: set null]
+Ref: conversation_messages.conversation_id > conversations.id [delete: cascade]
+Ref: conversation_messages.sender_id > users.id [delete: set null]
+Ref: message_attachments.message_id > conversation_messages.id [delete: cascade]
+Ref: message_attachments.asset_id > assets.id [delete: cascade]
+Ref: user_blocks.blocker_id > users.id [delete: cascade]
+Ref: user_blocks.blocked_id > users.id [delete: cascade]
