@@ -1,3 +1,4 @@
+import path from 'node:path'
 import express, { type Express } from 'express'
 import cookieParser from 'cookie-parser'
 import cors from 'cors'
@@ -30,7 +31,12 @@ function allowsCorsOrigin(origin: string | undefined): boolean {
   return !isProduction && localDevelopmentOrigin.test(origin)
 }
 
-export function createApp(): Express {
+export interface AppOptions {
+  /** โฟลเดอร์ build ของเว็บ — ถ้ามี API จะส่งหน้าเว็บด้วย (โดเมนเดียวกัน) */
+  webDist?: string | undefined
+}
+
+export function createApp(options: AppOptions = { webDist: env.WEB_DIST }): Express {
   const app = express()
 
   // อยู่หลัง reverse proxy ตอน production — ต้องบอก Express ให้เชื่อ X-Forwarded-*
@@ -51,7 +57,8 @@ export function createApp(): Express {
             imgSrc: ["'self'", 'data:', 'blob:'],
             styleSrc: ["'self'", "'unsafe-inline'"],
             scriptSrc: ["'self'"],
-            connectSrc: ["'self'", env.WEB_ORIGIN],
+            // blob:/data: — three.js โหลด texture ที่ฝังใน hand.glb ผ่าน fetch ของ blob URL
+            connectSrc: ["'self'", env.WEB_ORIGIN, 'blob:', 'data:'],
           },
         }
       : false,
@@ -90,8 +97,33 @@ export function createApp(): Express {
   app.use('/api/v1/users', usersRouter)
   app.use('/api/v1/tokens', tokensRouter)
 
+  if (options.webDist) serveWebApp(app, path.resolve(options.webDist))
+
   app.use(notFoundHandler)
   app.use(errorHandler)
 
   return app
+}
+
+/**
+ * ส่งหน้าเว็บ (Vite build) จาก API เอง — ใช้เมื่อ deploy เว็บกับ API เป็น service เดียว
+ *
+ * ไฟล์ใน /assets มี hash ในชื่อ จึง cache ได้ยาว ส่วน index.html ต้องไม่ cache ไม่งั้น
+ * ผู้ใช้จะค้างอยู่กับ build เก่าที่อ้างไฟล์ซึ่งถูกลบไปแล้วหลัง deploy ใหม่
+ * ทุกเส้นทางที่ไม่ใช่ /api และไม่ใช่ไฟล์จริงตอบ index.html ให้ router ฝั่งเว็บจัดการเอง
+ */
+function serveWebApp(app: Express, dist: string): void {
+  app.use(express.static(dist, {
+    index: false,
+    setHeaders: (response, filePath) => {
+      response.setHeader(
+        'Cache-Control',
+        filePath.includes(`${path.sep}assets${path.sep}`) ? 'public, max-age=31536000, immutable' : 'no-cache',
+      )
+    },
+  }))
+  app.get(/^\/(?!api\/).*/, (_request, response) => {
+    response.setHeader('Cache-Control', 'no-cache')
+    response.sendFile(path.join(dist, 'index.html'))
+  })
 }

@@ -20,6 +20,9 @@ const envSchema = z.object({
   STORAGE_ROOT: z.string().min(1).default('./storage'),
   AI_SERVICE_URL: z.string().url().default('http://localhost:4100'),
   AI_INTERNAL_TOKEN: z.string().default(''),
+  // โฟลเดอร์ build ของเว็บ (apps/web/dist) — ตั้งเมื่อให้ API ส่งหน้าเว็บเองจากโดเมนเดียวกัน
+  // (เช่นบน Render) ทำให้ cookie ล็อกอินเป็น first-party โดยไม่ต้องตั้ง rewrite/proxy
+  WEB_DIST: z.string().min(1).optional(),
 })
 
 export type Env = z.infer<typeof envSchema>
