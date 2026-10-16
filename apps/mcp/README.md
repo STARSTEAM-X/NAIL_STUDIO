@@ -38,6 +38,7 @@ npm install
 | `NAIL_STUDIO_API_URL` | `http://localhost:4000/api/v1` | API ของ NailStudio |
 | `NAIL_STUDIO_WEB_URL` | `http://localhost:5173` | ใช้สร้างลิงก์ editor ในคำตอบ |
 | `NAIL_STUDIO_TOKEN` | – | API token (โหมด stdio) |
+| `NAIL_STUDIO_TOKEN_FILE` | – | ไฟล์ที่เก็บ API token — อ่านใหม่ทุกครั้ง (ไม่ต้องใส่ secret ใน config ของ AI client, เปลี่ยน token ได้โดยไม่ต้องรีสตาร์ท) |
 | `NAIL_STUDIO_EMAIL` / `NAIL_STUDIO_PASSWORD` | – | ล็อกอินแบบเว็บ (dev) |
 | `PORT` | `4200` | พอร์ตของโหมด HTTP |
 
@@ -57,7 +58,7 @@ claude mcp add --transport http nail-studio http://localhost:4200/mcp --header "
 
 ## ใช้กับ Claude Desktop
 
-เพิ่มใน `claude_desktop_config.json`:
+เพิ่มใน `claude_desktop_config.json` (Windows: `%APPDATA%\Claude\`) แล้ววาง token ลงในไฟล์ที่ระบุ จากนั้นปิด-เปิด Claude Desktop ใหม่:
 
 ```json
 {
@@ -65,7 +66,7 @@ claude mcp add --transport http nail-studio http://localhost:4200/mcp --header "
     "nail-studio": {
       "command": "node",
       "args": ["C:\\Users\\SSX\\Documents\\GitHub\\NAIL_STUDIO\\apps\\mcp\\src\\stdio.ts"],
-      "env": { "NAIL_STUDIO_TOKEN": "nsk_xxx" }
+      "env": { "NAIL_STUDIO_TOKEN_FILE": "C:\\Users\\SSX\\.nail-studio\\token" }
     }
   }
 }
