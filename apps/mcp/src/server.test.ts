@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { createEmptyDocument, designDocumentSchema, type DesignDocument } from '@nail-studio/contracts'
@@ -64,8 +64,77 @@ describe('nail-studio MCP server', () => {
     expect(tools.map((t) => t.name).sort()).toEqual([
       'add_decoration', 'add_strokes', 'apply_preset', 'apply_recipe', 'clear_nail', 'copy_nail', 'create_project',
       'get_design', 'list_decorations', 'list_palettes', 'list_patterns', 'list_presets', 'list_projects',
-      'mirror_hand', 'preview_recipe', 'render_preview', 'set_nail', 'validate_document',
+      'mirror_hand', 'open_page', 'preview_recipe', 'render_preview', 'set_nail', 'set_nail_properties', 'validate_document',
     ])
+  })
+
+  it('ประกาศทุก array ด้วย items แบบ object เพื่อให้ client สร้าง tool signature ได้', async () => {
+    const { tools } = await client.listTools()
+    const inspect = (value: unknown): void => {
+      if (!value || typeof value !== 'object') return
+      if (Array.isArray(value)) {
+        value.forEach(inspect)
+        return
+      }
+      const schema = value as Record<string, unknown>
+      if (schema.type === 'array') {
+        expect(schema.items).toBeTypeOf('object')
+        expect(Array.isArray(schema.items)).toBe(false)
+      }
+      Object.values(schema).forEach(inspect)
+    }
+    tools.forEach((tool) => inspect(tool.inputSchema))
+  })
+
+  it('open_page คืนลิงก์ในเว็บที่ตั้งไว้ โดยไม่บันทึกหรือส่ง token', async () => {
+    for (const page of ['projects', 'profile', 'community', 'shops', 'appointments', 'login']) {
+      const result = await client.callTool({ name: 'open_page', arguments: { page } })
+      expect(result.isError).toBeFalsy()
+      expect(result.structuredContent).toEqual({ page, url: `http://web.test/${page}` })
+      expect(result.content).toContainEqual({ type: 'resource_link', uri: `http://web.test/${page}`, name: expect.any(String), mimeType: 'text/html' })
+    }
+    const read = vi.spyOn(api, 'getProject')
+    const editor = await client.callTool({ name: 'open_page', arguments: { page: 'editor', projectId: PROJECT } })
+    expect(read).toHaveBeenCalledWith(PROJECT)
+    expect(editor.structuredContent).toEqual({ page: 'editor', url: `http://web.test/editor/${PROJECT}` })
+    expect(api.saves).toHaveLength(0)
+  })
+
+  it('open_page ปฏิเสธหน้าหรือรหัสงานผิด และตรวจสิทธิ์งานก่อนคืนลิงก์', async () => {
+    for (const args of [{ page: 'editor' }, { page: 'login', projectId: PROJECT }, { page: 'https://evil.test' }, { page: 'editor', projectId: '../secret' }]) {
+      expect((await client.callTool({ name: 'open_page', arguments: args })).isError).toBe(true)
+    }
+    vi.spyOn(api, 'getProject').mockRejectedValueOnce(new ApiError(404, 'ไม่พบงาน'))
+    const result = await client.callTool({ name: 'open_page', arguments: { page: 'editor', projectId: PROJECT } })
+    expect(result.isError).toBe(true)
+    expect(result.structuredContent).toBeUndefined()
+    expect(textOf(result)).not.toContain('http://web.test')
+  })
+
+  it('set_nail_properties เปลี่ยนเฉพาะค่าที่ระบุและเก็บลาย/ของตกแต่งเดิม', async () => {
+    await client.callTool({ name: 'set_nail', arguments: { projectId: PROJECT, nails: ['index'], nail: {
+      patterns: [{ type: 'heart', color: '#aa2233' }], decorations: [{ catalogId: 'gem-round' }],
+    } } })
+    const before = api.versions.at(-1)!
+    const result = await client.callTool({ name: 'set_nail_properties', arguments: {
+      projectId: PROJECT, nails: ['index', 'right.index'], shape: 'almond', length: 'long', base: '#dfaaa2',
+    } })
+    expect(result.isError).toBeFalsy()
+    const after = api.versions.at(-1)!
+    for (const key of ['left.index', 'right.index'] as const) {
+      expect(after.nails[key]).toEqual({ ...before.nails[key], shape: 'almond', length: 'long', baseColor: '#dfaaa2' })
+    }
+    expect(after.nails['right.ring']).toEqual(before.nails['right.ring'])
+    expect(api.saves).toEqual([{ expectedVersion: 1 }, { expectedVersion: 2 }])
+  })
+
+  it('set_nail_properties ปฏิเสธค่าผิด/คำสั่งว่างก่อนอ่านหรือบันทึกงาน', async () => {
+    const read = vi.spyOn(api, 'getProject')
+    for (const fields of [{}, { shape: 'unknown' }, { base: 'pink' }]) {
+      expect((await client.callTool({ name: 'set_nail_properties', arguments: { projectId: PROJECT, nails: ['index'], ...fields } })).isError).toBe(true)
+    }
+    expect(read).not.toHaveBeenCalled()
+    expect(api.saves).toHaveLength(0)
   })
 
   it('preview_recipe คืนภาพ PNG และไม่บันทึกอะไร', async () => {

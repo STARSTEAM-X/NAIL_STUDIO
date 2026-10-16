@@ -110,6 +110,7 @@ claude mcp add --transport http nail-studio http://localhost:4200/mcp --header "
 | กลุ่ม | tool | หน้าที่ |
 |---|---|---|
 | อ่าน | `list_projects` | รายการงาน |
+| | `open_page` | คืนลิงก์หน้าที่เกี่ยวข้องให้ client เปิดในเบราว์เซอร์ หรือแสดงให้ผู้ใช้คลิก |
 | | `get_design` | สรุปต่อนิ้ว (`format: "full"` = JSON เต็ม) |
 | | `list_patterns` / `list_decorations` / `list_palettes` / `list_presets` | สิ่งที่ใช้ได้ |
 | ตรวจ/ดู | `preview_recipe` | **ภาพตัวอย่างจาก recipe โดยไม่บันทึก** — ใช้วนปรับก่อนบันทึก |
@@ -119,11 +120,36 @@ claude mcp add --transport http nail-studio http://localhost:4200/mcp --header "
 | | `apply_recipe` | ลง recipe (นิ้วที่ระบุถูกแทนทั้งนิ้ว นิ้วอื่นคงเดิม) |
 | | `apply_preset` | ลงดีไซน์สำเร็จรูป |
 | | `set_nail` | แก้บางนิ้ว |
+| | `set_nail_properties` | ปรับทรง ความยาว ผิว หรือสีพื้นของนิ้วที่ระบุ โดยเก็บลายและของตกแต่งเดิม |
 | | `copy_nail` / `mirror_hand` | คัดลอก/สมมาตร |
 | | `add_strokes` / `add_decoration` / `clear_nail` | ระดับต่ำ (ขั้นสูง) |
 
 Resources: `nailstudio://guide` (กฎและตัวอย่าง), `nailstudio://schema/recipe` (JSON Schema)
 Prompt: `design_from_description`
+
+### เปิดหน้าเว็บและปรับลักษณะเล็บ
+
+`open_page` รับ `page`: `projects`, `editor`, `profile`, `community`, `shops`,
+`appointments`, `login` โดยหน้า `editor` ต้องระบุ `projectId` และผ่านการตรวจสิทธิ์งานก่อน
+คืนทั้ง `structuredContent.url` และ `resource_link` ที่ชี้ไปยัง `NAIL_STUDIO_WEB_URL` เท่านั้น
+เซิร์ฟเวอร์ MCP ไม่สามารถสั่งเปิดเบราว์เซอร์บนเครื่องผู้ใช้โดยตรงได้:
+client ใช้ URL นี้กับเครื่องมือเปิดเบราว์เซอร์ หรือแสดงเป็นลิงก์ให้คลิก
+OAuth ของ MCP ไม่ใช่ session ล็อกอินของเว็บ ถ้าเว็บแสดงหน้าเข้าสู่ระบบให้ผู้ใช้ล็อกอินเอง
+ห้ามแนบ API token หรือ OAuth token ลงใน URL เพื่อข้ามขั้นตอนล็อกอิน
+
+ตัวอย่างปรับลักษณะเล็บโดยไม่ล้างลายเดิม:
+
+```json
+{ "projectId": "<uuid>", "nails": ["thumb", "index", "middle", "ring", "little"], "shape": "almond", "length": "long", "finish": "glossy" }
+```
+
+`set_nail` และ `apply_recipe` ยังคงแทนลายทั้งนิ้วที่ระบุ ส่วน `set_nail_properties`
+แก้เฉพาะค่าที่ส่งมาและต้องส่งอย่างน้อยหนึ่งค่า ทุกการแก้ตรวจ schema และใช้ `expectedVersion`
+
+Schema ของพิกัดเส้นโค้งประกาศเป็น array ที่มีตัวเลขสองค่า เพื่อหลีกเลี่ยง
+tuple-style `items: [...]` ที่ไคลเอนต์บางตัวแปลงเป็น tool signature ไม่ได้
+พิกัดที่รับและการตรวจค่าไม่เปลี่ยนแปลง หลัง deploy ให้ไคลเอนต์ refresh รายการเครื่องมือ
+หรือเชื่อมต่อใหม่หากยังแสดงรายการเก่า
 
 ทุก tool ที่เขียนข้อมูล: อ่านเวอร์ชันล่าสุด → แก้ → ตรวจ schema → บันทึกด้วย `expectedVersion`
 ถ้าผู้ใช้บันทึกแทรกเข้ามาระหว่างนั้น AI จะได้ข้อผิดพลาด ไม่ทับงานของผู้ใช้

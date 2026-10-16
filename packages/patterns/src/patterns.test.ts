@@ -55,6 +55,13 @@ describe('renderPattern', () => {
     const b = renderPattern({ type: 'glitter', colors: ['#ffffff'], seed: 7 })
     expect(a).toEqual(b)
   })
+
+  it('จุดเส้นโค้งต้องมีพิกัดสองค่าที่อยู่ในช่วง 0–1 เท่านั้น', () => {
+    for (const point of [[0.2], [0.2, 0.5, 0.8], [-0.1, 0.5], [0.2, 1.1], ['0.2', 0.5]]) {
+      expect(patternSchema.safeParse({ type: 'curve', color: '#112233', points: [point, [0.8, 0.8]] }).success).toBe(false)
+    }
+    expect(renderPattern({ type: 'curve', color: '#112233', points: [[0.2, 0.3], [0.7, 0.9]] }).length).toBeGreaterThan(0)
+  })
 })
 
 describe('buildFromRecipe', () => {

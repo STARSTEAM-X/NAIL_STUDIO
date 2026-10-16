@@ -73,6 +73,8 @@ export function createNailStudioServer({ api, webUrl, oauth = false }: ServerOpt
       instructions: `เครื่องมือออกแบบลายเล็บของ NailStudio — แก้งานได้ด้วยข้อมูล schema เท่านั้น
 ลำดับที่แนะนำ: list_patterns/list_presets → preview_recipe (ดูภาพก่อน) → apply_recipe (บันทึก) → render_preview (ตรวจ)
 ทุกการบันทึกสร้างเวอร์ชันใหม่ ผู้ใช้ย้อนกลับได้เสมอ
+ปรับทรง/ความยาว/สีพื้นโดยเก็บลายเดิม: set_nail_properties
+เมื่อผู้ใช้ต้องเปิดเว็บ: open_page คืนลิงก์ให้ client เปิดด้วยเครื่องมือเบราว์เซอร์ ถ้าต้องล็อกอินให้ผู้ใช้ทำในเบราว์เซอร์ของตนเอง
 
 ${DESIGN_RULES}`,
     },
@@ -96,6 +98,39 @@ ${DESIGN_RULES}`,
   })
 
   // ── อ่าน ────────────────────────────────────────────────────────────────
+
+  server.registerTool('open_page', {
+    ...authMetadata,
+    title: 'เปิดหน้าที่เกี่ยวข้องใน NailStudio',
+    description: 'คืนลิงก์หน้าเว็บที่ตรวจแล้วให้ client เปิดด้วยเครื่องมือเบราว์เซอร์ หรือแสดงลิงก์ให้ผู้ใช้คลิก ไม่สร้าง session ล็อกอินให้เบราว์เซอร์; editor ต้องระบุ projectId ของงานที่ผู้ใช้มีสิทธิ์',
+    inputSchema: {
+      page: z.enum(['projects', 'editor', 'profile', 'community', 'shops', 'appointments', 'login']),
+      projectId: z.string().uuid().optional(),
+    },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  }, async ({ page, projectId }) => {
+    try {
+      if (page === 'editor' && !projectId) return errorResult(new Error('หน้า editor ต้องระบุ projectId — ดู list_projects'))
+      if (page !== 'editor' && projectId) return errorResult(new Error('ใช้ projectId ได้เฉพาะหน้า editor'))
+      if (page === 'editor') await api.getProject(projectId!)
+      const path = page === 'editor' ? `/editor/${projectId}` : `/${page}`
+      const url = new URL(path, webUrl)
+      if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) {
+        return errorResult(new Error('NAIL_STUDIO_WEB_URL ต้องเป็น HTTP(S) URL ที่ไม่มี credentials'))
+      }
+      const titles = {
+        projects: 'งานออกแบบของฉัน', editor: 'ตัวออกแบบเล็บ', profile: 'โปรไฟล์และการเชื่อมต่อ AI',
+        community: 'ชุมชน', shops: 'ร้านทำเล็บ', appointments: 'การนัดหมาย', login: 'เข้าสู่ระบบ',
+      }
+      return {
+        structuredContent: { page, url: url.href },
+        content: [
+          { type: 'resource_link' as const, uri: url.href, name: titles[page], mimeType: 'text/html' },
+          ...text(`เปิด${titles[page]}: ${url.href}\nให้ client เปิดลิงก์นี้ด้วยเครื่องมือเบราว์เซอร์ หรือให้ผู้ใช้คลิก; หากพบหน้าเข้าสู่ระบบให้ผู้ใช้ล็อกอินเอง ไม่ส่ง token ผ่าน URL`).content,
+        ],
+      }
+    } catch (error) { return errorResult(error) }
+  })
 
   server.registerTool('list_projects', {
     ...authMetadata,
@@ -260,6 +295,40 @@ ${DESIGN_RULES}`,
     try {
       const recipe = { mirrorLeft, nails: Object.fromEntries(nails.map((key) => [key, nail])) }
       return text(await updateDesign(projectId, (document) => buildFromRecipe(recipe, document).document))
+    } catch (error) { return errorResult(error) }
+  })
+
+  server.registerTool('set_nail_properties', {
+    ...authMetadata,
+    title: 'ปรับลักษณะเล็บโดยเก็บลายเดิม',
+    description: 'ปรับทรง ความยาว ผิว หรือสีพื้นของนิ้วที่ระบุ โดยเก็บเลเยอร์ ลาย และของตกแต่งเดิม แล้วบันทึกเวอร์ชันใหม่; ชื่อนิ้วอย่าง index ใช้กับทั้งสองมือ',
+    inputSchema: {
+      projectId: z.string().uuid(),
+      nails: z.array(nailTarget).min(1),
+      shape: nailRecipeSchema.shape.shape,
+      length: nailRecipeSchema.shape.length,
+      finish: nailRecipeSchema.shape.finish,
+      base: nailRecipeSchema.shape.base,
+    },
+  }, async ({ projectId, nails, shape, length, finish, base }) => {
+    if (shape === undefined && length === undefined && finish === undefined && base === undefined) {
+      return errorResult(new Error('ระบุอย่างน้อยหนึ่งค่า: shape, length, finish หรือ base'))
+    }
+    try {
+      return text(await updateDesign(projectId, (document) => {
+        const next = { ...document, nails: { ...document.nails } }
+        for (const key of expandTargets(nails)) {
+          const old = document.nails[key]
+          next.nails[key] = {
+            ...old,
+            shape: shape ?? old.shape,
+            length: length ?? old.length,
+            finish: finish ?? old.finish,
+            baseColor: base ?? old.baseColor,
+          }
+        }
+        return next
+      }))
     } catch (error) { return errorResult(error) }
   })
 

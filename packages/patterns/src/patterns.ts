@@ -130,7 +130,10 @@ export const patternSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('curve'),
     color,
-    points: z.array(z.tuple([u, v])).min(2).max(4).describe('จุดควบคุม bezier 2–4 จุด'),
+    // Homogeneous array input avoids tuple-style JSON Schema `items: [...]`,
+    // which some MCP clients cannot turn into a callable tool. Keep the tuple
+    // output for the geometry code and validate exactly two coordinates.
+    points: z.array(z.array(u).length(2).pipe(z.tuple([u, v]))).min(2).max(4).describe('จุดควบคุม bezier 2–4 จุด แต่ละจุดเป็น [u, v]'),
     width: z.number().min(0.005).max(0.3).default(0.03),
   }).describe('เส้นโค้งอิสระ (แถบหนาได้ถ้า width ใหญ่)'),
 ])
