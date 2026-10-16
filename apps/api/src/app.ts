@@ -14,6 +14,7 @@ import { aiRouter } from './ai/routes.ts'
 import { reviewsRouter, shopsRouter } from './shops/routes.ts'
 import { appointmentsRouter } from './appointments/routes.ts'
 import { usersRouter } from './users/routes.ts'
+import { tokensRouter } from './tokens/routes.ts'
 import { apiLimiter } from './middleware/rateLimit.ts'
 import { isProduction } from './config/env.ts'
 
@@ -87,6 +88,7 @@ export function createApp(): Express {
   app.use('/api/v1/reviews', reviewsRouter)
   app.use('/api/v1/appointments', appointmentsRouter)
   app.use('/api/v1/users', usersRouter)
+  app.use('/api/v1/tokens', tokensRouter)
 
   app.use(notFoundHandler)
   app.use(errorHandler)

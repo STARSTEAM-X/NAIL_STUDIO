@@ -9,7 +9,8 @@
   "workspaces": [
     "packages/*",
     "apps/api",
-    "apps/web"
+    "apps/web",
+    "apps/mcp"
   ],
   "scripts": {
     "typecheck": "npm run typecheck --workspaces --if-present",

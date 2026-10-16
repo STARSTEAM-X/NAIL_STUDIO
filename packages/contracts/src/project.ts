@@ -89,3 +89,12 @@ export type DuplicateProjectInput = z.infer<typeof duplicateProjectSchema>
 export type VersionSummary = z.infer<typeof versionSummarySchema>
 export type SaveDraftInput = z.infer<typeof saveDraftSchema>
 export type ProjectSummary = z.infer<typeof projectSummarySchema>
+
+/** เหตุการณ์ที่ส่งให้ editor ผ่าน GET /projects/:id/events (Server-Sent Events) */
+export interface ProjectVersionEvent {
+  type: 'version-saved'
+  projectId: string
+  versionNumber: number
+  /** session = บันทึกจากเว็บ, token = บันทึกจาก AI/MCP ผ่าน API token */
+  via: 'session' | 'token'
+}

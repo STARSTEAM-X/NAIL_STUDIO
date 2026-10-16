@@ -2,9 +2,45 @@ import type { RequestHandler } from 'express'
 import { AppError } from '../errors/AppError.ts'
 import { SESSION_COOKIE } from '../auth/session.ts'
 import { resolveSession } from '../auth/service.ts'
+import { resolveToken } from '../tokens/service.ts'
 
-/** ตรวจ session แล้วเติม request.user — ทุก route ที่ต้องล็อกอินต้องผ่านตัวนี้ */
+/** API ที่ API token ใช้ได้ — จำกัดไว้ที่งานออกแบบ ไม่ให้ token แตะบัญชี การนัดหมาย ฯลฯ */
+const TOKEN_ALLOWED_PREFIXES = ['/api/v1/projects']
+
+/** ค่าใน `Authorization: Bearer ...` หรือ null — ใช้ร่วมกับตัวตรวจ CSRF */
+export function bearerToken(request: { get(name: string): string | undefined }): string | null {
+  const header = request.get('authorization')
+  if (!header || !/^Bearer\s+/i.test(header)) return null
+  const token = header.replace(/^Bearer\s+/i, '').trim()
+  return token.length > 0 ? token : null
+}
+
+/**
+ * ตรวจตัวตนแล้วเติม request.user — ทุก route ที่ต้องล็อกอินต้องผ่านตัวนี้
+ *
+ * รับได้สองแบบ: cookie session (เว็บ) หรือ API token ใน header Authorization (AI/MCP)
+ * ถ้ามี header Bearer จะใช้ token อย่างเดียวและไม่ดู cookie เลย — คำขอแบบนี้ข้ามการตรวจ
+ * CSRF ได้ (ดู csrf.ts) จึงต้องไม่ให้ cookie ที่เบราว์เซอร์แนบมาเองมีผลกับมันเด็ดขาด
+ */
 export const requireUser: RequestHandler = async (request, _response, next) => {
+  const apiToken = bearerToken(request)
+  if (apiToken !== null) {
+    const fullPath = `${request.baseUrl}${request.path}`
+    if (!TOKEN_ALLOWED_PREFIXES.some((prefix) => fullPath.startsWith(prefix))) {
+      next(AppError.forbidden('API token ใช้ได้กับ API งานออกแบบเท่านั้น'))
+      return
+    }
+    const resolvedToken = await resolveToken(apiToken)
+    if (!resolvedToken) {
+      next(AppError.unauthenticated('API token ไม่ถูกต้อง ถูกยกเลิก หรือหมดอายุแล้ว'))
+      return
+    }
+    request.user = resolvedToken.user
+    request.authVia = 'token'
+    next()
+    return
+  }
+
   const token = request.cookies?.[SESSION_COOKIE]
   if (typeof token !== 'string' || token.length === 0) {
     next(AppError.unauthenticated())
@@ -19,6 +55,7 @@ export const requireUser: RequestHandler = async (request, _response, next) => {
 
   request.user = resolved.user
   request.sessionId = resolved.sessionId
+  request.authVia = 'session'
   next()
 }
 

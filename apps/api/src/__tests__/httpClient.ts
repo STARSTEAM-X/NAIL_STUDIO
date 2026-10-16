@@ -43,6 +43,11 @@ export class Client {
     }
   }
 
+  /** ค่า Cookie header ปัจจุบัน — ใช้กับคำขอที่ต้องยิงเองนอก supertest (เช่น อ่านสตรีม SSE) */
+  cookieHeader(): string {
+    return this.header()
+  }
+
   csrf(): string {
     return this.cookies.get('nscsrf') ?? ''
   }

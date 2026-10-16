@@ -77,6 +77,11 @@ export async function create(userId: string, name: string): Promise<ProjectSumma
   return toSummary(row)
 }
 
+/** ตรวจว่าเป็นเจ้าของงาน (ไม่พบ/ไม่ใช่ของเรา = 404 เหมือนกัน) — ใช้กับ SSE ที่ไม่ได้อ่านเอกสาร */
+export async function assertOwner(userId: string, projectId: string): Promise<void> {
+  await mustOwn(userId, projectId)
+}
+
 async function mustOwn(userId: string, projectId: string): Promise<ProjectRow> {
   const project = await repository.findProject(userId, projectId)
   // ตอบ 404 ไม่ใช่ 403 แม้จะรู้ว่ามีอยู่จริงแต่เป็นของคนอื่น (ดู AppError.notFound)
