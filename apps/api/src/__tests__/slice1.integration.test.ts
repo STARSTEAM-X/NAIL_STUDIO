@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Express } from 'express'
-import { createEmptyDocument, type DesignDocument } from '@nail-studio/contracts'
+import { DESIGN_SCHEMA_VERSION, createEmptyDocument, type DesignDocument } from '@nail-studio/contracts'
 import { createApp } from '../app.ts'
 import { Client } from './httpClient.ts'
 import { disconnectDb, prisma } from '../db.ts'
@@ -141,7 +141,7 @@ describe('Slice 1 — walking skeleton', () => {
     expect(detail.status).toBe(200)
     expect(detail.body.data.version.number).toBe(1)
     expect(Object.keys(detail.body.data.version.document.nails)).toHaveLength(10)
-    expect(detail.body.data.version.document.schemaVersion).toBe(2)
+    expect(detail.body.data.version.document.schemaVersion).toBe(DESIGN_SCHEMA_VERSION)
     document = detail.body.data.version.document
   })
 

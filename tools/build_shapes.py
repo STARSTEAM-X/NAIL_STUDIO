@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from nail_geometry import ALL_TARGETS, base_max_displacement, deform_delta
 
 
-def add_shape_keys(obj, log):
+def add_shape_keys(obj, log, tip_dir=None):
     mesh = obj.data
     count = len(mesh.vertices)
     coords = np.empty(count * 3, dtype=np.float64)
@@ -25,13 +25,13 @@ def add_shape_keys(obj, log):
 
     peak = 0.0
     for target in ALL_TARGETS:
-        base_moved = base_max_displacement(coords, target)
+        base_moved = base_max_displacement(coords, target, tip_dir=tip_dir)
         if base_moved >= 1e-6:
             raise RuntimeError(
                 '%s target %s: โคนเล็บขยับ %.9f เมตร (ต้อง < 1e-6)'
                 % (obj.name, target, base_moved),
             )
-        delta = deform_delta(coords, target)
+        delta = deform_delta(coords, target, tip_dir)
         peak = max(peak, float(np.linalg.norm(delta, axis=1).max()))
         key = obj.shape_key_add(name=target, from_mix=False)
         key.data.foreach_set('co', (coords + delta).reshape(-1))

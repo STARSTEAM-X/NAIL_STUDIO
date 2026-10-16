@@ -72,6 +72,21 @@ describe('offline draft adapter', () => {
     expect(await store.get('user-2', 'project-a')).toMatchObject({ userId: 'user-2' })
   })
 
+  it('migrates a draft saved under an older document schema when read back', async () => {
+    const store = createOfflineDraftStore(memoryBackend())
+    const old = record('project-a', 1)
+    const document = old.document as unknown as Record<string, unknown>
+    document.schemaVersion = 2
+    old.document.nails['right.index'].decorations = [
+      { id: 'gem', catalogId: 'gem-round', u: 0.3, v: 0.2, rotation: 0, scale: 0.4 },
+    ]
+    await store.put(old)
+
+    const loaded = await store.get('user-1', 'project-a')
+    expect(loaded?.document.schemaVersion).toBe(3)
+    expect(loaded?.document.nails['right.index'].decorations[0]?.v).toBeCloseTo(0.8)
+  })
+
   it('deletes only the requested user and project record', async () => {
     const store = createOfflineDraftStore(memoryBackend())
     await store.put(record('project-a', 1))

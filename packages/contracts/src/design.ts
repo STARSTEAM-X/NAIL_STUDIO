@@ -147,9 +147,67 @@ export const editorSettingsSchema = z.object({
   layout: z.enum(['split', 'dock']),
 })
 
-export const DESIGN_SCHEMA_VERSION = 2
+export const DESIGN_SCHEMA_VERSION = 3
 
-export const designDocumentSchema = z.object({
+/**
+ * นิ้วที่ UV แกน v กลับด้านระหว่าง v2 → v3
+ *
+ * hand.glb รุ่นที่เอกสาร v2 ถูกวาด เดาปลายเล็บจาก "ฝั่งที่แคบกว่า" ซึ่งผิดกับเล็บต้นทาง
+ * ของสามนิ้วนี้ ทรงและ UV จึงกลับหัว — รุ่นใหม่ใช้ทิศจากกระดูกนิ้วแทน (tools/nail_geometry.py)
+ * วัดจากไฟล์ GLB ทั้งสองรุ่นแล้ว: u เท่าเดิมทุกจุด ส่วน v ใหม่ = 1 − v เดิมพอดี
+ */
+const V2_FLIPPED_FINGERS: readonly Finger[] = ['thumb', 'index', 'middle']
+
+type Loose = Record<string, unknown>
+
+function isRecord(value: unknown): value is Loose {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function flipV(value: unknown): unknown {
+  return typeof value === 'number' ? 1 - value : value
+}
+
+function flipNailV2(nail: unknown): unknown {
+  if (!isRecord(nail)) return nail
+  const layers = Array.isArray(nail.layers)
+    ? nail.layers.map((layer) => {
+      if (!isRecord(layer) || !Array.isArray(layer.strokes)) return layer
+      return {
+        ...layer,
+        strokes: layer.strokes.map((stroke) => {
+          if (!isRecord(stroke) || !Array.isArray(stroke.points)) return stroke
+          return {
+            ...stroke,
+            points: stroke.points.map((point) => (isRecord(point) ? { ...point, y: flipV(point.y) } : point)),
+          }
+        }),
+      }
+    })
+    : nail.layers
+  // rotation วัดจากแกน +u ของผิว (surfaceProjection.ts) ซึ่งไม่เปลี่ยน จึงไม่ต้องแก้
+  const decorations = Array.isArray(nail.decorations)
+    ? nail.decorations.map((item) => (isRecord(item) ? { ...item, v: flipV(item.v) } : item))
+    : nail.decorations
+  return { ...nail, layers, decorations }
+}
+
+/**
+ * ยกเอกสารเวอร์ชันเก่าขึ้นเป็นเวอร์ชันปัจจุบัน — นโยบาย migrate ตอนอ่าน (database.md §5)
+ *
+ * รับ unknown และไม่ throw เด็ดขาด: ถ้ารูปร่างไม่ใช่ที่คาด ให้คืนกลับไปให้ schema เป็นคน
+ * ปฏิเสธพร้อมข้อความที่บอกสาเหตุ ไม่แก้ก้อนต้นฉบับ (สร้างอ็อบเจกต์ใหม่ทุกชั้นที่แตะ)
+ */
+export function migrateDesignDocument(raw: unknown): unknown {
+  if (!isRecord(raw) || raw.schemaVersion !== 2 || !isRecord(raw.nails)) return raw
+  const nails: Loose = { ...raw.nails }
+  for (const key of Object.keys(nails)) {
+    if (V2_FLIPPED_FINGERS.includes(key.split('.')[1] as Finger)) nails[key] = flipNailV2(nails[key])
+  }
+  return { ...raw, schemaVersion: 3, nails }
+}
+
+const currentDesignDocumentSchema = z.object({
   schemaVersion: z.literal(DESIGN_SCHEMA_VERSION),
   hand: handSettingsSchema,
   // ต้องมีครบทั้ง 10 นิ้วเสมอ — ไม่ยอมให้เอกสารมีเล็บหายไปบางนิ้ว
@@ -158,6 +216,9 @@ export const designDocumentSchema = z.object({
   ),
   editorSettings: editorSettingsSchema,
 })
+
+/** ทุกจุดที่ parse เอกสาร (API อ่าน/เขียน, editor, export) ได้การ migrate ไปด้วยอัตโนมัติ */
+export const designDocumentSchema = z.preprocess(migrateDesignDocument, currentDesignDocumentSchema)
 
 export type Point = z.infer<typeof pointSchema>
 export type Stroke = z.infer<typeof strokeSchema>

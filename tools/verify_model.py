@@ -287,16 +287,63 @@ def check_morphs(gltf, names, check):
         )
 
 
+def node_world_matrices(gltf):
+    """เมทริกซ์ 4x4 ระดับโลกของทุก node (ประกอบ TRS ไล่จากราก)"""
+    parents = {}
+    for index, node in enumerate(gltf['nodes']):
+        for child in node.get('children', []):
+            parents[child] = index
+
+    def local(node):
+        if 'matrix' in node:
+            return np.array(node['matrix'], dtype=np.float64).reshape(4, 4).T
+        x, y, z, w = node.get('rotation', [0.0, 0.0, 0.0, 1.0])
+        rotation = np.array([
+            [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+            [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+            [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
+        ])
+        matrix = np.eye(4)
+        matrix[:3, :3] = rotation * np.array(node.get('scale', [1.0, 1.0, 1.0]))
+        matrix[:3, 3] = node.get('translation', [0.0, 0.0, 0.0])
+        return matrix
+
+    cache = {}
+
+    def world(index):
+        if index not in cache:
+            matrix = local(gltf['nodes'][index])
+            parent = parents.get(index)
+            cache[index] = matrix if parent is None else world(parent) @ matrix
+        return cache[index]
+
+    return {node.get('name', ''): world(index) for index, node in enumerate(gltf['nodes'])}
+
+
+# ชื่อกระดูกของแต่ละนิ้ว — ต้นทางเรียกนิ้วก้อยว่า Pinky
+BONE_STEM = {'thumb': 'Thumb', 'index': 'Index', 'middle': 'Middle', 'ring': 'Ring', 'little': 'Pinky'}
+
+
+def nail_tip_direction(worlds, nail_node):
+    """ทิศโคน→ปลายเล็บในพิกัด mesh ของเล็บ จากกระดูกข้อปลาย (X3 → X4) — ตรงกับที่ build ใช้"""
+    stem = BONE_STEM[nail_node.split('_')[1]]
+    along = worlds['%s4' % stem][:3, 3] - worlds['%s3' % stem][:3, 3]
+    local = np.linalg.inv(worlds[nail_node][:3, :3]) @ along
+    return local / np.linalg.norm(local)
+
+
 def check_base_still(buffer, gltf, binary_offset, names, check):
     """ด่าน 4.2 — โคนเล็บ (10% แรกตามแกน PCA) ต้องไม่ขยับในทุก target
 
     ใช้ nail_geometry ตัวเดียวกับที่ build_shapes.py ใช้สร้าง shape key — ด่านนี้จึง
     ตรวจว่าไฟล์ที่ export ออกมาตรงกับสิ่งที่ควรจะเป็น ไม่ใช่แค่เชื่อว่า build ทำถูก
     """
+    worlds = node_world_matrices(gltf)
     for wanted in NAILS:
         hits = [index for index, name in enumerate(names) if name == wanted + '_Mesh']
         if not hits:
             continue
+        tip_dir = nail_tip_direction(worlds, wanted)
         mesh = gltf['meshes'][hits[0]]
         primitive = mesh['primitives'][0]
         attributes = primitive['attributes']
@@ -309,7 +356,7 @@ def check_base_still(buffer, gltf, binary_offset, names, check):
             if 'POSITION' not in target:
                 continue
             morphed = base + np.array(accessor(buffer, gltf, binary_offset, target['POSITION']))
-            _, _, t01, _, _, _ = local_frame(base)
+            _, _, t01, _, _, _ = local_frame(base, tip_dir)
             mask = t01 <= 0.1
             if not np.any(mask):
                 continue
