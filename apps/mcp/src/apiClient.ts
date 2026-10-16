@@ -88,6 +88,7 @@ export class NailStudioApi {
     const response = await fetch(this.options.baseUrl + path, {
       method,
       headers,
+      signal: AbortSignal.timeout(20_000),
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     })
     for (const cookie of response.headers.getSetCookie()) {

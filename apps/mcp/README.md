@@ -41,6 +41,39 @@ npm install
 | `NAIL_STUDIO_TOKEN_FILE` | – | ไฟล์ที่เก็บ API token — อ่านใหม่ทุกครั้ง (ไม่ต้องใส่ secret ใน config ของ AI client, เปลี่ยน token ได้โดยไม่ต้องรีสตาร์ท) |
 | `NAIL_STUDIO_EMAIL` / `NAIL_STUDIO_PASSWORD` | – | ล็อกอินแบบเว็บ (dev) |
 | `PORT` | `4200` | พอร์ตของโหมด HTTP |
+| `NAIL_STUDIO_MCP_URL` | `RENDER_EXTERNAL_URL` บน Render | HTTPS origin ของบริการ MCP สำหรับ OAuth discovery |
+| `NAIL_STUDIO_OAUTH_SECRET` | – | secret สุ่มอย่างน้อย 32 ตัวอักษรสำหรับเข้ารหัส OAuth credentials; ต้องคงเดิมข้าม deploy |
+
+## Deploy บน Render และเชื่อมกับ ChatGPT
+
+สร้าง Web Service แยกจากเว็บ/API โดยใช้ repo นี้, Node **24**, แผน Free, region Singapore:
+
+- Build: `npm ci --include=dev`
+- Start: `node apps/mcp/src/http.ts`
+- Health check: `/health`
+- `NAIL_STUDIO_API_URL=https://nail-studio-nkmi.onrender.com/api/v1`
+- `NAIL_STUDIO_WEB_URL=https://nail-studio-nkmi.onrender.com`
+- `NAIL_STUDIO_OAUTH_SECRET`: ค่าสุ่มที่เก็บเฉพาะใน Render environment (ห้าม commit)
+
+Render กำหนด `RENDER_EXTERNAL_URL` ให้เอง จึงไม่ต้องเดาชื่อโดเมนก่อนสร้าง service
+บริการนี้ไม่ต้องใช้ฐานข้อมูลหรือ API token กลางร่วมกันระหว่างผู้ใช้
+
+เมื่อ `/health` พร้อม ให้เพิ่ม custom MCP server ใน ChatGPT โดยใช้ **URL ของบริการ MCP ตามด้วย `/mcp`**,
+เลือก **OAuth** และ **Dynamic Client Registration** (ไม่ต้องกรอก client ID/secret เอง)
+ตอนเชื่อมบัญชี หน้าอนุญาตของ NailStudio จะให้วาง API token ที่สร้างจากหน้าโปรไฟล์
+token ต้องเป็นของบัญชีบนเว็บ/API ที่ตั้งไว้ด้านบน; ไม่ต้องส่ง token ในข้อความแชต
+
+OAuth ใช้ authorization code + PKCE S256, callback อนุญาตเฉพาะ `chatgpt.com`,
+scope `nails:design`, และตรวจ API token กับ backend ทั้งก่อนอนุญาตและทุกคำขอ MCP
+access token มีอายุ 1 ชั่วโมง; confidential clients ได้ refresh token อายุ 30 วัน
+public clients ต้องเชื่อมบัญชีใหม่เมื่อ access token หมดอายุ
+ยกเลิกสิทธิ์ทันทีได้โดยยกเลิก API token จากหน้าโปรไฟล์
+
+client registrations และ OAuth tokens เข้ารหัสด้วย AES-256-GCM และใช้งานต่อได้หลัง restart
+เมื่อเก็บ secret เดิมไว้; การเปลี่ยน secret จะยกเลิกการเชื่อมต่อเดิมทั้งหมด
+authorization codes อายุ 5 นาที ใช้ได้ครั้งเดียวและเก็บในหน่วยความจำ จึงใช้ **หนึ่ง instance**
+(หาก restart ระหว่างอนุญาต ผู้ใช้เริ่มเชื่อมต่อใหม่ได้)
+แผน Free อาจพัก service เมื่อไม่มีการใช้งาน; เปิด `/health` รอให้พร้อมก่อนเพิ่มใน ChatGPT
 
 ## ใช้กับ Claude Code
 

@@ -42,6 +42,7 @@ import { renderPreviewPng, type PreviewScope } from './render.ts'
 export interface ServerOptions {
   api: NailStudioApi
   webUrl: string
+  oauth?: boolean
 }
 
 const nailTarget = z.union([z.enum(NAIL_KEYS as unknown as [NailKey, ...NailKey[]]), z.enum(FINGERS)])
@@ -65,7 +66,7 @@ function errorResult(error: unknown) {
   return { content: [{ type: 'text' as const, text: message }], isError: true }
 }
 
-export function createNailStudioServer({ api, webUrl }: ServerOptions): McpServer {
+export function createNailStudioServer({ api, webUrl, oauth = false }: ServerOptions): McpServer {
   const server = new McpServer(
     { name: 'nail-studio', version: '0.1.0' },
     {
@@ -78,6 +79,7 @@ ${DESIGN_RULES}`,
   )
 
   const editorLink = (projectId: string): string => `${webUrl}/editor/${projectId}`
+  const authMetadata = oauth ? { _meta: { securitySchemes: [{ type: 'oauth2', scopes: ['nails:design'] }] } } : {}
 
   /** อ่านเวอร์ชันล่าสุด → แก้ → ตรวจ → บันทึกเวอร์ชันใหม่ (กันทับงานด้วย expectedVersion) */
   async function updateDesign(projectId: string, edit: (document: DesignDocument) => DesignDocument): Promise<string> {
@@ -96,6 +98,7 @@ ${DESIGN_RULES}`,
   // ── อ่าน ────────────────────────────────────────────────────────────────
 
   server.registerTool('list_projects', {
+    ...authMetadata,
     title: 'รายการงานออกแบบ',
     description: 'รายการงานออกแบบของผู้ใช้ (ล่าสุดก่อน)',
     annotations: { readOnlyHint: true },
@@ -108,6 +111,7 @@ ${DESIGN_RULES}`,
   })
 
   server.registerTool('get_design', {
+    ...authMetadata,
     title: 'อ่านงานออกแบบ',
     description: 'อ่านเอกสารเวอร์ชันล่าสุด — summary (ค่าเริ่มต้น) สรุปต่อนิ้ว, full คืน JSON เต็ม (อาจใหญ่มาก)',
     inputSchema: { projectId: z.string().uuid(), format: z.enum(['summary', 'full']).default('summary') },
@@ -121,24 +125,28 @@ ${DESIGN_RULES}`,
   })
 
   server.registerTool('list_patterns', {
+    ...authMetadata,
     title: 'ชนิดลายที่ใช้ได้',
     description: 'ชนิดลายทั้งหมดที่ใช้ใน recipe.patterns พร้อมคำอธิบาย (พารามิเตอร์ดูได้จาก JSON Schema ของ apply_recipe)',
     annotations: { readOnlyHint: true },
   }, async () => text(PATTERN_TYPES.map((p) => `${p.type} — ${p.description}`).join('\n')))
 
   server.registerTool('list_decorations', {
+    ...authMetadata,
     title: 'ของตกแต่ง 3 มิติ',
     description: 'catalogId ของตกแต่งทั้งหมด ใช้กับ recipe.nails[*].decorations หรือ add_decoration',
     annotations: { readOnlyHint: true },
   }, async () => text(DECORATIONS.map((d) => `${d.id} — ${d.label} (${d.category})`).join('\n')))
 
   server.registerTool('list_palettes', {
+    ...authMetadata,
     title: 'ชุดสีแนะนำ',
     description: 'ชุดสีที่เข้ากัน (จากระบบ AI recipe เดิมของเว็บ)',
     annotations: { readOnlyHint: true },
   }, async () => text(Object.entries(PALETTES).map(([id, colors]) => `${id}: ${colors.join(' ')}`).join('\n')))
 
   server.registerTool('list_presets', {
+    ...authMetadata,
     title: 'ดีไซน์สำเร็จรูป',
     description: 'ดีไซน์ที่ทดสอบบน editor แล้ว — ใช้กับ apply_preset หรือดู recipe เป็นตัวอย่าง (includeRecipe)',
     inputSchema: { includeRecipe: z.boolean().default(false) },
@@ -149,6 +157,7 @@ ${DESIGN_RULES}`,
   // ── ตรวจ / ดูตัวอย่าง (ไม่บันทึก) ──────────────────────────────────────
 
   server.registerTool('preview_recipe', {
+    ...authMetadata,
     title: 'ดูตัวอย่าง recipe (ไม่บันทึก)',
     description: 'สร้างภาพตัวอย่างจาก recipe โดยไม่บันทึกอะไร — ถ้าใส่ projectId จะลงบนงานนั้น (นิ้วที่ไม่ระบุคงของเดิม)',
     inputSchema: {
@@ -166,6 +175,7 @@ ${DESIGN_RULES}`,
   })
 
   server.registerTool('render_preview', {
+    ...authMetadata,
     title: 'ภาพตัวอย่างงาน',
     description: 'ภาพ PNG ลายของงานเวอร์ชันล่าสุดแบบแบน (ปลายเล็บอยู่บน) — ใช้ตรวจผลหลังบันทึก',
     inputSchema: {
@@ -182,6 +192,7 @@ ${DESIGN_RULES}`,
   })
 
   server.registerTool('validate_document', {
+    ...authMetadata,
     title: 'ตรวจเอกสาร',
     description: 'ตรวจเอกสาร JSON กับ designDocumentSchema ตัวจริง (เอกสาร v2 จะถูก migrate ก่อนตรวจ)',
     inputSchema: { document: z.unknown() },
@@ -194,6 +205,7 @@ ${DESIGN_RULES}`,
   // ── สร้าง / แก้ (ทุกครั้ง = เวอร์ชันใหม่) ────────────────────────────────
 
   server.registerTool('create_project', {
+    ...authMetadata,
     title: 'สร้างงานใหม่',
     description: 'สร้างงานใหม่ แล้วลง preset หรือ recipe ได้ทันที (ไม่ใส่ = เล็บเปล่า)',
     inputSchema: {
@@ -212,6 +224,7 @@ ${DESIGN_RULES}`,
   })
 
   server.registerTool('apply_recipe', {
+    ...authMetadata,
     title: 'ลงลายจาก recipe',
     description: `ลงลายบนงานจาก recipe ระดับสูง แล้วบันทึกเป็นเวอร์ชันใหม่ — นิ้วที่ระบุถูกแทนทั้งนิ้ว นิ้วที่ไม่ระบุคงของเดิม
 คีย์ nails: ชื่อนิ้ว (thumb/index/middle/ring/little = ทั้งสองมือ, มือซ้าย mirror ให้) หรือคีย์เต็ม (right.index)`,
@@ -223,6 +236,7 @@ ${DESIGN_RULES}`,
   })
 
   server.registerTool('apply_preset', {
+    ...authMetadata,
     title: 'ลงดีไซน์สำเร็จรูป',
     description: 'ลง preset ทั้งชุดบนงาน (ทุกนิ้วที่ preset กำหนด) แล้วบันทึกเป็นเวอร์ชันใหม่',
     inputSchema: { projectId: z.string().uuid(), preset: z.enum(Object.keys(PRESETS) as [string, ...string[]]) },
@@ -233,6 +247,7 @@ ${DESIGN_RULES}`,
   })
 
   server.registerTool('set_nail', {
+    ...authMetadata,
     title: 'แก้เล็บบางนิ้ว',
     description: 'แทนเล็บที่ระบุด้วย recipe ของนิ้วเดียว (ทรง สีพื้น ลาย ของตกแต่ง)',
     inputSchema: {
@@ -249,6 +264,7 @@ ${DESIGN_RULES}`,
   })
 
   server.registerTool('copy_nail', {
+    ...authMetadata,
     title: 'คัดลอกลายเล็บ',
     description: 'คัดลอกเล็บนิ้วหนึ่งไปยังนิ้วอื่น (mirror = กลับซ้าย-ขวา)',
     inputSchema: {
@@ -264,6 +280,7 @@ ${DESIGN_RULES}`,
   })
 
   server.registerTool('mirror_hand', {
+    ...authMetadata,
     title: 'ทำอีกมือให้สมมาตร',
     description: 'คัดลอกทั้งมือไปอีกข้างแบบกลับซ้าย-ขวา',
     inputSchema: { projectId: z.string().uuid(), from: z.enum(HANDS) },
@@ -274,6 +291,7 @@ ${DESIGN_RULES}`,
   })
 
   server.registerTool('add_strokes', {
+    ...authMetadata,
     title: 'เพิ่ม stroke ดิบ (ขั้นสูง)',
     description: `ต่อ stroke ตาม schema ตรง ๆ บนเล็บที่ระบุ — ใช้เมื่อลายที่ต้องการไม่มีใน list_patterns
 points: x = u, y = v (0 ปลายเล็บ → 1 โคนเล็บ), p = แรงกด; size = พิกเซลบน texture 1024 (รัศมี = size/2)`,
@@ -290,6 +308,7 @@ points: x = u, y = v (0 ปลายเล็บ → 1 โคนเล็บ), p
   })
 
   server.registerTool('add_decoration', {
+    ...authMetadata,
     title: 'วางของตกแต่ง',
     description: 'วางของตกแต่ง 3 มิติ (catalogId จาก list_decorations) บนเล็บที่ระบุ',
     inputSchema: {
@@ -311,6 +330,7 @@ points: x = u, y = v (0 ปลายเล็บ → 1 โคนเล็บ), p
   })
 
   server.registerTool('clear_nail', {
+    ...authMetadata,
     title: 'ล้างลาย',
     description: 'ล้างลาย (และของตกแต่งถ้าไม่สั่ง keepDecorations) โดยคงทรง ความยาว ผิว สีพื้น',
     inputSchema: {
