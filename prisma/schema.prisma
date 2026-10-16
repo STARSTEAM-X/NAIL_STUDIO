@@ -146,6 +146,7 @@ model User {
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   sessions                Session[]
+  apiTokens               ApiToken[]
   projects                Project[]
   assets                  Asset[]
   templates               NailTemplate[]
@@ -178,6 +179,28 @@ model Session {
   @@index([userId])
   @@index([expiresAt])
   @@map("sessions")
+}
+
+// API token ส่วนตัว — ให้ AI/เครื่องมือภายนอก (เช่น MCP server) แก้งานออกแบบแทนผู้ใช้
+//
+// เก็บ SHA-256 ของ token เหมือน Session (token เป็นค่าสุ่ม 256 บิต ไม่ต้องใช้ Argon2)
+// prefix คือส่วนต้นของ token ที่ปลอดภัยจะแสดง ให้ผู้ใช้จำได้ว่า token ไหนเป็นของเครื่องไหน
+// สิทธิ์ของ token จำกัดไว้ที่ API งานออกแบบ (/projects) เท่านั้น — ตรวจใน requireUser
+model ApiToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  name       String
+  prefix     String
+  tokenHash  Bytes     @unique @map("token_hash")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz
+  expiresAt  DateTime? @map("expires_at") @db.Timestamptz
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("api_tokens")
 }
 
 model Project {

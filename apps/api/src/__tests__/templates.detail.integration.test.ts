@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { createEmptyDocument } from '@nail-studio/contracts'
+import { DESIGN_SCHEMA_VERSION, createEmptyDocument } from '@nail-studio/contracts'
 import type { Express } from 'express'
 import { createApp } from '../app.ts'
 import { disconnectDb, prisma } from '../db.ts'
@@ -45,7 +45,7 @@ describe('template detail API', () => {
     const result = await client.send('get', `/templates/${templateId}`)
     expect(result.status).toBe(200)
     expect(result.body.data.id).toBe(templateId)
-    expect(result.body.data.document.schemaVersion).toBe(2)
+    expect(result.body.data.document.schemaVersion).toBe(DESIGN_SCHEMA_VERSION)
     expect(result.body.data.document.nails).toHaveProperty('right.index')
   })
 

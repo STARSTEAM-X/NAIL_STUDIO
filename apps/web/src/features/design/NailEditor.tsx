@@ -48,6 +48,7 @@ import { VersionHistoryPanel } from './VersionHistoryPanel.tsx'
 import { EditorToolRail, type EditorPanelId } from './EditorToolRail.tsx'
 import { useAutosave, type AutosaveStatus } from './useAutosave.ts'
 import { useOfflineDraft } from './useOfflineDraft.ts'
+import { useProjectEvents } from './useProjectEvents.ts'
 import { downloadBlob, sanitizeFilename } from '@/utils/downloadBlob.ts'
 import { AiAssistantPanel } from '@/features/ai/AiAssistantPanel.tsx'
 
@@ -183,6 +184,33 @@ export function NailEditor({ projectId, detail }: Props) {
       setIsReloading(false)
     }
   }
+
+  // มีเวอร์ชันใหม่จากที่อื่นระหว่างที่งานเปิดอยู่ (AI ผ่าน MCP หรือหน้าต่างอื่นของผู้ใช้):
+  // - ยังไม่ได้แก้อะไร → โหลดเวอร์ชันใหม่ให้เลย
+  // - มีงานที่ยังไม่บันทึก → ถามก่อน ไม่ทับงานของผู้ใช้เด็ดขาด (ถ้าเลือกเก็บงานตัวเอง
+  //   การบันทึกครั้งถัดไปจะเจอ ConflictDialog เดิมซึ่งให้เลือกโหลดล่าสุด/ทำสำเนาได้)
+  // ข้ามช่วงที่แท็บนี้กำลังบันทึกเอง — event ของการบันทึกนั้นอาจมาถึงก่อนคำตอบของ API
+  const [remoteVersion, setRemoteVersion] = useState<{ number: number; byAi: boolean } | null>(null)
+  useProjectEvents(projectId, (event) => {
+    if (event.versionNumber <= saveBaseVersion) return
+    if (saveVersion.isPending || autosave.isVersionSavePending) return
+    const byAi = event.via === 'token'
+    // "ยังไม่ได้แก้" = เอกสารใน editor ตรงกับเอกสารของเวอร์ชันฐานทุกตัวอักษร (ดูสถานะ autosave
+    // ไม่ได้ เพราะการโหลดเวอร์ชันใหม่เองก็ทำให้ autosave บันทึกงานค้าง) — ไม่มีข้อมูลฐานให้เทียบ = ถามก่อน
+    const cached = queryClient.getQueryData<ProjectDetail>(projectKeys.detail(projectId))
+    const baseDocument = cached?.version.number === saveBaseVersion ? cached.version.document : null
+    const clean = baseDocument !== null
+      && conflict === null
+      && JSON.stringify(store.getState().document) === JSON.stringify(baseDocument)
+    if (clean && !isReloading) {
+      // ตั้งข้อความหลังโหลดเสร็จ — loadDocument ล้าง notice ของ store ทิ้งระหว่างโหลด
+      void handleReloadServer().then(() => {
+        store.setState({ notice: `${byAi ? 'AI' : 'มีการบันทึกจากหน้าต่างอื่น'} อัปเดตงานเป็นเวอร์ชัน ${event.versionNumber} แล้ว` })
+      })
+    } else {
+      setRemoteVersion({ number: event.versionNumber, byAi })
+    }
+  })
 
   const handleDuplicateCurrent = (name: string) => {
     setConflictActionError(null)
@@ -420,6 +448,20 @@ export function NailEditor({ projectId, detail }: Props) {
           />
         </div>
       </header>
+
+      {remoteVersion !== null && (
+        <p className="editor-notice" role="alert">
+          {remoteVersion.byAi ? 'AI' : 'หน้าต่างอื่น'} บันทึกเวอร์ชัน {remoteVersion.number} ระหว่างที่คุณมีงานที่ยังไม่บันทึก
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => { setRemoteVersion(null); void handleReloadServer() }}
+          >
+            โหลดเวอร์ชันใหม่
+          </button>
+          <button type="button" className="btn btn-ghost" onClick={() => setRemoteVersion(null)}>เก็บงานของฉันไว้</button>
+        </p>
+      )}
 
       {notice && (
         <p className="editor-notice" role="alert">

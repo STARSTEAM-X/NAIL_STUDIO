@@ -8,6 +8,7 @@ import { EmptyState, ErrorState, FeedSkeletonList } from '@/components/ui/States
 import { useToast } from '@/components/ui/Toast.tsx'
 import { useCurrentUser, useLogout } from '@/features/auth/useAuth.ts'
 import { useUpdateProfile } from '@/features/auth/useAuth.ts'
+import { ApiTokensPanel } from '@/features/aiAccess/ApiTokensPanel.tsx'
 import { TemplateTile } from '@/features/community/components/TemplateTile.tsx'
 import { useTemplateActions } from '@/features/community/useTemplateActions.ts'
 import { usePublicProfile } from '@/features/users/usePublicProfile.ts'
@@ -177,6 +178,8 @@ export function PublicProfilePage() {
           </div>
         </form>
       )}
+
+      {editing && currentUser && <ApiTokensPanel />}
 
       <section className="profile-stats" aria-label="สรุปผลงาน">
         <div><strong>{formatCount(user.templateCount)}</strong><span>ผลงานที่เผยแพร่</span></div>

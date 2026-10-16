@@ -2,6 +2,7 @@ import type { RequestHandler } from 'express'
 import { AppError } from '../errors/AppError.ts'
 import { CSRF_COOKIE, CSRF_HEADER, createCsrfToken, safeEqual } from '../auth/session.ts'
 import { isProduction } from '../config/env.ts'
+import { bearerToken } from './requireUser.ts'
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 
@@ -41,6 +42,14 @@ export const ensureCsrfCookie: RequestHandler = (request, response, next) => {
  */
 export const csrfProtection: RequestHandler = (request, _response, next) => {
   if (SAFE_METHODS.has(request.method)) {
+    next()
+    return
+  }
+
+  // คำขอแบบ API token ไม่ต้องตรวจ CSRF: เว็บอื่นสั่งเบราว์เซอร์แนบ cookie ได้ แต่ใส่ header
+  // Authorization เองไม่ได้ (CORS ไม่อนุญาต header นี้) และ requireUser จะใช้ token อย่างเดียว
+  // ไม่ดู cookie เลยเมื่อมี header นี้ — จึงไม่มีทางยืมสิทธิ์ของ cookie ผ่านช่องนี้ได้
+  if (bearerToken(request) !== null) {
     next()
     return
   }

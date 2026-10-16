@@ -1,0 +1,27 @@
+{
+  "name": "@nail-studio/mcp",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "nail-studio-mcp": "./src/stdio.ts"
+  },
+  "scripts": {
+    "start": "node src/stdio.ts",
+    "start:http": "node src/http.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "@nail-studio/contracts": "*",
+    "@nail-studio/patterns": "*",
+    "@napi-rs/canvas": "^1.0.11",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.9.2",
+    "typescript": "7.0.2",
+    "vitest": "^4.1.10"
+  }
+}

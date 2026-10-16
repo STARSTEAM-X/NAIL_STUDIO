@@ -13,6 +13,7 @@ import { z } from 'zod'
 import { currentUser, requireUser } from '../middleware/requireUser.ts'
 import { AppError } from '../errors/AppError.ts'
 import * as service from './service.ts'
+import { publishVersionSaved, subscribeProject } from './events.ts'
 
 const idParamSchema = z.object({ id: z.string().uuid('รหัสงานไม่ถูกต้อง') })
 
@@ -113,5 +114,30 @@ projectsRouter.post('/:id/versions', async (request, response) => {
   const { id } = idParamSchema.parse(request.params)
   const input = createVersionSchema.parse(request.body)
   const result = await service.saveVersion(currentUser(request).id, id, input)
+  publishVersionSaved({ projectId: id, versionNumber: result.versionNumber, via: request.authVia ?? 'session' })
   response.status(201).json({ success: true, data: result })
+})
+
+/**
+ * Server-Sent Events: แจ้ง editor ที่เปิดงานนี้อยู่เมื่อมีเวอร์ชันใหม่ (เช่น AI บันทึกผ่าน MCP)
+ * ส่ง comment ทุก 25 วินาทีกัน proxy ตัดการเชื่อมต่อที่เงียบนานเกินไป
+ */
+projectsRouter.get('/:id/events', async (request, response) => {
+  const { id } = idParamSchema.parse(request.params)
+  await service.assertOwner(currentUser(request).id, id)
+  response.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  })
+  response.write(': connected\n\n')
+  const unsubscribe = subscribeProject(id, (event) => {
+    response.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`)
+  })
+  const heartbeat = setInterval(() => response.write(': ping\n\n'), 25_000)
+  request.on('close', () => {
+    clearInterval(heartbeat)
+    unsubscribe()
+  })
 })

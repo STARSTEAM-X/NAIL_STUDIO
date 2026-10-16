@@ -26,7 +26,7 @@ UV_PADDING = 0.06
 LENGTH_K = {'short': 0.75, 'long': 1.30, 'extra': 1.60}
 
 
-def local_frame(coords):
+def local_frame(coords, tip_dir=None):
     """หาแกนหลักของเล็บด้วย PCA แล้วคืนพิกัดท้องถิ่น (t, w, d) ที่ normalize t แล้ว
 
     coords: (V, 3) ndarray
@@ -34,6 +34,10 @@ def local_frame(coords):
     คืนค่า: centroid (3,), axes (3,3) แถวคือ e0 (แกนยาว โคน→ปลาย) / e1 (แกนกว้าง) /
     e2 (แกนหนา), t01 (V,) ใน [0,1], w (V,) พิกัดจริงตามแกนกว้าง, d (V,) พิกัดจริง
     ตามแกนหนา, span (สเกลาร์) ความยาวจริงตามแกน e0 ก่อน normalize
+
+    tip_dir: (3,) ทิศโคน→ปลายเล็บในพิกัดเดียวกับ coords (ปกติได้จากกระดูกนิ้ว) — ถ้าส่งมา
+    จะใช้กำหนดทิศของ e0 แทนการเดาจากความกว้าง เพราะเล็บต้นทางบางนิ้ว (โป้ง ชี้ กลาง)
+    แคบฝั่งโคน การเดาแบบ "ฝั่งแคบคือปลาย" จึงทำให้ทรงและ UV ของนิ้วพวกนั้นกลับหัว
 
     ใช้ eigh ไม่ใช่ eig เพราะเมทริกซ์ความแปรปรวนร่วมเป็น symmetric เสมอ — eigh เร็วกว่า
     และคืนค่าจริงเสมอ (eig อาจคืนจำนวนเชิงซ้อนจาก error การปัดเศษ)
@@ -49,11 +53,15 @@ def local_frame(coords):
     w = centered @ axes[1]
     d = centered @ axes[2]
 
-    # ปลายเล็บคือฝั่งที่แคบกว่า — เทียบความกว้างของ 25% แรกกับ 25% สุดท้าย
     span = t.max() - t.min()
-    low = np.ptp(w[t < t.min() + span * 0.25])
-    high = np.ptp(w[t > t.max() - span * 0.25])
-    if low < high:
+    if tip_dir is not None:
+        flip = float(np.dot(axes[0], tip_dir)) < 0
+    else:
+        # ไม่รู้ทิศนิ้ว: เดาว่าปลายเล็บคือฝั่งที่แคบกว่า — เทียบความกว้างของ 25% แรกกับ 25% สุดท้าย
+        low = np.ptp(w[t < t.min() + span * 0.25])
+        high = np.ptp(w[t > t.max() - span * 0.25])
+        flip = low < high
+    if flip:
         t = -t
         axes[0] = -axes[0]
 
@@ -93,9 +101,9 @@ def deform_length(t01, span, length):
     return (LENGTH_K[length] - 1.0) * span * g
 
 
-def deform_delta(coords, target):
+def deform_delta(coords, target, tip_dir=None):
     """ส่วนต่างตำแหน่งเต็มรูป (V, 3) ของ target หนึ่งอัน (ทรงหรือความยาว)"""
-    _, axes, t01, w, d, span = local_frame(coords)
+    _, axes, t01, w, d, span = local_frame(coords, tip_dir)
     if target in SHAPE_TARGETS:
         dt, dw, dd = deform_shape(t01, w, d, span, target)
     elif target in LENGTH_TARGETS:
@@ -107,24 +115,24 @@ def deform_delta(coords, target):
     return np.outer(dt, axes[0]) + np.outer(dw, axes[1]) + np.outer(dd, axes[2])
 
 
-def base_max_displacement(coords, target, base_fraction=0.1):
+def base_max_displacement(coords, target, base_fraction=0.1, tip_dir=None):
     """ระยะขยับสูงสุดของ vertex ในช่วง base_fraction แรกจากโคนเล็บ — ใช้เป็นด่านตรวจ 4.2"""
-    _, _, t01, _, _, _ = local_frame(coords)
-    delta = deform_delta(coords, target)
+    _, _, t01, _, _, _ = local_frame(coords, tip_dir)
+    delta = deform_delta(coords, target, tip_dir)
     mask = t01 <= base_fraction
     if not np.any(mask):
         return 0.0
     return float(np.linalg.norm(delta[mask], axis=1).max())
 
 
-def project_to_uv(coords, panel_size=1.0, padding=UV_PADDING):
+def project_to_uv(coords, panel_size=1.0, padding=UV_PADDING, tip_dir=None):
     """ฉายจุดยอดของเล็บลงกรอบ UV 0-1 แบบคงสัดส่วน
 
     คืน (V, 2) ndarray พิกัด (u, v) โดย v ≈ 0 คือปลายเล็บ (บนสุดของแผง เมื่อวาดเป็นรูป)
     ค่า v นี้คือ "พิกัดพิกเซล/แผง" ไม่ใช่ mesh UV ดิบ — ตอนเขียนลง mesh UV จริงต้องกลับด้าน
     (`1 − v`) ให้ตรงกับที่ nailFlatten.ts อ่านกลับ (ดู tools/build_model.py::reunwrap_nails)
     """
-    centroid, axes, _, _, _, _ = local_frame(coords)
+    centroid, axes, _, _, _, _ = local_frame(coords, tip_dir)
     e0, e1 = axes[0], axes[1]  # e0 = แกนยาว (โคน→ปลาย) · e1 = แกนกว้าง
     x = (coords - centroid) @ e1                 # กว้าง -> แนวนอนของแผง
     y = -((coords - centroid) @ e0)               # ยาว -> แนวตั้ง ปลายเล็บอยู่ v เล็ก

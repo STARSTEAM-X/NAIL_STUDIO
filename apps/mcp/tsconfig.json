@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // DOM: ใช้ตัววาดของเว็บ (apps/web/src/3d/painting) ที่ประกาศ type ด้วย CanvasRenderingContext2D
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"]
+  },
+  "include": ["src"]
+}

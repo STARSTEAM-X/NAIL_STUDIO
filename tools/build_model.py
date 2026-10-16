@@ -329,6 +329,19 @@ def fix_nail_normals(hand):
         print('NORMALS: %-7s กลับทิศหน้าแล้ว (%s)' % (finger, kind))
 
 
+def nail_tip_direction(obj, rig, source):
+    """ทิศโคน→ปลายเล็บในพิกัด local ของ mesh เล็บ เอามาจากกระดูกข้อปลายของนิ้ว (X3 → X4)
+
+    ส่งให้ project_to_uv / deform_delta แทนการเดาจากความกว้างของเล็บ — เล็บต้นทางของ
+    โป้ง ชี้ กลาง แคบฝั่งโคน การเดาแบบเดิมจึงทำให้ทรงและ UV สามนิ้วนี้กลับหัว
+    """
+    stem = source.split('_')[1]
+    _, along = nail_facing(obj, rig, '%s3' % stem, '%s4' % stem)
+    local = obj.matrix_world.inverted().to_3x3() @ Vector([float(x) for x in along])
+    direction = np.array([float(x) for x in local])
+    return direction / np.linalg.norm(direction)
+
+
 def subdivide_nails():
     """แบ่งย่อยเล็บทุกชิ้นให้มีอย่างน้อย MIN_NAIL_VERTS verts
 
@@ -354,7 +367,7 @@ def subdivide_nails():
               % (finger, before, len(obj.data.vertices), levels, '' if levels == 1 else 's'))
 
 
-def reunwrap_nails():
+def reunwrap_nails(rig):
     """กาง UV ใหม่ทุกเล็บด้วย nail_geometry.project_to_uv แทน UV เดิมของโมเดลต้นทาง
 
     UV เดิมกางเต็ม 0-1 แต่ยืดรูปเล็บให้เป็นจัตุรัส (D-25) — เขียนทับด้วยการฉายที่คงสัดส่วน
@@ -372,7 +385,7 @@ def reunwrap_nails():
         coords = np.empty(count * 3, dtype=np.float64)
         mesh.vertices.foreach_get('co', coords)
         coords = coords.reshape(count, 3)
-        uv = project_to_uv(coords)
+        uv = project_to_uv(coords, tip_dir=nail_tip_direction(obj, rig, source))
 
         uv_layer = mesh.uv_layers.active or mesh.uv_layers.new(name='UVMap')
         for loop in mesh.loops:
@@ -385,10 +398,11 @@ def reunwrap_nails():
         print('UNWRAP: %-7s UV บิดสูงสุด %.3f' % (finger, distortion))
 
 
-def build_shapes():
+def build_shapes(rig):
     """สร้าง shape key 7 อันต่อเล็บ — เรียกหลังแบ่งย่อยและกาง UV เสร็จแล้วเสมอ"""
     for finger, source in NAIL_SRC.items():
-        add_shape_keys(bpy.data.objects[source], print)
+        obj = bpy.data.objects[source]
+        add_shape_keys(obj, print, nail_tip_direction(obj, rig, source))
 
 
 def rename_meshes():
@@ -410,8 +424,8 @@ def main():
     roll_thumb(rig, THUMB_ROLL)
     fix_nail_normals(_hand)
     subdivide_nails()
-    reunwrap_nails()
-    build_shapes()
+    reunwrap_nails(rig)
+    build_shapes(rig)
     drop_actions(rig)
     keep_rig(rig)
     rename_meshes()

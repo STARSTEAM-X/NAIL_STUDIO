@@ -1,4 +1,4 @@
-import type { DesignDocument } from '@nail-studio/contracts'
+import { migrateDesignDocument, type DesignDocument } from '@nail-studio/contracts'
 
 const DATABASE_NAME = 'nail-studio'
 const DATABASE_VERSION = 1
@@ -34,7 +34,13 @@ export function offlineDraftKey(userId: string, projectId: string): string {
 
 export function createOfflineDraftStore(backend: OfflineDraftBackend): OfflineDraftStore {
   return {
-    get: (userId, projectId) => backend.get(offlineDraftKey(userId, projectId)),
+    // draft อาจถูกเขียนไว้ก่อนอัปเดต schema — ยกขึ้นเวอร์ชันปัจจุบันตอนอ่าน
+    // เหมือนเอกสารจากเซิร์ฟเวอร์ (database.md §5) ไม่งั้นงานเก่าในเครื่องจะโหลดมาผิดรูป
+    get: async (userId, projectId) => {
+      const record = await backend.get(offlineDraftKey(userId, projectId))
+      if (!record) return null
+      return { ...record, document: migrateDesignDocument(record.document) as DesignDocument }
+    },
     put: (record) => backend.put({
       ...record,
       key: offlineDraftKey(record.userId, record.projectId),

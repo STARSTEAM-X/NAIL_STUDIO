@@ -43,6 +43,27 @@ class LocalFrameTests(unittest.TestCase):
         tip_mask = t01 > 0.9
         self.assertTrue(np.all(coords[tip_mask][:, 1] > 0))
 
+    def test_tip_direction_overrides_narrow_end_guess(self):
+        # เล็บจริงบางนิ้ว (โป้ง ชี้ กลาง) แคบฝั่งโคน — ถ้าเดาจากความกว้างปลายเล็บจะกลับหัว
+        xs_wide = np.linspace(-1.0, 1.0, 5)
+        xs_narrow = np.linspace(-0.2, 0.2, 5)
+        coords = np.array(
+            [[x, -1.0, 0.0] for x in xs_wide] + [[x, 1.0, 0.0] for x in xs_narrow],
+        )
+        _, axes, t01, _, _, _ = local_frame(coords, tip_dir=np.array([0.0, -1.0, 0.0]))
+        self.assertLess(axes[0][1], 0)
+        self.assertTrue(np.all(coords[t01 > 0.9][:, 1] < 0))
+
+    def test_uv_and_shapes_follow_tip_direction(self):
+        plate = rectangular_plate()
+        tip_dir = np.array([0.0, -1.0, 0.0])
+        uv = project_to_uv(plate, tip_dir=tip_dir)
+        # v เล็ก = ปลายเล็บ → จุดที่ y ติดลบที่สุดต้องได้ v น้อยที่สุด
+        self.assertEqual(int(np.argmin(uv[:, 1])), int(np.argmin(plate[:, 1])))
+        delta = deform_delta(plate, 'long', tip_dir=tip_dir)
+        self.assertLess(float(delta[:, 1].sum()), 0)
+        self.assertLess(base_max_displacement(plate, 'long', tip_dir=tip_dir), 1e-9)
+
 
 class TaperWeightTests(unittest.TestCase):
     def test_zero_before_taper_start(self):
