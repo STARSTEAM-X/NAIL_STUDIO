@@ -27,3 +27,12 @@ def test_recipe_rejects_unknown_catalog_reference() -> None:
 def test_recipe_request_is_bounded() -> None:
     request = RecipeRequest(user_id=uuid4(), prompt="แบบหวาน", count=3)
     assert request.count == 3
+
+
+@pytest.mark.parametrize("finish", ["pearl", "cat_eye"])
+def test_recipe_accepts_new_editor_finishes(finish: str) -> None:
+    recipe = parse_recipe(
+        '{"archetype":"ombre","paletteId":"pal-nude-rose","baseColor":"#D9B1AD",'
+        f'"finish":"{finish}","shape":"almond","length":"medium"}}'
+    )
+    assert recipe.finish == finish

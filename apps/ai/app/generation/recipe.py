@@ -18,7 +18,7 @@ Schema:
   \"paletteId\": \"pal-nude-rose\",
   \"baseColor\": \"#E0A884\",
   \"accentNails\": [0, 3],
-  \"finish\": \"glossy|matte|chrome|glitter\",
+  \"finish\": \"glossy|matte|chrome|glitter|pearl|cat_eye\",
   \"shape\": \"round|oval|square|squoval|almond|coffin|stiletto\",
   \"length\": \"short|medium|long\",
   \"decorations\": [{\"catalogId\": \"metal-bar\", \"zone\": \"nail-plate\", \"density\": 0.4}]

@@ -186,7 +186,7 @@ class Recipe(BaseModel):
     @field_validator("finish")
     @classmethod
     def validate_finish(cls, value: str) -> str:
-        if value not in {"glossy", "matte", "chrome", "glitter"}:
+        if value not in {"glossy", "matte", "chrome", "glitter", "pearl", "cat_eye"}:
             raise ValueError("finish is not supported by the editor")
         return value
 

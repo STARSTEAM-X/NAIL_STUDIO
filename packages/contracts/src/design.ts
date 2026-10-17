@@ -41,7 +41,7 @@ export function nailKeysOfHand(hand: Hand): NailKey[] {
 
 export const NAIL_SHAPES = ['round', 'almond', 'square', 'squoval', 'stiletto'] as const
 export const NAIL_LENGTHS = ['short', 'medium', 'long', 'extra'] as const
-export const FINISHES = ['glossy', 'matte', 'chrome', 'glitter'] as const
+export const FINISHES = ['glossy', 'matte', 'chrome', 'glitter', 'pearl', 'cat_eye'] as const
 export const BRUSHES = ['round', 'flat', 'liner', 'glitter', 'airbrush'] as const
 export const BLEND_MODES = ['normal', 'multiply', 'screen'] as const
 

@@ -22,6 +22,31 @@ const clamp01 = (n: number): number => Math.min(1, Math.max(0, n))
 export const clamp = (n: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, n))
 const px = (sizeUv: number): number => Math.min(MAX_SIZE_PX, Math.max(1, Math.round(sizeUv * TEX)))
 
+/** ผสมรหัสสี #rrggbb ที่ผ่าน schema แล้ว สำหรับรายละเอียดแสง/เงา */
+export function tint(hex: string, target: string, amount: number): string {
+  return `#${[1, 3, 5].map((offset) => {
+    const a = Number.parseInt(hex.slice(offset, offset + 2), 16)
+    const b = Number.parseInt(target.slice(offset, offset + 2), 16)
+    return Math.round(a + (b - a) * amount).toString(16).padStart(2, '0')
+  }).join('')}`
+}
+
+/** ตัดเส้นตรงกับกรอบ UV ก่อนวาด เพื่อรักษาความชันเมื่อปลายเส้นอยู่นอก texture: O(1) */
+export function clipSegment(a: Pt, b: Pt): Pt[] {
+  const dx = b[0] - a[0]
+  const dy = b[1] - a[1]
+  let from = 0
+  let to = 1
+  for (const [p, q] of [[-dx, a[0]], [dx, 1 - a[0]], [-dy, a[1]], [dy, 1 - a[1]]] as const) {
+    if (p === 0) { if (q < 0) return []; continue }
+    const t = q / p
+    if (p < 0) from = Math.max(from, t)
+    else to = Math.min(to, t)
+    if (from > to) return []
+  }
+  return [[a[0] + dx * from, a[1] + dy * from], [a[0] + dx * to, a[1] + dy * to]]
+}
+
 /** สุ่มแบบกำหนด seed — ลายเดิมต้องได้ผลเดิมทุกครั้ง (mulberry32) */
 export function rng(seed: number): () => number {
   let a = seed >>> 0

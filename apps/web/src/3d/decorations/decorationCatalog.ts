@@ -6,6 +6,8 @@ import {
   DodecahedronGeometry,
   ExtrudeGeometry,
   IcosahedronGeometry,
+  LatheGeometry,
+  Vector2,
   OctahedronGeometry,
   RingGeometry,
   Shape,
@@ -18,7 +20,7 @@ import {
   type BufferGeometry,
 } from 'three'
 
-/** หมวดหมู่ของ asset ที่แสดงในแผงตกแต่ง — ช่วยให้คลัง 30 ชิ้นยังเลือกใช้ง่าย */
+/** หมวดหมู่ของ asset ที่แสดงในแผงตกแต่ง — ช่วยให้คลัง 34 ชิ้นยังเลือกใช้ง่าย */
 export type DecorationCategory = 'gemstone' | 'metal' | 'pearl' | 'motif' | 'ribbon'
 
 /**
@@ -135,6 +137,15 @@ function waveGeometry(): BufferGeometry {
   return new TubeGeometry(curve, 24, 0.12, 6, false)
 }
 
+/** Flat table, crown, girdle and pavilion; local +Y is the nail normal. */
+function chatonGeometry(): BufferGeometry {
+  const geometry = new LatheGeometry([
+    new Vector2(0, -0.42), new Vector2(0.68, -0.02), new Vector2(0.68, 0.04),
+    new Vector2(0.37, 0.34), new Vector2(0, 0.34),
+  ], 16)
+  return geometry
+}
+
 function asset(
   id: string,
   label: string,
@@ -153,10 +164,13 @@ const SILVER = '#d8dde5'
 const ROSE_GOLD = '#d98f82'
 const CRYSTAL = '#eaf7ff'
 
-/** คลัง built-in ที่คัดให้มี 30 รูปทรงไม่ซ้ำกัน — พร้อมสลับ geometry เป็น GLB ผ่าน modelUrl */
+/** คลัง built-in ที่คัดให้มี 34 รูปทรงไม่ซ้ำกัน — พร้อมสลับ geometry เป็น GLB ผ่าน modelUrl */
 export const DECORATION_CATALOG: readonly CatalogEntry[] = [
   asset('gem-diamond', 'เพชรทรงเหลี่ยม', 'gemstone', () => new OctahedronGeometry(1, 0), 0.0016, CRYSTAL, 0.6, 0.12),
   asset('gem-round', 'เพชรกลม', 'gemstone', () => new IcosahedronGeometry(1, 1), 0.00145, '#d9ecff', 0.55, 0.14),
+  asset('gem-marquise', 'เพชรทรงเรือ', 'gemstone', () => new OctahedronGeometry(1, 0).scale(0.45, 0.3, 1.15), 0.00145, CRYSTAL, 0.6, 0.12),
+  asset('gem-chaton', 'เพชรกลมเจียระไน', 'gemstone', chatonGeometry, 0.00145, CRYSTAL, 0.6, 0.12),
+  asset('metal-bead', 'ลูกปัดโลหะ', 'metal', () => new SphereGeometry(0.5, 12, 8), 0.0012, GOLD, 0.95, 0.14),
   asset('gem-princess', 'เพชรสี่เหลี่ยม', 'gemstone', () => new BoxGeometry(1.1, 1.1, 0.5), 0.00155, '#f4fbff', 0.5, 0.16),
   asset('gem-cushion', 'เพชรคุชชั่น', 'gemstone', () => new DodecahedronGeometry(0.85, 0), 0.00155, '#f6d9ff', 0.55, 0.15),
   asset('gem-emerald', 'มรกต', 'gemstone', () => new CylinderGeometry(0.68, 0.68, 0.32, 6), 0.00175, '#49bf8a', 0.45, 0.18),

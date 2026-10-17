@@ -12,19 +12,21 @@ export interface FinishSpec {
   clearcoatRoughness: number
   envMapIntensity: number
   sparkle: boolean
+  iridescence?: number
+  anisotropy?: number
 }
 
 /**
- * วัสดุทั้งสี่แบบต่างกันเฉพาะค่าที่เป็น uniform ล้วน ๆ ยกเว้น sparkle
- *
- * เจตนาของการออกแบบตารางนี้คือ "สลับวัสดุแล้วต้องไม่คอมไพล์เชดเดอร์ใหม่"
- * — ดู applyFinish ว่ามีเงื่อนไขเดียวที่ยอมให้เกิด needsUpdate
+ * ผิวมุกเพิ่ม iridescence และตาแมวเพิ่ม anisotropy ให้ไฮไลต์ตอบสนองตามมุมจริง
+ * MaterialPool แยกตาม finish อยู่แล้ว จึงไม่แย่ง uniform ระหว่างนิ้ว
  */
 export const FINISH_PRESETS: Record<FinishId, FinishSpec> = {
   glossy: { roughness: 0.12, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 1, sparkle: false },
   matte: { roughness: 0.82, metalness: 0, clearcoat: 0.12, clearcoatRoughness: 0.7, envMapIntensity: 0.6, sparkle: false },
   chrome: { roughness: 0.05, metalness: 1, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 1.8, sparkle: false },
   glitter: { roughness: 0.38, metalness: 0.55, clearcoat: 1, clearcoatRoughness: 0.14, envMapIntensity: 1.4, sparkle: true },
+  pearl: { roughness: 0.22, metalness: 0.35, clearcoat: 0.8, clearcoatRoughness: 0.08, envMapIntensity: 1.2, sparkle: false, iridescence: 0.9 },
+  cat_eye: { roughness: 0.32, metalness: 0.65, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.2, sparkle: true, anisotropy: 0.55 },
 }
 
 /**
@@ -95,8 +97,8 @@ export function createSparkleNormalMap(factory: CanvasFactory, size = 512): Canv
  * ตั้งค่าวัสดุตามชนิดผิวที่เลือก
  *
  * ค่าเกือบทั้งหมดเป็น uniform เปลี่ยนได้โดยไม่ต้องคอมไพล์เชดเดอร์ใหม่
- * มีแต่การใส่/ถอด normalMap เท่านั้นที่ทำให้โปรแกรมที่คอมไพล์ไว้ใช้ไม่ได้
- * จึงตั้ง needsUpdate เฉพาะตอนที่แผนที่เปลี่ยนจริง ๆ
+ * three.js จัดการเปลี่ยน shader เมื่อเปิด/ปิด iridescence หรือ anisotropy
+ * ส่วน normalMap ตั้ง needsUpdate เฉพาะตอนเปลี่ยนแผนที่จริง
  */
 export function applyFinish(
   material: MeshPhysicalMaterial,
@@ -109,7 +111,13 @@ export function applyFinish(
   material.clearcoat = spec.clearcoat
   material.clearcoatRoughness = spec.clearcoatRoughness
   material.envMapIntensity = spec.envMapIntensity
-  material.normalScale.set(spec.sparkle ? 0.6 : 1, spec.sparkle ? 0.6 : 1)
+  material.iridescence = spec.iridescence ?? 0
+  material.anisotropy = spec.anisotropy ?? 0
+  material.anisotropyRotation = finish === 'cat_eye' ? -Math.PI / 6 : 0
+  material.iridescenceIOR = 1.45
+  material.iridescenceThicknessRange = [100, 280]
+  const normalStrength = finish === 'cat_eye' ? 0.08 : spec.sparkle ? 0.6 : 1
+  material.normalScale.set(normalStrength, normalStrength)
   const nextMap = spec.sparkle ? sparkle : null
   if (material.normalMap !== nextMap) {
     material.normalMap = nextMap

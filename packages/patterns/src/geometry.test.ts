@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Stroke } from '@nail-studio/contracts'
-import { TEX, circle, fill, type Pt } from './geometry.ts'
+import { TEX, circle, clipSegment, fill, type Pt } from './geometry.ts'
 import { renderPattern } from './index.ts'
 
 type Brush = Extract<Stroke, { kind: 'brush' }>
@@ -63,5 +63,13 @@ describe('fill', () => {
       prev = edge
     }
     expect(worst).toBeLessThan(2)
+  })
+})
+
+describe('clipSegment', () => {
+  it('ตัดเฉพาะส่วนที่อยู่นอก UV โดยคงความชันของเส้นเดิม', () => {
+    expect(clipSegment([-1, -0.5], [2, 1])).toEqual([[0, 0], [1, 0.5]])
+    expect(clipSegment([-1, 2], [-0.5, 3])).toEqual([])
+    expect(clipSegment([0.5, -2], [0.5, 2])).toEqual([[0.5, 0], [0.5, 1]])
   })
 })

@@ -1,10 +1,14 @@
 import type { Recipe } from './recipe.ts'
+import { REFERENCE_PRESETS } from './referencePresets.ts'
+import { LUXURY_PRESETS } from './luxuryPresets.ts'
 
 /**
  * ดีไซน์สำเร็จรูป (ทำจากรูปตัวอย่างและตรวจบน editor จริงแล้ว) — เป็น recipe ล้วน
  * ใช้ได้ทั้งเป็นจุดเริ่มต้น และเป็นตัวอย่าง few-shot ให้ AI เห็นว่า recipe ที่ดีหน้าตาเป็นอย่างไร
  */
 export const PRESETS: Record<string, { title: string; description: string; recipe: Recipe }> = {
+  ...REFERENCE_PRESETS,
+  ...LUXURY_PRESETS,
   'emerald-swirl': {
     title: 'Emerald Swirl',
     description: 'พื้นชมพูนู้ด ปลายเล็บโค้งเขียวเข้ม สลับนิ้วที่มีใบไม้เขียว',
@@ -63,9 +67,9 @@ export const PRESETS: Record<string, { title: string; description: string; recip
       defaults: { shape: 'almond', length: 'medium', base: '#b9580d' },
       nails: {
         thumb: { patterns: [{ type: 'tortoise', seed: 3 }, { type: 'curve', color: '#62d4c9', width: 0.12, points: [[0.1, 0.75], [0.4, 0.55], [0.6, 0.45], [0.95, 0.2]] }] },
-        index: { patterns: [{ type: 'tortoise', seed: 5 }, { type: 'star', color: '#62d4c9' }] },
+        index: { patterns: [{ type: 'tortoise', seed: 5 }, { type: 'star', color: '#62d4c9', rx: 0.24, ry: 0.32 }] },
         middle: { patterns: [{ type: 'tortoise', seed: 7 }, { type: 'curve', color: '#62d4c9', width: 0.13, points: [[0.25, 0], [0.15, 0.4], [0.85, 0.55], [0.75, 1]] }] },
-        ring: { patterns: [{ type: 'tortoise', seed: 9 }, { type: 'star', color: '#62d4c9' }] },
+        ring: { patterns: [{ type: 'tortoise', seed: 9 }, { type: 'star', color: '#62d4c9', rx: 0.24, ry: 0.32 }] },
         little: { patterns: [{ type: 'tortoise', seed: 11 }, { type: 'curve', color: '#62d4c9', width: 0.035, points: [[0.68, 0.95], [0.62, 0.35], [0.5, 0.05], [0.32, 0.4]] }] },
       },
     },
@@ -78,7 +82,7 @@ export const PRESETS: Record<string, { title: string; description: string; recip
       nails: {
         thumb: { base: '#f7f1e6', patterns: [{ type: 'stripes', color: '#8091ee', count: 5 }] },
         index: { base: '#f7f1e6', patterns: [{ type: 'fruit', kind: 'orange', u: 0.5, v: 0.45 }] },
-        middle: { patterns: [{ type: 'french', color: '#f7f1e6', depth: 0.34, smile: 0.06 }, { type: 'fruit', kind: 'strawberry', u: 0.4, v: 0.24 }, { type: 'fruit', kind: 'strawberry', u: 0.6, v: 0.22 }] },
+        middle: { patterns: [{ type: 'french', color: '#f7f1e6', depth: 0.34, smile: 0.06 }, { type: 'fruit', kind: 'strawberry', u: 0.39, v: 0.24, size: 0.6 }, { type: 'fruit', kind: 'strawberry', u: 0.61, v: 0.22, size: 0.6 }] },
         ring: { patterns: [{ type: 'french', color: '#f7f1e6', depth: 0.26, smile: 0.06 }, { type: 'fruit', kind: 'cherry', u: 0.5, v: 0.45 }] },
         little: { patterns: [{ type: 'french', color: '#f7f1e6', depth: 0.22, smile: 0.06 }, { type: 'fruit', kind: 'lemon', u: 0.5, v: 0.62 }] },
       },
@@ -99,9 +103,9 @@ export const PRESETS: Record<string, { title: string; description: string; recip
         ...Object.fromEntries(['index', 'ring'].map((finger) => [finger, {
           patterns: [
             { type: 'french', color: '#fdfbfa', depth: 0.28, soft: true },
-            { type: 'butterfly', wing: '#9070e4', outline: '#5d3aa8', u: 0.53, v: 0.16 },
-            { type: 'flower', petal: '#c2adf6', center: '#5d3aa8', u: 0.3, v: 0.22, size: 0.03 },
-            { type: 'flower', petal: '#c2adf6', center: '#5d3aa8', u: 0.27, v: 0.12, size: 0.024 },
+            { type: 'butterfly', wing: '#9070e4', outline: '#5d3aa8', u: 0.55, v: 0.24, size: 0.13 },
+            { type: 'flower', petal: '#c2adf6', center: '#5d3aa8', u: 0.32, v: 0.3, size: 0.045 },
+            { type: 'flower', petal: '#c2adf6', center: '#5d3aa8', u: 0.35, v: 0.15, size: 0.035 },
           ],
         }])),
       },

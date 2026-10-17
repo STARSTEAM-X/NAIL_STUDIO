@@ -15,6 +15,9 @@ export interface DecorationInfo {
 export const DECORATIONS: readonly DecorationInfo[] = [
   { id: 'gem-diamond', label: 'เพชรทรงเหลี่ยม', category: 'gemstone' },
   { id: 'gem-round', label: 'เพชรกลม', category: 'gemstone' },
+  { id: 'gem-marquise', label: 'เพชรทรงเรือ', category: 'gemstone' },
+  { id: 'gem-chaton', label: 'เพชรกลมเจียระไน', category: 'gemstone' },
+  { id: 'metal-bead', label: 'ลูกปัดโลหะ', category: 'metal' },
   { id: 'gem-princess', label: 'เพชรสี่เหลี่ยม', category: 'gemstone' },
   { id: 'gem-cushion', label: 'เพชรคุชชั่น', category: 'gemstone' },
   { id: 'gem-emerald', label: 'มรกต', category: 'gemstone' },

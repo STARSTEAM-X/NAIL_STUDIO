@@ -18,6 +18,8 @@ const FINISH_LABELS: Record<Nail['finish'], string> = {
   matte: 'ด้าน',
   chrome: 'โครม',
   glitter: 'กลิตเตอร์',
+  pearl: 'มุกเหลือบ',
+  cat_eye: 'แม่เหล็กตาแมว',
 }
 
 const SHAPE_LABELS: Record<Nail['shape'], string> = {

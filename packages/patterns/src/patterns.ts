@@ -2,15 +2,15 @@ import { z } from 'zod'
 import { hexColorSchema, type Stroke } from '@nail-studio/contracts'
 import {
   bezier, blobShape, circle, clamp, dot, ellipse, fill, gradient, heartShape, leafShape, line, rng,
-  sparkleShape, type Pt,
+  sparkleShape, tint, type Pt,
 } from './geometry.ts'
+import { referencePatternSchemas, referenceRenderers, renderGlitterPath } from './referencePatterns.ts'
 
 /**
  * คลังลายแบบมีพารามิเตอร์ — AI เลือก "ชนิดลาย + ค่า" แล้วโค้ดตรงนี้เป็นคนแปลงเป็น stroke
  *
- * ทุก schema ใส่ค่าตั้งต้นและช่วงค่าที่ปลอดภัยไว้แล้ว (กฎจากการทดสอบบนโมเดลจริง เช่น
- * วางลายในพื้นที่ที่มองเห็น u 0.2–0.8 / v 0.05–0.95, เส้นกว้างพอให้เห็นบนจอ 3 มิติ)
- * จึงไม่มีค่าไหนที่ทำให้ได้เอกสารผิด schema หรือได้ลายที่มองไม่เห็นเลย
+ * ค่าตั้งต้นเว้นพื้นที่รอบลายหลัก และช่วงค่าจำกัดต้นทุนการสร้าง stroke
+ * พื้นที่มองเห็นราว u 0.2–0.8 / v 0.05–0.95; ผู้ใช้ยังวางรูปชิดขอบเพื่อให้ตัดขอบได้
  */
 
 const u = z.number().min(0).max(1)
@@ -24,7 +24,13 @@ export const patternSchema = z.discriminatedUnion('type', [
     color,
     depth: z.number().min(0.08).max(0.5).default(0.25).describe('ความลึกจากปลายเล็บ (v)'),
     smile: z.number().min(-0.12).max(0.15).default(0.04).describe('ความโค้งของเส้นยิ้ม'),
-    soft: z.boolean().default(false).describe('true = ไล่จางลงสู่พื้นแทนขอบคม'),
+    soft: z.boolean().default(false).describe('ไล่จางสำหรับ classic ที่ไม่มี border/outlineOnly'),
+    style: z.enum(['classic', 'diagonal', 'chevron', 'reverse', 'almond', 'swoop']).default('classic'),
+    side: z.enum(['left', 'right']).default('left'),
+    outlineOnly: z.boolean().default(false).describe('วาดเฉพาะเส้นยิ้ม เหมาะกับ double French'),
+    border: color.optional(),
+    borderStyle: z.enum(['solid', 'glitter']).default('solid'),
+    borderWidth: z.number().min(0.003).max(0.04).default(0.008),
   }).describe('French tip'),
   z.object({
     type: z.literal('gradient'),
@@ -41,18 +47,21 @@ export const patternSchema = z.discriminatedUnion('type', [
     reach: z.number().min(0.15).max(1).default(0.55).describe('กลิตเตอร์หนาแน่นที่ปลายแล้วบางลงถึงระยะนี้'),
     size: z.number().min(0.006).max(0.03).default(0.016),
     seed: z.number().int().default(1),
+    coverage: z.enum(['tip', 'full']).default('tip'),
   }).describe('กลิตเตอร์ไล่จากปลายเล็บ'),
   z.object({
     type: z.literal('dots'),
     color,
-    size: z.number().min(0.02).max(0.1).default(0.05),
+    size: z.number().min(0.008).max(0.1).default(0.035),
     spacing: z.number().min(0.08).max(0.25).default(0.13),
+    from: v.default(0),
+    to: v.default(1),
   }).describe('polka dot เต็มเล็บ'),
   z.object({
     type: z.literal('stripes'),
     color,
     count: z.number().int().min(1).max(9).default(5),
-    width: z.number().min(0.01).max(0.08).default(0.026),
+    width: z.number().min(0.01).max(0.08).default(0.018),
     direction: z.enum(['vertical', 'horizontal', 'diagonal']).default('vertical'),
     from: v.default(0).describe('ขอบเขต v เริ่ม'),
     to: v.default(1).describe('ขอบเขต v จบ'),
@@ -77,23 +86,24 @@ export const patternSchema = z.discriminatedUnion('type', [
     petal: color,
     center: color,
     u: u.default(0.5), v: v.default(0.5),
-    size: z.number().min(0.02).max(0.2).default(0.08),
+    size: z.number().min(0.02).max(0.2).default(0.13),
     petals: z.number().int().min(4).max(8).default(5),
+    style: z.enum(['filled', 'outline']).default('filled'),
   }).describe('ดอกไม้'),
   z.object({
     type: z.literal('butterfly'),
     wing: color,
     outline: color,
-    u: u.default(0.5), v: v.default(0.18),
-    size: z.number().min(0.05).max(0.25).default(0.11),
+    u: u.default(0.5), v: v.default(0.5),
+    size: z.number().min(0.05).max(0.25).default(0.16),
     tilt: angle.default(-17),
   }).describe('ผีเสื้อ'),
   z.object({
     type: z.literal('star'),
     color,
     u: u.default(0.5), v: v.default(0.5),
-    rx: z.number().min(0.05).max(0.5).default(0.42),
-    ry: z.number().min(0.05).max(0.6).default(0.55),
+    rx: z.number().min(0.01).max(0.5).default(0.13),
+    ry: z.number().min(0.01).max(0.6).default(0.2),
   }).describe('ดาวสี่แฉกขอบเว้า (sparkle)'),
   z.object({
     type: z.literal('heart'),
@@ -117,6 +127,8 @@ export const patternSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('fruit'),
     kind: z.enum(['orange', 'cherry', 'strawberry', 'lemon']),
+    color: color.optional().describe('สีผลไม้ เช่น เชอร์รีเงิน'),
+    stem: color.optional(),
     u: u.default(0.5), v: v.default(0.5),
     size: z.number().min(0.6).max(1.6).default(1).describe('ตัวคูณขนาด'),
   }).describe('ผลไม้'),
@@ -136,6 +148,7 @@ export const patternSchema = z.discriminatedUnion('type', [
     points: z.array(z.array(u).length(2).pipe(z.tuple([u, v]))).min(2).max(4).describe('จุดควบคุม bezier 2–4 จุด แต่ละจุดเป็น [u, v]'),
     width: z.number().min(0.005).max(0.3).default(0.03),
   }).describe('เส้นโค้งอิสระ (แถบหนาได้ถ้า width ใหญ่)'),
+  ...referencePatternSchemas,
 ])
 
 export type PatternSpec = z.input<typeof patternSchema>
@@ -149,12 +162,17 @@ function leafStrokes(p: { color: string; vein?: string | undefined; u: number; v
   const root: Pt = [p.u - Math.cos(a) * p.size, p.v - Math.sin(a) * p.size]
   const strokes: Stroke[] = [...fill(leafShape(root, tip, p.size * 0.55), p.color, { brushWidth: 0.016 })]
   if (p.vein) {
-    strokes.push(line([root, tip], p.vein, 0.012))
+    const at = (t: number): Pt => [root[0] + (tip[0] - root[0]) * t, root[1] + (tip[1] - root[1]) * t]
+    const width = clamp(p.size * 0.035, 0.002, 0.008)
+    strokes.push(line([at(0.08), at(0.94)], p.vein, width))
     for (const t of [0.3, 0.5, 0.7]) {
-      const c: Pt = [root[0] + (tip[0] - root[0]) * t, root[1] + (tip[1] - root[1]) * t]
-      const n: Pt = [-(tip[1] - root[1]) * 0.18, (tip[0] - root[0]) * 0.18]
-      strokes.push(line([c, [c[0] + n[0], c[1] + n[1]]], p.vein, 0.008))
-      strokes.push(line([c, [c[0] - n[0], c[1] - n[1]]], p.vein, 0.008))
+      const c = at(t)
+      const end = at(t + 0.16)
+      const spread = Math.sin(Math.PI * t) * 0.2
+      const n: Pt = [-(tip[1] - root[1]) * spread, (tip[0] - root[0]) * spread]
+      for (const sign of [-1, 1]) strokes.push(line(bezier([
+        c, at(t + 0.1), [end[0] + sign * n[0], end[1] + sign * n[1]],
+      ], 8), p.vein, width * 0.65, { opacity: 0.8 }))
     }
   }
   return strokes
@@ -166,14 +184,28 @@ function smallLeaf(cu: number, cv: number, ang: number, len: number, col: string
 
 const RENDER: { [K in z.infer<typeof patternSchema>['type']]: (p: Parsed<K>) => Stroke[] } = {
   french: (p) => {
-    if (p.soft) {
+    if (p.soft && p.style === 'classic' && !p.outlineOnly && !p.border) {
       return [
         ...gradient(0, p.depth * 1.6, p.color, { strength: 1.6, steps: 20, solidUntil: 0.35 }),
         ...gradient(0, p.depth * 0.7, p.color, { strength: 1.2, steps: 8 }),
       ]
     }
-    const edge = bezier([[0, p.depth], [0.5, p.depth + p.smile * 2], [1, p.depth]], 20)
-    return fill([...edge, [1, 0], [0, 0]], p.color, { brushWidth: 0.025 })
+    let edge: Pt[] = bezier([[0, p.depth], [0.5, p.depth + p.smile * 2], [1, p.depth]], 32)
+    if (p.style === 'almond') edge = Array.from({ length: 65 }, (_, i): Pt => {
+      const u = i / 64
+      return [u, p.depth + p.smile * 3 * Math.sqrt(Math.max(0, 1 - ((u - 0.5) / 0.32) ** 2))]
+    })
+    if (p.style === 'swoop') edge = bezier([[0, p.depth * 0.1], [0.3, p.depth * 0.12], [0.6, p.depth * 1.8], [1, p.depth * 1.8]], 64)
+    if (p.style === 'diagonal') edge = [[0, p.depth * 0.15], [1, p.depth * 1.8]]
+    if (p.style === 'chevron') edge = [[0, p.depth * 0.15], [0.5, p.depth * 1.35], [1, p.depth * 0.15]]
+    if (p.side === 'right') edge = edge.map(([x, y]): Pt => [1 - x, y]).reverse()
+    if (p.style === 'reverse') edge = edge.map(([x, y]): Pt => [x, 1 - y])
+    const end = p.style === 'reverse' ? 1 : 0
+    const strokes: Stroke[] = p.outlineOnly
+      ? [line(edge, p.color, p.borderWidth)]
+      : fill([...edge, [1, end], [0, end]], p.color, { brushWidth: 0.016 })
+    if (p.border) strokes.push(...(p.borderStyle === 'glitter' ? renderGlitterPath(edge, p.border, p.borderWidth, 0.9, false) : [line(edge, p.border, p.borderWidth)]))
+    return strokes
   },
   gradient: (p) => (p.from === 'tip'
     ? gradient(0, p.reach, p.color, { strength: p.strength, steps: 18, solidUntil: 0.1 })
@@ -188,10 +220,21 @@ const RENDER: { [K in z.infer<typeof patternSchema>['type']]: (p: Parsed<K>) => 
     let guard = 0
     let placed = 0
     while (placed < target && guard++ < target * 20) {
-      const vv = 0.02 + rand() * p.reach
-      if (rand() > Math.pow(1 - vv / (p.reach + 0.02), 1.3)) continue
-      const d = p.size * (0.6 + rand() * 1.0)
-      strokes.push(dot(0.15 + rand() * 0.7, vv, d, p.colors[Math.floor(rand() * p.colors.length)]!, { softness: 0.2, opacity: 0.75 + rand() * 0.25 }))
+      const vv = 0.02 + rand() * (p.coverage === 'full' ? 0.96 : p.reach)
+      if (p.coverage === 'tip' && rand() > Math.pow(1 - vv / (p.reach + 0.02), 1.3)) continue
+      const d = p.size * (0.25 + rand() ** 2 * 1.4)
+      const uu = 0.15 + rand() * 0.7
+      const col = p.colors[Math.floor(rand() * p.colors.length)]!
+      // แต้มละเอียดสลับเกล็ดสั้น แทนเม็ดกลมขนาดใกล้กันทั้งหมด
+      if (placed % 5 === 0) {
+        const a = rand() * Math.PI
+        strokes.push(line([[uu, vv], [uu + Math.cos(a) * d, vv + Math.sin(a) * d]], col, d * 0.45, { softness: 0.05 }))
+      } else {
+        strokes.push(dot(uu, vv, d, col, { softness: 0.12, opacity: 0.65 + rand() * 0.35 }))
+      }
+      if (placed % 60 === 0) {
+        strokes.push(...fill(sparkleShape(uu, vv, p.size * 1.1, p.size * 1.7, 24), tint(col, '#ffffff', 0.65), { brushWidth: 0.002 }))
+      }
       placed++
     }
     return strokes
@@ -200,7 +243,7 @@ const RENDER: { [K in z.infer<typeof patternSchema>['type']]: (p: Parsed<K>) => 
     const out: Stroke[] = []
     for (let row = 0, vv = 0.12; vv < 0.92; vv += p.spacing * 0.85, row++) {
       for (let uu = 0.2 + (row % 2) * (p.spacing / 2); uu < 0.82; uu += p.spacing) {
-        if (((uu - 0.5) / 0.34) ** 2 + ((vv - 0.5) / 0.46) ** 2 < 1) out.push(dot(uu, vv, p.size, p.color, { softness: 0.04 }))
+        if (vv >= p.from && vv <= p.to && ((uu - 0.5) / 0.34) ** 2 + ((vv - 0.5) / 0.46) ** 2 < 1) out.push(dot(uu, vv, p.size, p.color, { softness: 0.04 }))
       }
     }
     return out
@@ -227,13 +270,29 @@ const RENDER: { [K in z.infer<typeof patternSchema>['type']]: (p: Parsed<K>) => 
     return strokes
   },
   leaf: (p) => leafStrokes(p),
-  flower: (p) => [
-    ...Array.from({ length: p.petals }, (_, i) => {
-      const a = (i / p.petals) * Math.PI * 2
-      return fill(circle(p.u + Math.cos(a) * p.size * 0.55, p.v + Math.sin(a) * p.size * 0.55, p.size * 0.45), p.petal, { brushWidth: 0.008 })
-    }).flat(),
-    dot(p.u, p.v, p.size * 0.5, p.center),
-  ],
+  flower: (p) => {
+    if (p.style === 'outline') {
+      const petal = Array.from({ length: 121 }, (_, i): Pt => {
+        const a = i / 120 * Math.PI * 2
+        const period = Math.PI * 2 / p.petals
+        const delta = ((a + Math.PI / 2 + period / 2) % period + period) % period - period / 2
+        const r = p.size * (0.58 * Math.cos(delta) + Math.sqrt(Math.max(0, 0.44 ** 2 - (0.58 * Math.sin(delta)) ** 2)))
+        return [p.u + Math.cos(a) * r, p.v + Math.sin(a) * r]
+      })
+      return [line(petal, p.petal, clamp(p.size * 0.085, 0.003, 0.012)), dot(p.u, p.v, p.size * 0.24, p.center)]
+    }
+    const out: Stroke[] = []
+    const width = clamp(p.size * 0.055, 0.002, 0.01)
+    for (let i = 0; i < p.petals; i++) {
+      const a = (i / p.petals) * Math.PI * 2 - Math.PI / 2
+      const at = (r: number): Pt => [p.u + Math.cos(a) * p.size * r, p.v + Math.sin(a) * p.size * r]
+      out.push(...fill(ellipse(...at(0.52), p.size * 0.53, p.size * 0.3, a), p.petal, { brushWidth: width }))
+      out.push(line(bezier([at(0.22), at(0.5), at(0.8)], 8), tint(p.petal, '#ffffff', 0.4), width * 0.75))
+    }
+    out.push(dot(p.u, p.v, p.size * 0.42, p.center))
+    out.push(dot(p.u - p.size * 0.06, p.v - p.size * 0.06, p.size * 0.12, tint(p.center, '#ffffff', 0.6)))
+    return out
+  },
   butterfly: (p) => {
     const tilt = rad(p.tilt)
     const at = (du: number, dv: number): Pt => [
@@ -241,33 +300,56 @@ const RENDER: { [K in z.infer<typeof patternSchema>['type']]: (p: Parsed<K>) => 
       p.v + (du * Math.sin(tilt) + dv * Math.cos(tilt)) * p.size,
     ]
     const strokes: Stroke[] = []
-    const wings: [number, number, number, number, number][] = [
-      [-0.55, -0.35, 0.55, 0.42, -0.5], [0.55, -0.35, 0.55, 0.42, 0.5],
-      [-0.42, 0.38, 0.38, 0.3, 0.6], [0.42, 0.38, 0.38, 0.3, -0.6],
-    ]
-    for (const [du, dv, ru, rv, rot] of wings) {
-      const [eu, ev] = at(du, dv)
-      const shape = ellipse(eu, ev, ru * p.size, rv * p.size, rot + tilt)
-      strokes.push(...fill(shape, p.wing, { brushWidth: 0.008 }))
-      strokes.push(line([...shape, shape[0]!], p.outline, 0.009, { softness: 0.05 }))
-      strokes.push(line([at(0, dv * 0.3), at(du * 0.75, dv)], p.outline, 0.005))
+    const width = p.size * 0.04
+    for (const side of [-1, 1]) {
+      const upper = [
+        ...bezier([at(0, -0.12), at(side * 0.38, -0.85), at(side * 1.02, -1), at(side * 1.04, -0.58)], 14),
+        ...bezier([at(side * 1.04, -0.58), at(side * 1.12, -0.2), at(side * 0.56, 0.16), at(0, 0.1)], 14).slice(1),
+      ]
+      const lower = [
+        ...bezier([at(0, 0.02), at(side * 0.82, -0.02), at(side * 0.85, 0.48), at(side * 0.48, 0.65)], 12),
+        ...bezier([at(side * 0.48, 0.65), at(side * 0.2, 0.8), at(side * 0.12, 0.45), at(0, 0.02)], 12).slice(1),
+      ]
+      for (const shape of [lower, upper]) {
+        strokes.push(...fill(shape, p.wing, { brushWidth: width }))
+        const root = at(0, 0)
+        const inset = shape.map(([x, y]): Pt => [root[0] + (x - root[0]) * 0.73, root[1] + (y - root[1]) * 0.73])
+        strokes.push(...fill(inset, tint(p.wing, '#ffffff', 0.35), { brushWidth: width }))
+        strokes.push(line([...shape, shape[0]!], p.outline, width, { softness: 0.05 }))
+      }
+      strokes.push(line(bezier([at(0, 0), at(side * 0.35, -0.25), at(side * 0.8, -0.58)], 12), p.outline, width * 0.65))
+      strokes.push(line([at(0, 0.08), at(side * 0.43, 0.44)], p.outline, width * 0.65))
+      strokes.push(dot(...at(side * 0.8, -0.62), p.size * 0.07, tint(p.wing, '#ffffff', 0.8)))
     }
-    strokes.push(line([at(0, -0.6), at(0, 0.65)], p.outline, 0.02))
-    strokes.push(line(bezier([at(0, -0.6), at(-0.15, -0.95), at(-0.35, -1.05)], 8), p.outline, 0.005))
-    strokes.push(line(bezier([at(0, -0.6), at(0.15, -0.95), at(0.35, -1.05)], 8), p.outline, 0.005))
+    strokes.push(line([at(0, -0.45), at(0, 0.55)], p.outline, p.size * 0.09))
+    strokes.push(dot(...at(0, -0.5), p.size * 0.14, p.outline))
+    for (const side of [-1, 1]) strokes.push(line(bezier([at(0, -0.5), at(side * 0.12, -0.85), at(side * 0.3, -0.9)], 8), p.outline, width * 0.65))
     return strokes
   },
-  star: (p) => fill(sparkleShape(p.u, p.v, p.rx, p.ry), p.color, { brushWidth: 0.014 }),
+  star: (p) => fill(sparkleShape(p.u, p.v, p.rx, p.ry), p.color, { brushWidth: clamp(Math.min(p.rx, p.ry) * 0.05, 0.003, 0.014) }),
   heart: (p) => fill(heartShape(p.u, p.v, p.size), p.color, { brushWidth: 0.012 }),
   circle: (p) => fill(circle(p.u, p.v, p.radius), p.color, { brushWidth: clamp(p.radius / 5, 0.008, 0.02) }),
   tortoise: (p) => {
     const rand = rng(p.seed)
-    const at = (): Pt => [0.22 + rand() * 0.56, 0.08 + rand() * 0.84]
     const out: Stroke[] = []
-    for (let i = 0; i < 6; i++) { const [uu, vv] = at(); out.push(dot(uu, vv, 0.3, p.glow, { brush: 'airbrush', opacity: 0.55, softness: 0.95 })) }
-    for (let i = 0; i < 7; i++) { const [uu, vv] = at(); out.push(...fill(blobShape(uu, vv, 0.06 + rand() * 0.05, rand), p.dark, { brushWidth: 0.03, opacity: 0.55, softness: 0.8 })) }
-    for (let i = 0; i < 12; i++) { const [uu, vv] = at(); out.push(...fill(blobShape(uu, vv, 0.022 + rand() * 0.03, rand), p.spot, { brushWidth: 0.012, softness: 0.35 })) }
-    for (let i = 0; i < 10; i++) { const [uu, vv] = at(); out.push(dot(uu, vv, 0.012 + rand() * 0.012, p.spot, { softness: 0.3 })) }
+    // ปื้นอำพันโปร่งซ้อนกัน แล้วรวมจุดเข้มเป็นกลุ่ม แทนจุดดำกระจายแบบลายเสือ
+    for (let i = 0; i < 8; i++) {
+      out.push(dot(0.2 + rand() * 0.6, 0.06 + rand() * 0.88, 0.25 + rand() * 0.14, p.glow, { brush: 'airbrush', opacity: 0.65, softness: 0.95 }))
+    }
+    for (let row = 0; row < 3; row++) {
+      for (let col = 0; col < 2; col++) {
+        const uu = 0.3 + col * 0.35 + (rand() - 0.5) * 0.16
+        const vv = 0.17 + row * 0.31 + (rand() - 0.5) * 0.16
+        const radius = 0.085 + rand() * 0.035
+        out.push(dot(uu, vv, radius * 3.4, p.dark, { brush: 'airbrush', opacity: 0.48, softness: 0.95 }))
+        out.push(...fill(blobShape(uu, vv, radius, rand, 24), p.dark, { brushWidth: 0.026, opacity: 0.18, softness: 0.95 }))
+        for (let i = 0; i < 3; i++) {
+          const a = rand() * Math.PI * 2
+          const offset = radius * (0.25 + rand() * 0.35)
+          out.push(dot(uu + Math.cos(a) * offset, vv + Math.sin(a) * offset, radius * (0.5 + rand() * 0.5), p.spot, { opacity: 0.6, softness: 0.7 }))
+        }
+      }
+    }
     return out
   },
   fruit: (p) => {
@@ -276,47 +358,66 @@ const RENDER: { [K in z.infer<typeof patternSchema>['type']]: (p: Parsed<K>) => 
     const GREEN = '#4f9a4a'
     switch (p.kind) {
       case 'orange': return [
-        ...fill(circle(...at(0, 0), 0.13 * s), '#f2862a', { brushWidth: 0.02 }),
-        dot(...at(-0.05, -0.05), 0.05 * s, '#f8b25c', { brush: 'airbrush', opacity: 0.7, softness: 0.9 }),
-        line(bezier([at(0, -0.13), at(0.05, -0.23), at(0.11, -0.28)]), GREEN, 0.012),
-        ...smallLeaf(...at(0.1, -0.26), -0.6, 0.08 * s, GREEN), ...smallLeaf(...at(0.05, -0.22), -2.4, 0.07 * s, GREEN),
+        ...fill(circle(...at(0, 0.02), 0.13 * s), p.color ?? '#ed882b', { brushWidth: 0.014 * s }),
+        dot(...at(-0.035, -0.025), 0.12 * s, p.color ? tint(p.color, '#ffffff', 0.5) : '#ffc570', { opacity: 0.65, softness: 0.95 }),
+        line(bezier([at(0, -0.11), at(0, -0.17), at(0.035, -0.2)]), p.stem ?? '#527344', 0.008 * s),
+        ...smallLeaf(...at(0.01, -0.16), -0.35, 0.1 * s, GREEN),
+        line(bezier([at(0.02, -0.16), at(0.055, -0.18), at(0.085, -0.185)], 8), '#9fb965', 0.004 * s),
       ]
       case 'cherry': return [
-        line(bezier([at(-0.1, 0.05), at(-0.05, -0.15), at(0.06, -0.25)]), '#3e6b2c', 0.012),
-        line(bezier([at(0.12, 0.07), at(0.1, -0.13), at(0.06, -0.25)]), '#3e6b2c', 0.012),
-        ...fill(circle(...at(-0.1, 0.1), 0.075 * s), '#e3313b', { brushWidth: 0.016 }),
-        ...fill(circle(...at(0.12, 0.12), 0.075 * s), '#e3313b', { brushWidth: 0.016 }),
-        dot(...at(-0.12, 0.07), 0.025 * s, '#ffffff', { opacity: 0.8 }), dot(...at(0.1, 0.09), 0.025 * s, '#ffffff', { opacity: 0.8 }),
+        line(bezier([at(-0.1, 0.05), at(-0.05, -0.15), at(0.06, -0.25)]), p.stem ?? '#527344', 0.008 * s),
+        line(bezier([at(0.12, 0.07), at(0.1, -0.13), at(0.06, -0.25)]), p.stem ?? '#527344', 0.008 * s),
+        ...fill(circle(...at(-0.1, 0.1), 0.075 * s), p.color ?? '#b72e48', { brushWidth: 0.012 * s }),
+        ...fill(circle(...at(0.12, 0.12), 0.075 * s), p.color ?? '#c8374e', { brushWidth: 0.012 * s }),
+        dot(...at(-0.12, 0.08), 0.07 * s, p.color ? tint(p.color, '#ffffff', 0.65) : '#f57e88', { opacity: 0.7, softness: 0.95 }),
+        dot(...at(0.1, 0.1), 0.07 * s, p.color ? tint(p.color, '#ffffff', 0.65) : '#f57e88', { opacity: 0.7, softness: 0.95 }),
+        dot(...at(-0.125, 0.07), 0.015 * s, '#fff3df'), dot(...at(0.095, 0.09), 0.015 * s, '#fff3df'),
         ...smallLeaf(...at(0.06, -0.25), -0.3, 0.09 * s, GREEN),
       ]
-      case 'strawberry': return [
-        ...fill([...bezier([at(-0.08, -0.03), at(0, 0.16), at(0.08, -0.03)], 16), ...bezier([at(0.08, -0.03), at(0, -0.1), at(-0.08, -0.03)], 10).slice(1)], '#e3313b', { brushWidth: 0.014 }),
-        ...([[-0.03, 0.01], [0.03, 0.01], [0, 0.05], [-0.02, 0.08], [0.02, 0.08]] as const).map(([du, dv]) => dot(...at(du, dv), 0.01, '#fbe7a6')),
-        ...smallLeaf(...at(0, -0.04), -2.0, 0.05 * s, GREEN), ...smallLeaf(...at(0, -0.04), -1.1, 0.05 * s, GREEN),
-      ]
+      case 'strawberry': {
+        const body = [
+          ...bezier([at(0, -0.09), at(-0.15, -0.16), at(-0.18, -0.02), at(-0.1, 0.1)], 14),
+          ...bezier([at(-0.1, 0.1), at(-0.03, 0.21), at(0, 0.23), at(0.1, 0.1)], 14).slice(1),
+          ...bezier([at(0.1, 0.1), at(0.18, -0.02), at(0.15, -0.16), at(0, -0.09)], 14).slice(1),
+        ]
+        return [
+          ...fill(body, p.color ?? '#d94a58', { brushWidth: 0.01 * s }),
+          dot(...at(-0.045, -0.025), 0.15 * s, p.color ? tint(p.color, '#ffffff', 0.5) : '#f88487', { opacity: 0.65, softness: 0.95 }),
+          ...([[-0.08, -0.035], [0, -0.03], [0.08, -0.035], [-0.055, 0.035], [0.04, 0.04], [-0.02, 0.1], [0.035, 0.105]] as const)
+            .map(([du, dv]) => line([at(du, dv), at(du - 0.003, dv + 0.012)], '#ffe1a0', 0.007 * s)),
+          ...[-2.8, -2.05, -1.2, -0.35].flatMap((a) => smallLeaf(...at(0, -0.09), a, 0.075 * s, GREEN)),
+        ]
+      }
       case 'lemon': return [
-        ...fill(ellipse(...at(0, 0), 0.15 * s, 0.09 * s, -0.35), '#f6d84b', { brushWidth: 0.016 }),
-        line([at(-0.07, -0.02), at(0.1, -0.07)], '#fff3a8', 0.012),
+        ...fill(ellipse(...at(0, 0), 0.15 * s, 0.09 * s, -0.35), p.color ?? '#eccb45', { brushWidth: 0.012 * s }),
+        dot(...at(-0.03, -0.025), 0.12 * s, p.color ? tint(p.color, '#ffffff', 0.6) : '#fff0a0', { opacity: 0.65, softness: 0.95 }),
+        line(bezier([at(-0.075, -0.015), at(-0.01, -0.06), at(0.06, -0.06)], 12), '#fff5bf', 0.006 * s),
         ...smallLeaf(...at(0.12, -0.09), -1.0, 0.07 * s, GREEN),
       ]
     }
   },
   vine: (p) => {
     const f = (pt: Pt): Pt => (p.flip ? [1 - pt[0], pt[1]] : pt)
-    const stem = bezier(([[0.3, 0.82], [0.36, 0.6], [0.6, 0.52], [0.66, 0.3]] as Pt[]).map(f))
-    const leaves = ([[0.32, 0.7, -2.4], [0.45, 0.58, 0.6], [0.58, 0.52, -2.2], [0.67, 0.38, 0.9]] as const).flatMap(([uu, vv, a]) => {
-      const [cu, cv] = f([uu, vv])
-      return smallLeaf(cu, cv, p.flip ? Math.PI - a : a, 0.13, p.leaf).map((s) => s)
-    })
-    const accent = p.accent
-      ? ([[0.5, 0.72, -0.6], [0.4, 0.45, 2.6]] as const).flatMap(([uu, vv, a]) => {
-        const [cu, cv] = f([uu, vv])
-        return smallLeaf(cu, cv, p.flip ? Math.PI - a : a, 0.11, p.accent!)
-      })
-      : []
-    return [line(stem, p.stem, 0.018), ...leaves, ...accent]
+    const stem = bezier([[0.3, 0.84], [0.4, 0.63], [0.6, 0.5], [0.64, 0.24]], 40)
+    const out: Stroke[] = [line(stem.map(f), p.stem, 0.01)]
+    // จุดโคนใบมาจากเส้นก้านเดียวกับที่วาด จึงไม่ลอยแม้ flip หรือใส่ accent
+    for (const [index, a, len, accent] of [
+      [6, -2.5, 0.14, false], [12, -0.25, 0.15, false], [19, -2.6, 0.14, false],
+      [26, -0.3, 0.13, false], [33, -2.5, 0.11, false],
+      [9, -0.35, 0.1, true], [23, -2.5, 0.1, true],
+    ] as const) {
+      const col = accent ? p.accent : p.leaf
+      if (!col) continue
+      const root = stem[index]!
+      const tip: Pt = [root[0] + Math.cos(a) * len, root[1] + Math.sin(a) * len]
+      out.push(...fill(leafShape(root, tip, len * 0.23).map(f), col, { brushWidth: 0.006 }))
+      const mid: Pt = [root[0] + (tip[0] - root[0]) * 0.8, root[1] + (tip[1] - root[1]) * 0.8]
+      out.push(line([f(root), f(mid)], tint(col, '#ffffff', 0.3), 0.0025))
+    }
+    return out
   },
   curve: (p) => [line(p.points.length === 2 ? p.points : bezier(p.points, 28), p.color, p.width)],
+  ...referenceRenderers,
 }
 
 /** แปลงลายหนึ่งชิ้นเป็น stroke — ค่าที่ขาดจะเติมค่าตั้งต้น ค่าที่ผิดจะ throw พร้อมเหตุผล */
