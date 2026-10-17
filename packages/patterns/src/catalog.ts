@@ -3,6 +3,8 @@
  *
  * - DECORATIONS: ต้องตรงกับ apps/web/src/3d/decorations/decorationCatalog.ts —
  *   apps/mcp มีเทสที่อ่านไฟล์นั้นแล้วเทียบ id ทุกตัว ถ้าเว็บเพิ่ม/ลบชิ้น เทสจะเตือน
+ *   ส่วน worldRadius/defaultColor (ใช้วาดภาพตัวอย่าง) ถูกเทียบกับ geometry จริงใน
+ *   apps/web/src/3d/decorations/decorationCatalog.test.ts
  * - PALETTES: ยกจาก apps/web/src/3d/generation/composer.ts
  */
 
@@ -10,43 +12,46 @@ export interface DecorationInfo {
   id: string
   label: string
   category: 'gemstone' | 'metal' | 'pearl' | 'motif' | 'ribbon'
+  /** รัศมีทรงกลมที่ครอบชิ้นนี้ในหน่วยโลกเมื่อ scale = 1 (= boundingSphere × defaultScale ในเว็บ) */
+  worldRadius: number
+  defaultColor: string
 }
 
 export const DECORATIONS: readonly DecorationInfo[] = [
-  { id: 'gem-diamond', label: 'เพชรทรงเหลี่ยม', category: 'gemstone' },
-  { id: 'gem-round', label: 'เพชรกลม', category: 'gemstone' },
-  { id: 'gem-marquise', label: 'เพชรทรงเรือ', category: 'gemstone' },
-  { id: 'gem-chaton', label: 'เพชรกลมเจียระไน', category: 'gemstone' },
-  { id: 'metal-bead', label: 'ลูกปัดโลหะ', category: 'metal' },
-  { id: 'gem-princess', label: 'เพชรสี่เหลี่ยม', category: 'gemstone' },
-  { id: 'gem-cushion', label: 'เพชรคุชชั่น', category: 'gemstone' },
-  { id: 'gem-emerald', label: 'มรกต', category: 'gemstone' },
-  { id: 'gem-sapphire', label: 'แซฟไฟร์', category: 'gemstone' },
-  { id: 'gem-ruby', label: 'ทับทิม', category: 'gemstone' },
-  { id: 'gem-crystal', label: 'คริสตัลยอดแหลม', category: 'gemstone' },
-  { id: 'metal-hoop', label: 'ห่วงกลม', category: 'metal' },
-  { id: 'metal-double-hoop', label: 'ห่วงคู่', category: 'metal' },
-  { id: 'metal-square-hoop', label: 'ห่วงเหลี่ยม', category: 'metal' },
-  { id: 'metal-bar', label: 'แท่งทอง', category: 'metal' },
-  { id: 'metal-bar-double', label: 'แท่งคู่', category: 'metal' },
-  { id: 'metal-stud', label: 'หมุดเงิน', category: 'metal' },
-  { id: 'metal-knot', label: 'ปมโลหะ', category: 'metal' },
-  { id: 'pearl-single', label: 'ไข่มุกเดี่ยว', category: 'pearl' },
-  { id: 'pearl-cabochon', label: 'ไข่มุกรี', category: 'pearl' },
-  { id: 'pearl-drop', label: 'ไข่มุกหยดน้ำ', category: 'pearl' },
-  { id: 'motif-heart', label: 'หัวใจ', category: 'motif' },
-  { id: 'motif-star', label: 'ดาวห้าแฉก', category: 'motif' },
-  { id: 'motif-moon', label: 'พระจันทร์เสี้ยว', category: 'motif' },
-  { id: 'motif-bolt', label: 'สายฟ้า', category: 'motif' },
-  { id: 'motif-leaf', label: 'ใบไม้', category: 'motif' },
-  { id: 'motif-butterfly', label: 'ผีเสื้อ', category: 'motif' },
-  { id: 'motif-crown', label: 'มงกุฎ', category: 'motif' },
-  { id: 'motif-flower', label: 'ดอกไม้', category: 'motif' },
-  { id: 'motif-orbit', label: 'วงแหวนซ้อน', category: 'motif' },
-  { id: 'ribbon-bow', label: 'โบว์', category: 'ribbon' },
-  { id: 'ribbon-knot', label: 'ริบบิ้นปม', category: 'ribbon' },
-  { id: 'ribbon-wave', label: 'ริบบิ้นคลื่น', category: 'ribbon' },
-  { id: 'ribbon-loop', label: 'ริบบิ้นห่วง', category: 'ribbon' },
+  { id: 'gem-diamond', label: 'เพชรทรงเหลี่ยม', category: 'gemstone', worldRadius: 0.0016, defaultColor: '#eaf7ff' },
+  { id: 'gem-round', label: 'เพชรกลม', category: 'gemstone', worldRadius: 0.00145, defaultColor: '#d9ecff' },
+  { id: 'gem-marquise', label: 'เพชรทรงเรือ', category: 'gemstone', worldRadius: 0.00167, defaultColor: '#eaf7ff' },
+  { id: 'gem-chaton', label: 'เพชรกลมเจียระไน', category: 'gemstone', worldRadius: 0.000993, defaultColor: '#eaf7ff' },
+  { id: 'metal-bead', label: 'ลูกปัดโลหะ', category: 'metal', worldRadius: 0.0006, defaultColor: '#d4af37' },
+  { id: 'gem-princess', label: 'เพชรสี่เหลี่ยม', category: 'gemstone', worldRadius: 0.00127, defaultColor: '#f4fbff' },
+  { id: 'gem-cushion', label: 'เพชรคุชชั่น', category: 'gemstone', worldRadius: 0.00132, defaultColor: '#f6d9ff' },
+  { id: 'gem-emerald', label: 'มรกต', category: 'gemstone', worldRadius: 0.00122, defaultColor: '#49bf8a' },
+  { id: 'gem-sapphire', label: 'แซฟไฟร์', category: 'gemstone', worldRadius: 0.00115, defaultColor: '#3e75df' },
+  { id: 'gem-ruby', label: 'ทับทิม', category: 'gemstone', worldRadius: 0.00157, defaultColor: '#d64a62' },
+  { id: 'gem-crystal', label: 'คริสตัลยอดแหลม', category: 'gemstone', worldRadius: 0.00149, defaultColor: '#b9f2ff' },
+  { id: 'metal-hoop', label: 'ห่วงกลม', category: 'metal', worldRadius: 0.00095, defaultColor: '#d4af37' },
+  { id: 'metal-double-hoop', label: 'ห่วงคู่', category: 'metal', worldRadius: 0.00103, defaultColor: '#d98f82' },
+  { id: 'metal-square-hoop', label: 'ห่วงเหลี่ยม', category: 'metal', worldRadius: 0.00105, defaultColor: '#d8dde5' },
+  { id: 'metal-bar', label: 'แท่งทอง', category: 'metal', worldRadius: 0.000909, defaultColor: '#d4af37' },
+  { id: 'metal-bar-double', label: 'แท่งคู่', category: 'metal', worldRadius: 0.000764, defaultColor: '#d8dde5' },
+  { id: 'metal-stud', label: 'หมุดเงิน', category: 'metal', worldRadius: 0.00072, defaultColor: '#d8dde5' },
+  { id: 'metal-knot', label: 'ปมโลหะ', category: 'metal', worldRadius: 0.00078, defaultColor: '#d98f82' },
+  { id: 'pearl-single', label: 'ไข่มุกเดี่ยว', category: 'pearl', worldRadius: 0.000986, defaultColor: '#fff4e8' },
+  { id: 'pearl-cabochon', label: 'ไข่มุกรี', category: 'pearl', worldRadius: 0.000871, defaultColor: '#f4e2ce' },
+  { id: 'pearl-drop', label: 'ไข่มุกหยดน้ำ', category: 'pearl', worldRadius: 0.00113, defaultColor: '#fff1da' },
+  { id: 'motif-heart', label: 'หัวใจ', category: 'motif', worldRadius: 0.000901, defaultColor: '#e85d75' },
+  { id: 'motif-star', label: 'ดาวห้าแฉก', category: 'motif', worldRadius: 0.000907, defaultColor: '#d4af37' },
+  { id: 'motif-moon', label: 'พระจันทร์เสี้ยว', category: 'motif', worldRadius: 0.000883, defaultColor: '#f3d57a' },
+  { id: 'motif-bolt', label: 'สายฟ้า', category: 'motif', worldRadius: 0.000898, defaultColor: '#f4c84f' },
+  { id: 'motif-leaf', label: 'ใบไม้', category: 'motif', worldRadius: 0.000808, defaultColor: '#69b889' },
+  { id: 'motif-butterfly', label: 'ผีเสื้อ', category: 'motif', worldRadius: 0.00079, defaultColor: '#bb7be8' },
+  { id: 'motif-crown', label: 'มงกุฎ', category: 'motif', worldRadius: 0.000947, defaultColor: '#d4af37' },
+  { id: 'motif-flower', label: 'ดอกไม้', category: 'motif', worldRadius: 0.00084, defaultColor: '#f28fa6' },
+  { id: 'motif-orbit', label: 'วงแหวนซ้อน', category: 'motif', worldRadius: 0.000952, defaultColor: '#9aa8bb' },
+  { id: 'ribbon-bow', label: 'โบว์', category: 'ribbon', worldRadius: 0.000876, defaultColor: '#e9799a' },
+  { id: 'ribbon-knot', label: 'ริบบิ้นปม', category: 'ribbon', worldRadius: 0.000793, defaultColor: '#e8a0bc' },
+  { id: 'ribbon-wave', label: 'ริบบิ้นคลื่น', category: 'ribbon', worldRadius: 0.000877, defaultColor: '#c982d8' },
+  { id: 'ribbon-loop', label: 'ริบบิ้นห่วง', category: 'ribbon', worldRadius: 0.000852, defaultColor: '#e48aab' },
 ]
 
 export const PALETTES: Readonly<Record<string, readonly string[]>> = {

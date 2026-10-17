@@ -98,7 +98,7 @@ describe('HTTP MCP and OAuth', () => {
     const init = await mcp(app, response.body.access_token).expect(200)
     expect(init.body.result.serverInfo.name).toBe('nail-studio')
     const list = await mcp(app, response.body.access_token, 'tools/list', {}).expect(200)
-    expect(list.body.result.tools).toHaveLength(20)
+    expect(list.body.result.tools).toHaveLength(21)
     expect(list.body.result.tools[0]._meta.securitySchemes).toEqual([{ type: 'oauth2', scopes: ['nails:design'] }])
     const patterns = await mcp(app, response.body.access_token, 'tools/call', { name: 'list_patterns', arguments: {} }).expect(200)
     expect(patterns.body.result.isError).not.toBe(true)

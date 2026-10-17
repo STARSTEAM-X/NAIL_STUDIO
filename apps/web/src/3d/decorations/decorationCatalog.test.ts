@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { BufferGeometry } from 'three'
 import { catalogEntry, DECORATION_CATALOG } from './decorationCatalog.ts'
+// ข้อมูลชุดเดียวกันฝั่ง MCP (ไม่พึ่ง three) — import แบบ relative เพราะเว็บไม่ได้ประกาศ
+// patterns เป็น dependency และไฟล์ catalog ไม่ import อะไรเลย
+import { DECORATIONS } from '../../../../../packages/patterns/src/catalog.ts'
 
 describe('decorationCatalog', () => {
   it('has at least one entry with a unique id, label, and positive default scale', () => {
@@ -42,5 +45,21 @@ describe('decorationCatalog', () => {
     const known = DECORATION_CATALOG[0]!
     expect(catalogEntry(known.id)).toBe(known)
     expect(catalogEntry('does-not-exist')).toBeUndefined()
+  })
+
+  it('ข้อมูลภาพตัวอย่างของ MCP (packages/patterns) ตรงกับ geometry จริงทุกชิ้น', () => {
+    // MCP วาดของตกแต่งด้วย worldRadius/defaultColor — ถ้าเว็บเปลี่ยน geometry/สเกล/สี
+    // แต่ลืมแก้ฝั่ง patterns ภาพตัวอย่างจะผิดขนาดเงียบ ๆ เทสนี้กันไว้
+    expect(DECORATIONS.map((d) => d.id).sort()).toEqual(DECORATION_CATALOG.map((e) => e.id).sort())
+    for (const entry of DECORATION_CATALOG) {
+      const info = DECORATIONS.find((d) => d.id === entry.id)!
+      const geometry = entry.geometry()
+      geometry.computeBoundingSphere()
+      const radius = geometry.boundingSphere!.radius * entry.defaultScale
+      geometry.dispose()
+      expect(Math.abs(info.worldRadius - radius) / radius, entry.id).toBeLessThanOrEqual(0.05)
+      expect(info.defaultColor.toLowerCase(), entry.id).toBe(entry.defaultColor.toLowerCase())
+      expect(info.category, entry.id).toBe(entry.category)
+    }
   })
 })

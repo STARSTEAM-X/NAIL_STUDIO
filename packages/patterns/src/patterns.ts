@@ -426,7 +426,17 @@ export function renderPattern(spec: PatternSpec): Stroke[] {
   return (RENDER[parsed.type] as (p: typeof parsed) => Stroke[])(parsed)
 }
 
+/**
+ * ลายที่ใช้ stroke มาก (≥ 150 เมื่อใช้ค่าเริ่มต้น) — lint เตือนเมื่อเล็บเดียวใช้เกิน 2 ลาย
+ * เพราะกินเพดาน 6 เลเยอร์ × 500 stroke เร็ว; patterns.test.ts วัดจำนวนจริงเทียบกับชุดนี้
+ */
+export const DENSE_PATTERN_TYPES: ReadonlySet<string> = new Set([
+  'ghost', 'bead_line', 'flower', 'skull', 'constellation', 'cat_eye', 'glitter_line', 'butterfly',
+  'checkerboard', 'bunny', 'flame', 'gold_vein', 'foil', 'glitter', 'floral_spray',
+])
+
 export const PATTERN_TYPES = patternSchema.options.map((option) => ({
   type: option.shape.type.value,
   description: option.description ?? '',
+  dense: DENSE_PATTERN_TYPES.has(option.shape.type.value),
 }))

@@ -63,7 +63,7 @@ describe('nail-studio MCP server', () => {
     const { tools } = await client.listTools()
     expect(tools.map((t) => t.name).sort()).toEqual([
       'add_decoration', 'add_strokes', 'apply_preset', 'apply_recipe', 'clear_nail', 'copy_nail', 'create_project',
-      'get_design', 'list_decorations', 'list_palettes', 'list_patterns', 'list_presets', 'list_projects',
+      'get_design', 'lint_design', 'list_decorations', 'list_palettes', 'list_patterns', 'list_presets', 'list_projects',
       'mirror_hand', 'open_page', 'preview_recipe', 'render_preview', 'set_nail', 'set_nail_properties', 'validate_document',
     ])
   })
@@ -214,5 +214,127 @@ describe('catalog', () => {
     const source = readFileSync(fileURLToPath(new URL('../../web/src/3d/decorations/decorationCatalog.ts', import.meta.url)), 'utf8')
     const webIds = [...source.matchAll(/asset\('([a-z-]+)'/g)].map((m) => m[1])
     expect(DECORATIONS.map((d) => d.id).sort()).toEqual(webIds.sort())
+  })
+})
+
+describe('dryRun / ภาพหลังบันทึก / lint', () => {
+  let api: FakeApi
+  let client: Client
+
+  type Part = { type: string; data?: string; text?: string }
+  const parts = (result: object): Part[] => ((result as { content?: unknown }).content ?? []) as Part[]
+  const images = (result: object): Part[] => parts(result).filter((c) => c.type === 'image')
+  const pngWidth = (part: Part): number => Buffer.from(part.data!, 'base64').readUInt32BE(16)
+
+  beforeEach(async () => {
+    api = new FakeApi()
+    // งานตั้งต้นที่มีของบน right.index ให้ copy/mirror/clear มีอะไรให้เปลี่ยน
+    const document = createEmptyDocument()
+    document.nails['right.index'] = {
+      ...document.nails['right.index'],
+      baseColor: '#aa3355',
+      layers: [{
+        id: 'layer-1', name: 'เลเยอร์ 1', visible: true, opacity: 1, blend: 'normal',
+        strokes: [{ kind: 'brush', brush: 'round', color: '#ffffff', size: 40, opacity: 1, softness: 0.1, points: [{ x: 0.5, y: 0.5, p: 1 }] }],
+      }],
+      decorations: [{ id: 'd1', catalogId: 'pearl-single', u: 0.5, v: 0.6, rotation: 0, scale: 0.4 }],
+    }
+    api.versions = [document]
+    client = await connect(api)
+  })
+
+  const writeCalls: { name: string; arguments: Record<string, unknown> }[] = [
+    { name: 'apply_recipe', arguments: { projectId: PROJECT, recipe: { nails: { middle: { base: '#112233' } } } } },
+    { name: 'apply_preset', arguments: { projectId: PROJECT, preset: 'glazed-pearl' } },
+    { name: 'set_nail', arguments: { projectId: PROJECT, nails: ['ring'], nail: { base: '#123456' } } },
+    { name: 'set_nail_properties', arguments: { projectId: PROJECT, nails: ['right.index'], base: '#abcdef' } },
+    { name: 'copy_nail', arguments: { projectId: PROJECT, from: 'right.index', to: ['right.middle'] } },
+    { name: 'mirror_hand', arguments: { projectId: PROJECT, from: 'right' } },
+    { name: 'add_strokes', arguments: { projectId: PROJECT, nails: ['right.thumb'], strokes: [{ kind: 'fill', color: '#334455' }] } },
+    { name: 'add_decoration', arguments: { projectId: PROJECT, nails: ['right.ring'], decorations: [{ catalogId: 'gem-round', u: 0.5, v: 0.5 }] } },
+    { name: 'clear_nail', arguments: { projectId: PROJECT, nails: ['right.index'] } },
+  ]
+
+  it('dryRun ของทุก tool ที่บันทึก: คืนภาพ ไม่เรียก saveVersion', async () => {
+    for (const call of writeCalls) {
+      const result = await client.callTool({ name: call.name, arguments: { ...call.arguments, dryRun: true } })
+      expect(result.isError, call.name).toBeFalsy()
+      expect(textOf(result), call.name).toContain('ยังไม่บันทึก')
+      expect(images(result), call.name).toHaveLength(1)
+    }
+    expect(api.saves).toHaveLength(0)
+    expect(api.versions).toHaveLength(1)
+  })
+
+  it('บันทึกจริงคืนภาพเฉพาะนิ้วที่เปลี่ยน — นิ้วเดียวเป็นภาพขยาย', async () => {
+    const result = await client.callTool({ name: 'set_nail_properties', arguments: { projectId: PROJECT, nails: ['right.index'], base: '#abcdef' } })
+    expect(textOf(result)).toContain('เวอร์ชัน 2')
+    const [image] = images(result)
+    expect(image).toBeDefined()
+    expect(pngWidth(image!)).toBe(512)
+
+    const many = await client.callTool({ name: 'set_nail_properties', arguments: { projectId: PROJECT, nails: ['ring'], base: '#123123' } })
+    // สองนิ้ว (สองมือ) → ภาพทั้งมือแบบปกติ แถวละหนึ่งนิ้ว
+    expect(pngWidth(images(many)[0]!)).toBe(200)
+  })
+
+  it('preview: false ไม่คืนภาพ', async () => {
+    const result = await client.callTool({ name: 'set_nail_properties', arguments: { projectId: PROJECT, nails: ['right.index'], base: '#abcdef', preview: false } })
+    expect(textOf(result)).toContain('เวอร์ชัน 2')
+    expect(images(result)).toHaveLength(0)
+  })
+
+  it('แก้ที่ไม่เปลี่ยนอะไร ไม่บันทึกเวอร์ชันใหม่', async () => {
+    const result = await client.callTool({ name: 'set_nail_properties', arguments: { projectId: PROJECT, nails: ['right.index'], base: '#aa3355' } })
+    expect(textOf(result)).toContain('ไม่มีการเปลี่ยนแปลง')
+    expect(api.saves).toHaveLength(0)
+  })
+
+  it('เอกสารจาก API ที่ลำดับคีย์ต่างจาก schema ไม่ถูกนับว่าเปลี่ยน', async () => {
+    // API คืน JSON ที่เรียงคีย์ตามที่เก็บไว้ — กลับลำดับคีย์ของทุกอ็อบเจกต์ให้ต่างจากผลของ zod
+    const reverse = (value: unknown): unknown => Array.isArray(value) ? value.map(reverse)
+      : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).reverse().map(([k, v]) => [k, reverse(v)]))
+        : value
+    api.versions = [reverse(api.versions[0]) as DesignDocument]
+    const result = await client.callTool({ name: 'set_nail_properties', arguments: { projectId: PROJECT, nails: ['right.index'], base: '#aa3355' } })
+    expect(textOf(result)).toContain('ไม่มีการเปลี่ยนแปลง')
+    const changed = await client.callTool({ name: 'set_nail_properties', arguments: { projectId: PROJECT, nails: ['right.index'], base: '#000000', dryRun: true } })
+    expect(textOf(changed)).toContain('นิ้วที่เปลี่ยน: right.index')
+  })
+
+  it('คำเตือนจาก lint ต่อท้ายผลของ dryRun', async () => {
+    const result = await client.callTool({
+      name: 'add_decoration',
+      arguments: { projectId: PROJECT, nails: ['right.ring'], decorations: [{ catalogId: 'gem-round', u: 0.02, v: 0.5 }], dryRun: true },
+    })
+    expect(textOf(result)).toContain('[OUTSIDE_NAIL]')
+  })
+
+  it('lint_design ผ่าน client จริง', async () => {
+    expect(textOf(await client.callTool({ name: 'lint_design', arguments: { projectId: PROJECT } }))).toBe('ไม่พบปัญหา')
+    await client.callTool({
+      name: 'add_decoration',
+      arguments: { projectId: PROJECT, nails: ['right.ring'], decorations: [{ catalogId: 'gem-round', u: 0.02, v: 0.5 }] },
+    })
+    const result = await client.callTool({ name: 'lint_design', arguments: { projectId: PROJECT, nails: ['right.ring'] } })
+    expect(textOf(result)).toContain('[OUTSIDE_NAIL] right.ring')
+  })
+
+  it('preview_recipe แบบ zoom nail แสดงนิ้วที่เปลี่ยนในมือที่เลือก และบอกวิธีแก้เมื่อเกิน', async () => {
+    const recipe = { nails: { index: { base: '#112233' }, ring: { base: '#334455' } } }
+    const right = await client.callTool({ name: 'preview_recipe', arguments: { recipe, hands: 'right', zoom: 'nail' } })
+    expect(right.isError).toBeFalsy()
+    expect(pngWidth(images(right)[0]!)).toBe(1024)
+    const both = await client.callTool({ name: 'preview_recipe', arguments: { recipe, zoom: 'nail' } })
+    expect(both.isError).toBe(true)
+    expect(textOf(both)).toContain("hands: 'right'")
+  })
+
+  it('render_preview แบบ zoom nail และปฏิเสธเมื่อเกิน 3 นิ้ว', async () => {
+    const ok = await client.callTool({ name: 'render_preview', arguments: { projectId: PROJECT, nails: ['right.index'], zoom: 'nail' } })
+    expect(pngWidth(images(ok)[0]!)).toBe(512)
+    const tooMany = await client.callTool({ name: 'render_preview', arguments: { projectId: PROJECT, nails: ['index', 'middle'], zoom: 'nail' } })
+    expect(tooMany.isError).toBe(true)
+    expect(textOf(tooMany)).toContain('ไม่เกิน 3 นิ้ว')
   })
 })

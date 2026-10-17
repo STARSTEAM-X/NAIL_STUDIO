@@ -1,12 +1,11 @@
 import type { Mesh } from 'three'
 import type { Nail } from '@nail-studio/contracts'
+import { nailMorphWeights } from './nailMorphWeights.ts'
 
 /**
  * ตั้งค่า `morphTargetInfluences` ของ mesh เล็บให้ตรงกับทรง/ความยาวที่เลือก
  *
- * ทรงกับความยาวมาจาก shape key คนละชุดที่บวกกันได้ (ไม่ใช่ทางแยกที่ต้องเลือกอย่างใด
- * อย่างหนึ่ง) เพราะ `hand.glb` ถูกสร้างให้ delta ของ morph เป็นเวกเตอร์ที่บวกกันตรง ๆ
- * (ดูสเปก D-A2) — `round`/`medium` เป็นทรงฐาน ไม่มี target ของตัวเอง จึงไม่เปิดอะไรเลย
+ * กฎการเลือกน้ำหนักอยู่ที่ nailMorphWeights.ts (ใช้ร่วมกับภาพตัวอย่างของ MCP)
  */
 export function applyNailMorphs(mesh: Mesh, shape: Nail['shape'], length: Nail['length']): void {
   const dictionary = mesh.morphTargetDictionary
@@ -16,16 +15,11 @@ export function applyNailMorphs(mesh: Mesh, shape: Nail['shape'], length: Nail['
   const influences = mesh.morphTargetInfluences?.length === count
     ? mesh.morphTargetInfluences
     : new Array(count).fill(0)
-  influences.fill(0)
-
-  if (shape !== 'round') {
-    const index = dictionary[shape]
-    if (index !== undefined) influences[index] = 1
+  const names: string[] = new Array(count).fill('')
+  for (const [name, index] of Object.entries(dictionary)) {
+    if (index < count) names[index] = name
   }
-  if (length !== 'medium') {
-    const index = dictionary[length]
-    if (index !== undefined) influences[index] = 1
-  }
+  nailMorphWeights(names, shape, length).forEach((weight, index) => { influences[index] = weight })
 
   mesh.morphTargetInfluences = influences
 }

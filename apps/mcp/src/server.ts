@@ -25,9 +25,11 @@ import {
   nailRecipeSchema,
   recipeSchema,
   summarizeDocument,
+  type Recipe,
 } from '@nail-studio/patterns'
 import type { NailStudioApi } from './apiClient.ts'
-import { renderPreviewPng, type PreviewScope } from './render.ts'
+import { formatFindings, lintDesign } from './lint.ts'
+import { MAX_ZOOMED_NAILS, renderPreviewPng, type PreviewOptions } from './render.ts'
 
 /**
  * MCP server ของ NailStudio — ให้ AI อ่าน/สร้าง/แก้ลายเล็บในเว็บผ่านข้อมูล schema เท่านั้น
@@ -59,6 +61,39 @@ function expandTargets(targets: readonly string[]): NailKey[] {
 
 const text = (value: string) => ({ content: [{ type: 'text' as const, text: value }] })
 
+type Content = { type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }
+
+/** ส่วนของคู่มือ (resource) ที่อธิบายภาพตัวอย่าง, dryRun และคำเตือน */
+const PREVIEW_GUIDE = [
+  '- ภาพตัวอย่างวาดตามทรง/ความยาวจริงของโมเดล: ลายที่ปลายเล็บทรงยาว (long/extra, almond/stiletto) ถูกยืดตามแนวยาวแบบเดียวกับที่ผู้ใช้เห็น',
+  "- lighting 'scene' (ค่าเริ่มต้น) = สีที่ผู้ใช้เห็นบนโมเดล, 'flat' = สี hex ตรงตัว",
+  "- zoom 'nail' ขยายทีละนิ้ว (ไม่เกิน 3 นิ้ว) ไว้ดูเส้นบาง เกล็ด และของตกแต่ง",
+  '- ทุก tool ที่บันทึกรับ dryRun: true เพื่อดูภาพ + คำเตือนก่อน — วน ร่าง → dryRun → แก้ตามคำเตือน → บันทึก',
+  '- คำเตือน: OUTSIDE_NAIL (นอก/ล้นเล็บ), STRETCHED (ทรงยืดลายชิ้น — ย้ายออกจากปลายหรือย่อ), LOW_CONTRAST (สีกลืนพื้น), NEAR_LIMIT (stroke/เลเยอร์ใกล้เพดาน), DENSE_PATTERNS (ลายหนาแน่นเกิน 2 ลาย)',
+  '- lint_design ตรวจงานที่บันทึกแล้วได้ทุกเมื่อ',
+].join('\n')
+
+/** ตัวเลือกภาพตัวอย่างที่ใช้ร่วมกันทุก tool ที่แสดงภาพ */
+const zoomInput = z.enum(['hand', 'nail']).default('hand')
+  .describe("'hand' = ทั้งมือ, 'nail' = ขยายทีละนิ้ว (texture 1024, ไม่เกิน 3 นิ้ว) ไว้ดูเส้นบาง/เกล็ด")
+const lightingInput = z.enum(['scene', 'flat']).default('scene')
+  .describe("'scene' = แสง + tone mapping แบบฉากในเว็บ (สีที่ผู้ใช้เห็นจริง), 'flat' = สี hex ตรงตัว")
+/** ตัวเลือกของทุก tool ที่บันทึก */
+const dryRunInput = z.boolean().default(false).describe('true = ดูภาพ + คำเตือนโดยไม่บันทึก')
+const previewInput = z.boolean().default(true).describe('คืนภาพของนิ้วที่เปลี่ยนหลังบันทึก')
+
+/** นิ้วที่เนื้อหาเปลี่ยน — เทียบ JSON ทีละนิ้ว O(ขนาดเอกสาร) */
+function changedNails(before: DesignDocument, after: DesignDocument): NailKey[] {
+  return NAIL_KEYS.filter((key) => JSON.stringify(before.nails[key]) !== JSON.stringify(after.nails[key]))
+}
+
+/** ภาพของนิ้วที่เปลี่ยน: นิ้วเดียวขยายเต็ม, หลายนิ้วแสดงทั้งมือเฉพาะนิ้วนั้น */
+function changedPreview(keys: readonly NailKey[]): PreviewOptions {
+  if (keys.length === 1) return { only: [...keys], zoom: 'nail' }
+  const hands = new Set(keys.map((key) => key.split('.')[0]))
+  return { only: [...keys], scope: hands.size === 2 ? 'both' : (hands.has('left') ? 'left' : 'right') }
+}
+
 function errorResult(error: unknown) {
   const message = error instanceof z.ZodError
     ? `ข้อมูลไม่ผ่าน schema:\n${error.issues.slice(0, 8).map((i) => `- ${i.path.join('.')}: ${i.message}`).join('\n')}`
@@ -71,7 +106,8 @@ export function createNailStudioServer({ api, webUrl, oauth = false }: ServerOpt
     { name: 'nail-studio', version: '0.1.0' },
     {
       instructions: `เครื่องมือออกแบบลายเล็บของ NailStudio — แก้งานได้ด้วยข้อมูล schema เท่านั้น
-ลำดับที่แนะนำ: list_patterns/list_presets → preview_recipe (ดูภาพก่อน) → apply_recipe (บันทึก) → render_preview (ตรวจ)
+ลำดับที่แนะนำ: list_patterns/list_presets → preview_recipe หรือ tool แก้งานด้วย dryRun: true (ดูภาพ + คำเตือน) → ปรับจนคำเตือนหมด → บันทึก → render_preview (ตรวจ)
+ภาพตัวอย่างแสดงทรงเล็บจริงและแสงแบบในเว็บ; zoom: 'nail' ขยายทีละนิ้ว (ไม่เกิน 3) ไว้ดูเส้นบาง/เกล็ด; lighting: 'flat' ดูสี hex ตรงตัว
 ทุกการบันทึกสร้างเวอร์ชันใหม่ ผู้ใช้ย้อนกลับได้เสมอ
 ปรับทรง/ความยาว/สีพื้นโดยเก็บลายเดิม: set_nail_properties
 เมื่อผู้ใช้ต้องเปิดเว็บ: open_page คืนลิงก์ให้ client เปิดด้วยเครื่องมือเบราว์เซอร์ ถ้าต้องล็อกอินให้ผู้ใช้ทำในเบราว์เซอร์ของตนเอง
@@ -83,19 +119,57 @@ ${DESIGN_RULES}`,
   const editorLink = (projectId: string): string => `${webUrl}/editor/${projectId}`
   const authMetadata = oauth ? { _meta: { securitySchemes: [{ type: 'oauth2', scopes: ['nails:design'] }] } } : {}
 
-  /** อ่านเวอร์ชันล่าสุด → แก้ → ตรวจ → บันทึกเวอร์ชันใหม่ (กันทับงานด้วย expectedVersion) */
-  async function updateDesign(projectId: string, edit: (document: DesignDocument) => DesignDocument): Promise<string> {
-    const current = await api.getProject(projectId)
-    const next = designDocumentSchema.parse(edit(current.version.document))
-    const saved = await api.saveVersion(projectId, next, current.version.number)
-    return `บันทึกเป็นเวอร์ชัน ${saved.versionNumber} แล้ว (จากเวอร์ชัน ${current.version.number})\nเปิดใน editor: ${editorLink(projectId)}`
-  }
-
-  const image = (document: DesignDocument, scope: PreviewScope, only?: NailKey[]) => ({
-    type: 'image' as const,
-    data: renderPreviewPng(document, scope, only).toString('base64'),
+  const image = (document: DesignDocument, options: PreviewOptions): Content => ({
+    type: 'image',
+    data: renderPreviewPng(document, options).toString('base64'),
     mimeType: 'image/png',
   })
+
+  /** ข้อความคำเตือนจาก lint (ไม่มีคำเตือน = ไม่มีอะไรต่อท้าย) */
+  const warnings = (document: DesignDocument, nails: readonly NailKey[], recipe?: Recipe): Content[] => {
+    const message = formatFindings(lintDesign(document, { nails, ...(recipe ? { recipe } : {}) }))
+    return message ? [{ type: 'text', text: message }] : []
+  }
+
+  interface UpdateOptions {
+    dryRun?: boolean
+    preview?: boolean
+    /** recipe ที่ใช้สร้างการแก้ — ส่งให้ lint ตรวจลายหนาแน่น */
+    recipe?: Recipe
+  }
+
+  /**
+   * อ่านเวอร์ชันล่าสุด → แก้ → ตรวจ → บันทึกเวอร์ชันใหม่ (กันทับงานด้วย expectedVersion)
+   * dryRun ไม่บันทึก; ไม่มีอะไรเปลี่ยนก็ไม่บันทึก (ไม่สร้างเวอร์ชันซ้ำ)
+   */
+  async function updateDesign(
+    projectId: string,
+    edit: (document: DesignDocument) => DesignDocument,
+    { dryRun = false, preview = true, recipe }: UpdateOptions = {},
+  ): Promise<{ content: Content[] }> {
+    const current = await api.getProject(projectId)
+    // เทียบกับเอกสารที่ผ่าน schema แล้วเหมือนกัน — ลำดับคีย์จาก API ต่างจากผลของ zod ได้
+    const before = designDocumentSchema.parse(current.version.document)
+    const next = designDocumentSchema.parse(edit(current.version.document))
+    if (JSON.stringify(next) === JSON.stringify(before)) {
+      return text(`ไม่มีการเปลี่ยนแปลง — ไม่ได้บันทึกเวอร์ชันใหม่ (ยังเป็นเวอร์ชัน ${current.version.number})`)
+    }
+    const changed = changedNails(before, next)
+    const visuals = (show: boolean): Content[] => (changed.length > 0
+      ? [...(show ? [image(next, changedPreview(changed))] : []), ...warnings(next, changed, recipe)]
+      : [])
+    if (dryRun) {
+      const which = changed.join(', ') || 'ไม่มี (เปลี่ยนเฉพาะค่าของมือ)'
+      return { content: [{ type: 'text', text: `ตัวอย่าง (ยังไม่บันทึก) — นิ้วที่เปลี่ยน: ${which}` }, ...visuals(true)] }
+    }
+    const saved = await api.saveVersion(projectId, next, current.version.number)
+    return {
+      content: [
+        { type: 'text', text: `บันทึกเป็นเวอร์ชัน ${saved.versionNumber} แล้ว (จากเวอร์ชัน ${current.version.number})\nเปิดใน editor: ${editorLink(projectId)}` },
+        ...visuals(preview),
+      ],
+    }
+  }
 
   // ── อ่าน ────────────────────────────────────────────────────────────────
 
@@ -199,30 +273,70 @@ ${DESIGN_RULES}`,
       recipe: recipeSchema,
       projectId: z.string().uuid().optional(),
       hands: z.enum(['right', 'left', 'both']).default('both'),
+      zoom: zoomInput.describe("'hand' = ทั้งมือ, 'nail' = ขยายเฉพาะนิ้วที่ recipe เปลี่ยน (ไม่เกิน 3 นิ้ว)"),
+      lighting: lightingInput,
     },
     annotations: { readOnlyHint: true },
-  }, async ({ recipe, projectId, hands }) => {
+  }, async ({ recipe, projectId, hands, zoom, lighting }) => {
     try {
       const base = projectId ? (await api.getProject(projectId)).version.document : undefined
       const { document, changed } = buildFromRecipe(recipe, base)
-      return { content: [text(`ตัวอย่าง (ยังไม่บันทึก) — นิ้วที่เปลี่ยน: ${changed.join(', ') || 'ไม่มี'}`).content[0]!, image(document, hands)] }
+      const zoomed = changed.filter((key) => hands === 'both' || key.startsWith(`${hands}.`))
+      if (zoom === 'nail' && zoomed.length > MAX_ZOOMED_NAILS) {
+        return errorResult(new Error(`recipe นี้เปลี่ยน ${zoomed.length} นิ้วในมือที่เลือก — zoom 'nail' แสดงได้ไม่เกิน ${MAX_ZOOMED_NAILS} นิ้ว: ใช้ hands: 'right' หรือ zoom: 'hand'`))
+      }
+      const options: PreviewOptions = zoom === 'nail' ? { only: zoomed, zoom, lighting } : { scope: hands, zoom, lighting }
+      return {
+        content: [
+          { type: 'text' as const, text: `ตัวอย่าง (ยังไม่บันทึก) — นิ้วที่เปลี่ยน: ${changed.join(', ') || 'ไม่มี'}` },
+          image(document, options),
+          ...warnings(document, changed, recipe),
+        ],
+      }
     } catch (error) { return errorResult(error) }
   })
 
   server.registerTool('render_preview', {
     ...authMetadata,
     title: 'ภาพตัวอย่างงาน',
-    description: 'ภาพ PNG ลายของงานเวอร์ชันล่าสุดแบบแบน (ปลายเล็บอยู่บน) — ใช้ตรวจผลหลังบันทึก',
+    description: 'ภาพ PNG ของงานเวอร์ชันล่าสุด ตามทรงเล็บจริง (ปลายเล็บอยู่บน) พร้อมคำเตือนจาก lint — ใช้ตรวจผลหลังบันทึก',
     inputSchema: {
       projectId: z.string().uuid(),
       hands: z.enum(['right', 'left', 'both']).default('both'),
-      nails: z.array(nailTarget).optional().describe('เฉพาะบางนิ้ว'),
+      nails: z.array(nailTarget).optional().describe('เฉพาะบางนิ้ว (จำเป็นเมื่อ zoom = nail)'),
+      zoom: zoomInput,
+      lighting: lightingInput,
     },
     annotations: { readOnlyHint: true },
-  }, async ({ projectId, hands, nails }) => {
+  }, async ({ projectId, hands, nails, zoom, lighting }) => {
     try {
       const { version } = await api.getProject(projectId)
-      return { content: [image(version.document, hands, nails ? expandTargets(nails) : undefined)] }
+      const only = nails ? expandTargets(nails) : undefined
+      const shown = (only ?? NAIL_KEYS).filter((key) => hands === 'both' || key.startsWith(`${hands}.`))
+      return {
+        content: [
+          image(version.document, { scope: hands, zoom, lighting, ...(only ? { only } : {}) }),
+          ...warnings(version.document, shown),
+        ],
+      }
+    } catch (error) { return errorResult(error) }
+  })
+
+  server.registerTool('lint_design', {
+    ...authMetadata,
+    title: 'ตรวจกฎการออกแบบ',
+    description: `ตรวจงานเวอร์ชันล่าสุดตามกฎในคู่มือ: ลายชิ้น/ของตกแต่งนอกเล็บหรือล้นขอบ (OUTSIDE_NAIL),
+ลายชิ้นที่ทรงเล็บยืดจนเพี้ยน (STRETCHED), สีที่กลืนกับพื้น (LOW_CONTRAST) และจำนวน stroke/เลเยอร์ใกล้เพดาน (NEAR_LIMIT)`,
+    inputSchema: {
+      projectId: z.string().uuid(),
+      nails: z.array(nailTarget).optional().describe('เฉพาะบางนิ้ว (ไม่ใส่ = ทุกนิ้ว)'),
+    },
+    annotations: { readOnlyHint: true },
+  }, async ({ projectId, nails }) => {
+    try {
+      const { version } = await api.getProject(projectId)
+      const findings = lintDesign(version.document, nails ? { nails: expandTargets(nails) } : {})
+      return text(formatFindings(findings, 40) ?? 'ไม่พบปัญหา')
     } catch (error) { return errorResult(error) }
   })
 
@@ -253,8 +367,10 @@ ${DESIGN_RULES}`,
       const project = await api.createProject(name)
       const chosen = recipe ?? (preset ? PRESETS[preset]!.recipe : undefined)
       if (!chosen) return text(`สร้างงาน ${project.id} แล้ว\n${editorLink(project.id)}`)
-      const saved = await updateDesign(project.id, (document) => buildFromRecipe(chosen, document).document)
-      return text(`สร้างงาน ${project.id} แล้ว\n${saved}`)
+      const saved = await updateDesign(project.id, (document) => buildFromRecipe(chosen, document).document, { recipe: chosen })
+      const [first, ...rest] = saved.content
+      const message = first?.type === 'text' ? `\n${first.text}` : ''
+      return { content: [{ type: 'text' as const, text: `สร้างงาน ${project.id} แล้ว${message}` }, ...(first?.type === 'text' ? rest : saved.content)] }
     } catch (error) { return errorResult(error) }
   })
 
@@ -263,10 +379,10 @@ ${DESIGN_RULES}`,
     title: 'ลงลายจาก recipe',
     description: `ลงลายบนงานจาก recipe ระดับสูง แล้วบันทึกเป็นเวอร์ชันใหม่ — นิ้วที่ระบุถูกแทนทั้งนิ้ว นิ้วที่ไม่ระบุคงของเดิม
 คีย์ nails: ชื่อนิ้ว (thumb/index/middle/ring/little = ทั้งสองมือ, มือซ้าย mirror ให้) หรือคีย์เต็ม (right.index)`,
-    inputSchema: { projectId: z.string().uuid(), recipe: recipeSchema },
-  }, async ({ projectId, recipe }) => {
+    inputSchema: { projectId: z.string().uuid(), recipe: recipeSchema, dryRun: dryRunInput, preview: previewInput },
+  }, async ({ projectId, recipe, dryRun, preview }) => {
     try {
-      return text(await updateDesign(projectId, (document) => buildFromRecipe(recipe, document).document))
+      return await updateDesign(projectId, (document) => buildFromRecipe(recipe, document).document, { dryRun, preview, recipe })
     } catch (error) { return errorResult(error) }
   })
 
@@ -274,10 +390,16 @@ ${DESIGN_RULES}`,
     ...authMetadata,
     title: 'ลงดีไซน์สำเร็จรูป',
     description: 'ลง preset ทั้งชุดบนงาน (ทุกนิ้วที่ preset กำหนด) แล้วบันทึกเป็นเวอร์ชันใหม่',
-    inputSchema: { projectId: z.string().uuid(), preset: z.enum(Object.keys(PRESETS) as [string, ...string[]]) },
-  }, async ({ projectId, preset }) => {
+    inputSchema: {
+      projectId: z.string().uuid(),
+      preset: z.enum(Object.keys(PRESETS) as [string, ...string[]]),
+      dryRun: dryRunInput,
+      preview: previewInput,
+    },
+  }, async ({ projectId, preset, dryRun, preview }) => {
     try {
-      return text(await updateDesign(projectId, (document) => buildFromRecipe(PRESETS[preset]!.recipe, document).document))
+      const recipe = PRESETS[preset]!.recipe
+      return await updateDesign(projectId, (document) => buildFromRecipe(recipe, document).document, { dryRun, preview, recipe })
     } catch (error) { return errorResult(error) }
   })
 
@@ -290,11 +412,13 @@ ${DESIGN_RULES}`,
       nails: z.array(nailTarget).min(1),
       nail: nailRecipeSchema,
       mirrorLeft: z.boolean().default(true),
+      dryRun: dryRunInput,
+      preview: previewInput,
     },
-  }, async ({ projectId, nails, nail, mirrorLeft }) => {
+  }, async ({ projectId, nails, nail, mirrorLeft, dryRun, preview }) => {
     try {
       const recipe = { mirrorLeft, nails: Object.fromEntries(nails.map((key) => [key, nail])) }
-      return text(await updateDesign(projectId, (document) => buildFromRecipe(recipe, document).document))
+      return await updateDesign(projectId, (document) => buildFromRecipe(recipe, document).document, { dryRun, preview, recipe })
     } catch (error) { return errorResult(error) }
   })
 
@@ -309,13 +433,15 @@ ${DESIGN_RULES}`,
       length: nailRecipeSchema.shape.length,
       finish: nailRecipeSchema.shape.finish,
       base: nailRecipeSchema.shape.base,
+      dryRun: dryRunInput,
+      preview: previewInput,
     },
-  }, async ({ projectId, nails, shape, length, finish, base }) => {
+  }, async ({ projectId, nails, shape, length, finish, base, dryRun, preview }) => {
     if (shape === undefined && length === undefined && finish === undefined && base === undefined) {
       return errorResult(new Error('ระบุอย่างน้อยหนึ่งค่า: shape, length, finish หรือ base'))
     }
     try {
-      return text(await updateDesign(projectId, (document) => {
+      return await updateDesign(projectId, (document) => {
         const next = { ...document, nails: { ...document.nails } }
         for (const key of expandTargets(nails)) {
           const old = document.nails[key]
@@ -328,7 +454,7 @@ ${DESIGN_RULES}`,
           }
         }
         return next
-      }))
+      }, { dryRun, preview })
     } catch (error) { return errorResult(error) }
   })
 
@@ -341,10 +467,12 @@ ${DESIGN_RULES}`,
       from: z.enum(NAIL_KEYS as unknown as [NailKey, ...NailKey[]]),
       to: z.array(nailTarget).min(1),
       mirror: z.boolean().default(false),
+      dryRun: dryRunInput,
+      preview: previewInput,
     },
-  }, async ({ projectId, from, to, mirror }) => {
+  }, async ({ projectId, from, to, mirror, dryRun, preview }) => {
     try {
-      return text(await updateDesign(projectId, (document) => copyNail(document, from, expandTargets(to).filter((k) => k !== from), mirror)))
+      return await updateDesign(projectId, (document) => copyNail(document, from, expandTargets(to).filter((k) => k !== from), mirror), { dryRun, preview })
     } catch (error) { return errorResult(error) }
   })
 
@@ -352,10 +480,10 @@ ${DESIGN_RULES}`,
     ...authMetadata,
     title: 'ทำอีกมือให้สมมาตร',
     description: 'คัดลอกทั้งมือไปอีกข้างแบบกลับซ้าย-ขวา',
-    inputSchema: { projectId: z.string().uuid(), from: z.enum(HANDS) },
-  }, async ({ projectId, from }) => {
+    inputSchema: { projectId: z.string().uuid(), from: z.enum(HANDS), dryRun: dryRunInput, preview: previewInput },
+  }, async ({ projectId, from, dryRun, preview }) => {
     try {
-      return text(await updateDesign(projectId, (document) => mirrorHand(document, from)))
+      return await updateDesign(projectId, (document) => mirrorHand(document, from), { dryRun, preview })
     } catch (error) { return errorResult(error) }
   })
 
@@ -368,11 +496,13 @@ points: x = u, y = v (0 ปลายเล็บ → 1 โคนเล็บ), p
       projectId: z.string().uuid(),
       nails: z.array(nailTarget).min(1),
       strokes: z.array(strokeSchema).min(1).max(500),
+      dryRun: dryRunInput,
+      preview: previewInput,
     },
-  }, async ({ projectId, nails, strokes }) => {
+  }, async ({ projectId, nails, strokes, dryRun, preview }) => {
     try {
-      return text(await updateDesign(projectId, (document) =>
-        expandTargets(nails).reduce((doc, key) => addStrokes(doc, key, strokes), document)))
+      return await updateDesign(projectId, (document) =>
+        expandTargets(nails).reduce((doc, key) => addStrokes(doc, key, strokes), document), { dryRun, preview })
     } catch (error) { return errorResult(error) }
   })
 
@@ -384,17 +514,19 @@ points: x = u, y = v (0 ปลายเล็บ → 1 โคนเล็บ), p
       projectId: z.string().uuid(),
       nails: z.array(nailTarget).min(1),
       decorations: z.array(decorationSpecSchema).min(1).max(30),
+      dryRun: dryRunInput,
+      preview: previewInput,
     },
-  }, async ({ projectId, nails, decorations }) => {
+  }, async ({ projectId, nails, decorations, dryRun, preview }) => {
     try {
       const unknown = decorations.map((d) => d.catalogId).filter((id) => !DECORATIONS.some((d) => d.id === id))
       if (unknown.length > 0) return errorResult(new Error(`ไม่รู้จัก catalogId: ${unknown.join(', ')} — ดู list_decorations`))
-      return text(await updateDesign(projectId, (document) => expandTargets(nails).reduce((doc, key) => addDecorations(doc, key,
+      return await updateDesign(projectId, (document) => expandTargets(nails).reduce((doc, key) => addDecorations(doc, key,
         decorations.map((d, i) => ({
           id: `ai-${d.catalogId}-${Date.now().toString(36)}-${i}`,
           catalogId: d.catalogId, u: d.u, v: d.v, rotation: d.rotation, scale: d.scale,
           ...(d.color === undefined ? {} : { color: d.color }),
-        }))), document)))
+        }))), document), { dryRun, preview })
     } catch (error) { return errorResult(error) }
   })
 
@@ -406,12 +538,14 @@ points: x = u, y = v (0 ปลายเล็บ → 1 โคนเล็บ), p
       projectId: z.string().uuid(),
       nails: z.array(nailTarget).min(1),
       keepDecorations: z.boolean().default(false),
+      dryRun: dryRunInput,
+      preview: previewInput,
     },
     annotations: { destructiveHint: true },
-  }, async ({ projectId, nails, keepDecorations }) => {
+  }, async ({ projectId, nails, keepDecorations, dryRun, preview }) => {
     try {
-      return text(await updateDesign(projectId, (document) =>
-        expandTargets(nails).reduce((doc, key) => clearNail(doc, key, !keepDecorations), document)))
+      return await updateDesign(projectId, (document) =>
+        expandTargets(nails).reduce((doc, key) => clearNail(doc, key, !keepDecorations), document), { dryRun, preview })
     } catch (error) { return errorResult(error) }
   })
 
@@ -425,7 +559,7 @@ points: x = u, y = v (0 ปลายเล็บ → 1 โคนเล็บ), p
     contents: [{
       uri: uri.href,
       mimeType: 'text/markdown',
-      text: `# NailStudio — คู่มือสำหรับ AI\n\n## กฎ\n${DESIGN_RULES}\n\n## ชนิดลาย\n${PATTERN_TYPES.map((p) => `- \`${p.type}\` — ${p.description}`).join('\n')}\n\n## ตัวอย่าง recipe\n\`\`\`json\n${JSON.stringify(PRESETS['lavender-butterfly']!.recipe, null, 2)}\n\`\`\``,
+      text: `# NailStudio — คู่มือสำหรับ AI\n\n## กฎ\n${DESIGN_RULES}\n\n## ภาพตัวอย่างและการตรวจ\n${PREVIEW_GUIDE}\n\n## ชนิดลาย\n${PATTERN_TYPES.map((p) => `- \`${p.type}\` — ${p.description}`).join('\n')}\n\n## ตัวอย่าง recipe\n\`\`\`json\n${JSON.stringify(PRESETS['lavender-butterfly']!.recipe, null, 2)}\n\`\`\``,
     }],
   }))
 
