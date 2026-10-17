@@ -84,7 +84,12 @@ export interface FillOptions {
 
 /**
  * เติมสีในรูปหลายเหลี่ยมด้วยเส้นแนวนอนเรียงกัน (scanline)
- * ขอบแนวนอนหดเข้าครึ่งความกว้างแปรง เพื่อให้ขอบรูปตรงกับรูปทรงที่สั่ง
+ * ปลายแถวหดเข้าครึ่งความกว้างแปรง เพื่อให้ขอบซ้าย-ขวาตรงกับรูปทรงที่สั่ง
+ *
+ * แถวมีขอบบน-ล่างตรง ขอบรูปที่เกือบแนวนอน (เช่นเส้นยิ้มของ french) จึงกลายเป็นขั้นบันได
+ * ห่างกันทีละ step — ปิดท้ายด้วยเส้นขอบตามรูปจริงที่กว้างเท่าแปรง ซึ่งครอบทั้งมุมที่ยื่น
+ * และร่องที่เว้า (ไม่เกินครึ่งแปรงทั้งคู่) ขอบที่มองเห็นจึงเรียบ แลกกับรูปขยายออกราวครึ่งแปรง
+ * ไม่ใส่เส้นขอบเมื่อทึบไม่เต็ม เพราะสีจะสะสมเป็นวงเข้มกว่าเนื้อใน
  */
 export function fill(poly: readonly Pt[], color: string, opts: FillOptions = {}): BrushStroke[] {
   const { brushWidth = 0.02, opacity = 1, softness = 0.05 } = opts
@@ -107,6 +112,7 @@ export function fill(poly: readonly Pt[], color: string, opts: FillOptions = {})
       strokes.push(line(pts, color, brushWidth, { opacity, softness }))
     }
   }
+  if (opacity >= 1 && poly.length >= 2) strokes.push(line([...poly, poly[0]!], color, brushWidth, { opacity, softness }))
   return strokes
 }
 
