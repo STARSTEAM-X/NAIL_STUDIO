@@ -142,6 +142,15 @@ describe('HTTP MCP and OAuth', () => {
     expect(denied.text).not.toContain(API_TOKEN)
   })
 
+  it('lets browsers send the real Origin when the consent form is submitted', async () => {
+    const app = appFor()
+    const { response } = await authorize(app, await register(app))
+    // no-referrer ทำให้เบราว์เซอร์ส่ง Origin: null ตอน POST ฟอร์ม → consent ตอบ 403 ทุกครั้ง
+    expect(response.headers['referrer-policy']).toBe('same-origin')
+    const health = await request(app).get('/health').expect(200)
+    expect(health.headers['referrer-policy']).toBe('no-referrer')
+  })
+
   it('rejects invalid API tokens without exposing upstream errors', async () => {
     const app = appFor(vi.fn(async () => { throw new Error(`upstream secret ${API_TOKEN}`) }))
     const { cookie, flow } = await authorize(app, await register(app))

@@ -181,6 +181,9 @@ export class NailStudioOAuth implements OAuthServerProvider {
       csrf: randomBytes(32).toString('base64url'), expiresAt: this.now() + FLOW_SECONDS,
       ...(params.state === undefined ? {} : { state: params.state }),
     }
+    // no-referrer (ค่าทั้งแอป) ทำให้เบราว์เซอร์ส่ง Origin: null ตอน POST ฟอร์ม consent จึงตรวจที่มาไม่ผ่าน
+    // same-origin ยังไม่ส่ง referrer ไปปลายทาง redirect ข้าม origin
+    response.setHeader('Referrer-Policy', 'same-origin')
     response.cookie(COOKIE, flow.csrf, { httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: FLOW_SECONDS * 1000 })
     const request = this.sealed.seal('flow', flow)
     // แสดง hostname ปลายทางเสมอ (MCP authorization spec) — ชื่อ client ผู้ลงทะเบียนตั้งเองได้ จึงเชื่อไม่ได้
