@@ -1,10 +1,13 @@
+import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { createEmptyDocument, designDocumentSchema, type DesignDocument } from '@nail-studio/contracts'
-import { DECORATIONS } from '@nail-studio/patterns'
+import { createCanvas } from '@napi-rs/canvas'
+import { renderLayer, type Ctx2D } from '../../web/src/3d/painting/rasterizer.ts'
+import { DECORATIONS, PRESETS, buildFromRecipe, mirrorStroke, circle, fill, fillPolygons, type Pt } from '@nail-studio/patterns'
 import { ApiError, type NailStudioApi } from './apiClient.ts'
 import { createNailStudioServer } from './server.ts'
 
@@ -62,7 +65,7 @@ describe('nail-studio MCP server', () => {
   it('เปิดเครื่องมือครบตามที่ออกแบบ', async () => {
     const { tools } = await client.listTools()
     expect(tools.map((t) => t.name).sort()).toEqual([
-      'add_decoration', 'add_strokes', 'apply_preset', 'apply_recipe', 'clear_nail', 'copy_nail', 'create_project',
+      'add_decoration', 'add_path', 'add_strokes', 'apply_preset', 'apply_recipe', 'clear_nail', 'copy_nail', 'create_project',
       'get_design', 'lint_design', 'list_decorations', 'list_palettes', 'list_patterns', 'list_presets', 'list_projects',
       'mirror_hand', 'open_page', 'preview_recipe', 'render_preview', 'set_nail', 'set_nail_properties', 'validate_document',
     ])
@@ -250,6 +253,7 @@ describe('dryRun / ภาพหลังบันทึก / lint', () => {
     { name: 'set_nail_properties', arguments: { projectId: PROJECT, nails: ['right.index'], base: '#abcdef' } },
     { name: 'copy_nail', arguments: { projectId: PROJECT, from: 'right.index', to: ['right.middle'] } },
     { name: 'mirror_hand', arguments: { projectId: PROJECT, from: 'right' } },
+    { name: 'add_path', arguments: { projectId: PROJECT, nails: ['right.thumb'], paths: [{ d: 'M.3 .3 L.7 .7', stroke: '#123456' }] } },
     { name: 'add_strokes', arguments: { projectId: PROJECT, nails: ['right.thumb'], strokes: [{ kind: 'fill', color: '#334455' }] } },
     { name: 'add_decoration', arguments: { projectId: PROJECT, nails: ['right.ring'], decorations: [{ catalogId: 'gem-round', u: 0.5, v: 0.5 }] } },
     { name: 'clear_nail', arguments: { projectId: PROJECT, nails: ['right.index'] } },
@@ -337,4 +341,135 @@ describe('dryRun / ภาพหลังบันทึก / lint', () => {
     expect(tooMany.isError).toBe(true)
     expect(textOf(tooMany)).toContain('ไม่เกิน 3 นิ้ว')
   })
+})
+
+
+describe('add_path', () => {
+
+  it('apply_recipe ปฏิเสธ zigzag ตั้งแต่ path แรกและไม่เรียก saveVersion', async () => {
+    const api = new FakeApi(), client = await connect(api)
+    const save = vi.spyOn(api, 'saveVersion')
+    const d = 'M' + Array.from({ length: 1000 }, (_, i) => [i, i % 2 ? 9 : 1]).flat().join(' ') + 'Z'
+    const result = await client.callTool({ name: 'apply_recipe', arguments: {
+      projectId: PROJECT,
+      recipe: { nails: { index: { patterns: Array.from({ length: 24 }, () => ({
+        type: 'path', d, viewBox: [0, 0, 1000, 10], fill: '#000000',
+      })) } } },
+    } })
+    expect(result.isError).toBe(true)
+    expect(textOf(result)).toContain('ลายระบายใช้ stroke เกิน 3,000 — ลดจำนวนจุดหยัก/รายละเอียดของ path')
+    expect(save).not.toHaveBeenCalled()
+    expect(api.versions).toHaveLength(1)
+  })
+
+  it('บันทึก expectedVersion, mirror เฉพาะชื่อนิ้ว และ preview ปิดได้', async () => {
+    const api = new FakeApi(), client = await connect(api)
+    const paths = [{ d: 'M20 20 Q40 70 60 80', viewBox: [0, 0, 100, 100], stroke: '#123456' }]
+    const result = await client.callTool({ name: 'add_path', arguments: { projectId: PROJECT, nails: ['index'], paths, preview: false } })
+    expect(result.isError).toBeFalsy()
+    expect(api.saves).toEqual([{ expectedVersion: 1 }])
+    const right = api.versions.at(-1)!.nails['right.index'].layers.flatMap((l) => l.strokes)
+    const left = api.versions.at(-1)!.nails['left.index'].layers.flatMap((l) => l.strokes)
+    expect(left).toEqual(right.map(mirrorStroke))
+    expect((result.content as { type: string }[]).some((p) => p.type === 'image')).toBe(false)
+    await client.callTool({ name: 'add_path', arguments: { projectId: PROJECT, nails: ['left.ring', 'right.ring'], paths } })
+    expect(api.saves.at(-1)).toEqual({ expectedVersion: 2 })
+    expect(api.versions.at(-1)!.nails['left.ring'].layers).toEqual(api.versions.at(-1)!.nails['right.ring'].layers)
+    await client.callTool({ name: 'add_path', arguments: { projectId: PROJECT, nails: ['middle'], paths, mirrorLeft: false, preview: false } })
+    expect(api.versions.at(-1)!.nails['left.middle'].layers).toEqual(api.versions.at(-1)!.nails['right.middle'].layers)
+    await client.callTool({ name: 'add_path', arguments: { projectId: PROJECT, nails: ['thumb', 'left.thumb'], paths, preview: false } })
+    expect(api.versions.at(-1)!.nails['left.thumb'].layers).toEqual(api.versions.at(-1)!.nails['right.thumb'].layers)
+  })
+
+  it('dryRun คืนภาพและคำเตือน โดยไม่บันทึก', async () => {
+    const api = new FakeApi(), client = await connect(api)
+    const result = await client.callTool({ name: 'add_path', arguments: {
+      projectId: PROJECT, nails: ['right.index'], dryRun: true,
+      paths: [{ d: 'M.01 .45 L.01 .55', stroke: '#000000' }],
+    } })
+    expect(result.isError).toBeFalsy()
+    expect(textOf(result)).toContain('ยังไม่บันทึก')
+    expect(textOf(result)).toContain('[OUTSIDE_NAIL]')
+    expect((result.content as { type: string }[]).some((p) => p.type === 'image')).toBe(true)
+    expect(api.saves).toHaveLength(0)
+  })
+
+  it('syntax/จุด/จำนวน stroke/ชุดที่ไม่มีรูป ถูกปฏิเสธก่อนอ่าน API', async () => {
+    const api = new FakeApi(), client = await connect(api)
+    const read = vi.spyOn(api, 'getProject')
+    const invalid = await client.callTool({ name: 'add_path', arguments: { projectId: PROJECT, nails: ['index'], paths: [
+      { d: 'M0 0 L1 1', stroke: '#000000' }, { d: 'M 0 0 C 1', fill: '#000000' },
+    ] } })
+    expect(invalid.isError).toBe(true)
+    expect(textOf(invalid)).toMatch(/paths\[1\]: path ผิดที่ตำแหน่ง \d+/)
+    for (const paths of [
+      [{ d: '', fill: '#000000' }, { d: 'M0 0', stroke: '#000000' }],
+      Array.from({ length: 40 }, () => ({ d: 'M.2 0 H.8 V1 H.2 Z', fill: '#000000' })),
+      [{ d: 'M0 0 ' + 'C1e10 1e10 -1e10 1e10 0 0 '.repeat(6), stroke: '#000000' }],
+    ]) {
+      const result = await client.callTool({ name: 'add_path', arguments: { projectId: PROJECT, nails: ['index'], paths } })
+      expect(result.isError).toBe(true)
+      expect(textOf(result)).toMatch(/ไม่มีรูปที่วาดได้|3,000|4,000/)
+    }
+    expect(read).not.toHaveBeenCalled()
+    expect(api.saves).toHaveLength(0)
+  })
+
+  it('path ใช้ผ่าน preview_recipe/apply_recipe/set_nail และ fire-dragon อยู่ใน 4 MB', async () => {
+    const api = new FakeApi(), client = await connect(api)
+    const nail = { patterns: [{ type: 'path', d: 'M30 30 A20 20 0 1 1 70 30 Z', viewBox: [0, 0, 100, 100], fill: '#123456', stroke: '#abcdef' }] }
+    for (const call of [
+      { name: 'preview_recipe', arguments: { recipe: { nails: { 'right.index': nail } }, zoom: 'nail' } },
+      { name: 'apply_recipe', arguments: { projectId: PROJECT, recipe: { nails: { 'right.index': nail } }, preview: false } },
+      { name: 'set_nail', arguments: { projectId: PROJECT, nails: ['right.ring'], nail, preview: false } },
+    ]) expect((await client.callTool(call)).isError, call.name).toBeFalsy()
+    const document = buildFromRecipe(PRESETS['fire-dragon']!.recipe).document
+    expect(designDocumentSchema.safeParse(document).success).toBe(true)
+    expect(Buffer.byteLength(JSON.stringify(document))).toBeLessThan(4 * 1024 * 1024)
+    for (const nail of Object.values(document.nails)) expect(nail.layers.flatMap((l) => l.strokes).length).toBeLessThanOrEqual(3000)
+  })
+})
+
+describe('fillPolygons raster coverage', () => {
+  it('fill เดิมคง JSON ทุก byte ของรูปอ้างอิงก่อนแก้ 5 แบบ', () => {
+    const polys: Pt[][] = [circle(.5, .5, .2), [[.1, .1], [.9, .1], [.9, .9], [.1, .9]],
+      [[.2, .2], [.8, .3], [.5, .8]], [[.1, .1], [.9, .1], [.5, .4], [.9, .9], [.1, .9]],
+      [[.5, .5], [.501, .5], [.501, .501]]]
+    const expected = ["8ced4751fa005bdbb1a67cfb2b3249772d8cf176bdab31dedec433dac57508b0","9400087b110e68373bea2c2c399638bf3a11b587844ea216fd7704fa64b34487","8fcd10a1a52713b2554d344745bc5eae0296db1af19665e5c241c87e55e6e265","5f3b83c62cf08aa4a7a5b4d37b91555e4212bd9ac70f22ef10421deec693be35","a71b0f9b715d8b25f5a7ec1f90704dd73013110122a4db7a9e2a2f9a3627e162"]
+    expect(polys.map((poly) => createHash('sha256').update(JSON.stringify(fill(poly, '#123456'))).digest('hex'))).toEqual(expected)
+  })
+
+
+  it('วงกลม ดาว และรูปเว้า ต่างจากพื้นที่จริงไม่เกิน 4% ด้วย renderLayer ที่ 512', () => {
+    const star = Array.from({ length: 10 }, (_, i): Pt => {
+      const a = i * Math.PI / 5, r = i % 2 ? .16 : .35
+      return [.5 + r * Math.cos(a), .5 + r * Math.sin(a)]
+    })
+    const concave: Pt[] = [[.2, .2], [.8, .2], [.8, .4], [.4, .4], [.4, .8], [.2, .8]]
+    for (const poly of [circle(.5, .5, .3, 160), star, concave]) {
+      const size = 512, canvas = createCanvas(size, size)
+      const strokes = fillPolygons([poly], '#000000', { brushWidth: .004 })
+      // size เป็น px บน 1024 จึงย่อครึ่งเมื่อ render ที่ 512 เหมือน preview ของ MCP
+      renderLayer(canvas.getContext('2d') as unknown as Ctx2D, {
+        id: 'test', name: 'test', visible: true, opacity: 1, blend: 'normal',
+        strokes: strokes.map((s) => ({ ...s, size: s.size / 2 })),
+      }, size)
+      const pixels = canvas.getContext('2d').getImageData(0, 0, size, size).data
+      // เทียบกับ polygon ที่ Canvas เติมสีตรง ๆ ไม่ใช้ stroke/scanline ของเรา
+      const expected = createCanvas(size, size), ctx = expected.getContext('2d')
+      ctx.beginPath()
+      ctx.moveTo(poly[0]![0] * size, (1 - poly[0]![1]) * size)
+      for (const [u, v] of poly.slice(1)) ctx.lineTo(u * size, (1 - v) * size)
+      ctx.closePath()
+      ctx.fill()
+      const truth = ctx.getImageData(0, 0, size, size).data
+      let actual = 0, difference = 0
+      for (let i = 3; i < pixels.length; i += 4) {
+        const inside = truth[i]! > 127
+        if (inside) actual++
+        if (inside !== (pixels[i]! > 127)) difference++
+      }
+      expect(difference / actual).toBeLessThanOrEqual(.04)
+    }
+  }, 15000)
 })

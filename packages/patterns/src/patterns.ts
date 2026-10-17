@@ -1,9 +1,10 @@
 import { z } from 'zod'
-import { hexColorSchema, type Stroke } from '@nail-studio/contracts'
+import { hexColorSchema, MAX_LAYERS_PER_NAIL, MAX_POINTS_PER_STROKE, MAX_STROKES_PER_LAYER, type Stroke } from '@nail-studio/contracts'
 import {
-  bezier, blobShape, circle, clamp, dot, ellipse, fill, gradient, heartShape, leafShape, line, rng,
+  bezier, blobShape, circle, clamp, dot, ellipse, fill, fillPolygons, gradient, heartShape, leafShape, line, rng,
   sparkleShape, tint, type Pt,
 } from './geometry.ts'
+import { flattenSvgPath } from './svgPath.ts'
 import { referencePatternSchemas, referenceRenderers, renderGlitterPath } from './referencePatterns.ts'
 
 /**
@@ -18,7 +19,26 @@ const v = z.number().min(0).max(1)
 const color = hexColorSchema
 const angle = z.number().min(-360).max(360).describe('องศา — 0 = ชี้ไปทาง +u, 90 = ชี้ไปทางโคนเล็บ')
 
+/** ลายอิสระใช้ข้อมูล path เท่านั้น ไม่รับไฟล์ SVG หรือ transform */
+export const pathSpecSchema = z.object({
+  d: z.string().max(8000),
+  // array แบบ homogeneous เพื่อให้ MCP client อ่าน items เป็น object ได้
+  viewBox: z.array(z.number()).length(4).pipe(z.tuple([z.number(), z.number(), z.number().positive(), z.number().positive()])).default([0, 0, 1, 1]),
+  region: z.object({ u0: z.number(), v0: z.number(), u1: z.number(), v1: z.number() })
+    .refine((r) => r.u0 < r.u1 && r.v0 < r.v1, 'region ต้องมี u0 < u1 และ v0 < v1')
+    .default({ u0: 0, v0: 0, u1: 1, v1: 1 }),
+  fill: color.optional(),
+  fillRule: z.enum(['nonzero', 'evenodd']).default('nonzero'),
+  stroke: color.optional(),
+  strokeWidth: z.number().positive().optional().describe('หน่วยเดียวกับ viewBox ค่าเริ่มต้น 1% ของความกว้าง'),
+  opacity: z.number().min(0).max(1).default(1).describe('ความทึบของเส้นขอบเท่านั้น fill ทึบเสมอ'),
+}).refine((p) => p.fill !== undefined || p.stroke !== undefined, 'ต้องระบุ fill หรือ stroke อย่างน้อยหนึ่งค่า')
+
+const pathPatternSchema = pathSpecSchema.safeExtend({ type: z.literal('path') })
+  .describe('SVG path อิสระ: M L H V C S Q T A Z และตัวเล็ก รองรับ fill/fillRule และ stroke; แนะนำ viewBox: [0, 0, 100, 100] เขียน d ด้วยจำนวนเต็ม เช่น M20 10 Q80 50 20 90 Z; region วางใน u 0.2–0.8, v 0.05–0.95')
+
 export const patternSchema = z.discriminatedUnion('type', [
+  pathPatternSchema,
   z.object({
     type: z.literal('french'),
     color,
@@ -183,6 +203,43 @@ function smallLeaf(cu: number, cv: number, ang: number, len: number, col: string
 }
 
 const RENDER: { [K in z.infer<typeof patternSchema>['type']]: (p: Parsed<K>) => Stroke[] } = {
+  path: (p) => {
+    const maxStrokes = MAX_LAYERS_PER_NAIL * MAX_STROKES_PER_LAYER
+    const [vx, vy, vw, vh] = p.viewBox
+    const { u0, v0, u1, v1 } = p.region
+    const su = (u1 - u0) / vw, sv = (v1 - v0) / vh
+    if (![su, sv].every((n) => Number.isFinite(n) && n > 0)) throw new Error('สเกล viewBox/region ต้องเป็นจำนวนบวก finite')
+    const subpaths = flattenSvgPath(p.d, 0.001 / Math.max(su, sv)).map((sub) => ({
+      ...sub, points: sub.points.map(([x, y]): Pt => [u0 + (x - vx) * su, v0 + (y - vy) * sv]),
+    }))
+    if (subpaths.some((sub) => sub.points.some((pt) => !pt.every(Number.isFinite)))) throw new Error('พิกัดหลังแปลง viewBox/region ต้อง finite')
+    const drawable = subpaths.filter((sub) => sub.points.length >= 2)
+    const out: Stroke[] = []
+    const polys = drawable.filter((sub) => sub.points.length >= 3).map((sub) => sub.points)
+    if (p.fill && polys.length) {
+      const points = polys.flat()
+      const width = Math.max(...points.map((pt) => pt[0])) - Math.min(...points.map((pt) => pt[0]))
+      const height = Math.max(...points.map((pt) => pt[1])) - Math.min(...points.map((pt) => pt[1]))
+      const brushWidth = Math.max(clamp(Math.min(width, height) / 6, 0.004, 0.02), height / (0.45 * 200))
+      if (Math.max(width, height) < brushWidth && polys.length === 1) {
+        const x = Math.min(...points.map((pt) => pt[0])) + width / 2
+        const y = Math.min(...points.map((pt) => pt[1])) + height / 2
+        out.push(dot(x, y, brushWidth, p.fill))
+      } else out.push(...fillPolygons(polys, p.fill, { brushWidth, rule: p.fillRule, maxStrokes }))
+    }
+    if (p.stroke) {
+      const width = (p.strokeWidth ?? vw * 0.01) * (su / 2 + sv / 2)
+      if (!Number.isFinite(width)) throw new Error('strokeWidth หลังแปลงต้อง finite')
+      for (const sub of drawable) {
+        const pts = sub.closed && (sub.points[0]![0] !== sub.points.at(-1)![0] || sub.points[0]![1] !== sub.points.at(-1)![1]) ? [...sub.points, sub.points[0]!] : sub.points
+        for (let i = 0; i < pts.length - 1; i += MAX_POINTS_PER_STROKE - 1) {
+          if (out.length >= maxStrokes) throw new Error(`ลาย path ใช้ stroke รวมเกิน ${maxStrokes.toLocaleString('en-US')} — ลดจำนวนจุดหยัก/รายละเอียดของ path`)
+          out.push(line(pts.slice(i, i + MAX_POINTS_PER_STROKE), p.stroke, width, { opacity: p.opacity }))
+        }
+      }
+    }
+    return out
+  },
   french: (p) => {
     if (p.soft && p.style === 'classic' && !p.outlineOnly && !p.border) {
       return [

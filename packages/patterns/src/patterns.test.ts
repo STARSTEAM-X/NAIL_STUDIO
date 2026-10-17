@@ -32,6 +32,7 @@ function paintedBounds(strokes: Stroke[]) {
 describe('renderPattern', () => {
   it('ทุกชนิดลายสร้าง stroke ที่ผ่าน schema ได้ด้วยค่าตั้งต้น', () => {
     const minimal: Record<string, object> = {
+      path: { d: 'M.3 .3 L.7 .7', stroke: '#888888' },
       french: { color: '#ffffff' },
       gradient: { color: '#a184ee' },
       glitter: { colors: ['#9a78ee', '#ffffff'] },

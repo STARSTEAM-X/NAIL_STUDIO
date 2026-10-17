@@ -4,10 +4,13 @@ import {
   FINGERS,
   HANDS,
   NAIL_KEYS,
+  MAX_LAYERS_PER_NAIL,
+  MAX_STROKES_PER_LAYER,
   designDocumentSchema,
   strokeSchema,
   type DesignDocument,
   type NailKey,
+  type Stroke,
 } from '@nail-studio/contracts'
 import {
   DECORATIONS,
@@ -22,6 +25,9 @@ import {
   copyNail,
   decorationSpecSchema,
   mirrorHand,
+  mirrorStroke,
+  pathSpecSchema,
+  renderPattern,
   nailRecipeSchema,
   recipeSchema,
   summarizeDocument,
@@ -65,6 +71,7 @@ type Content = { type: 'text'; text: string } | { type: 'image'; data: string; m
 
 /** ส่วนของคู่มือ (resource) ที่อธิบายภาพตัวอย่าง, dryRun และคำเตือน */
 const PREVIEW_GUIDE = [
+  "- ลายที่ไม่มีใน catalog ใช้ add_path หรือ recipe type: 'path' เขียน SVG d ใน viewBox [0,0,100,100] แล้ววาง region ใน u 0.2–0.8, v 0.05–0.95; เลี่ยงรายละเอียดสำคัญช่วงปลายเล็บทรงยาว; วน dryRun + render_preview zoom: 'nail' เพื่อปรับ",
   '- ภาพตัวอย่างวาดตามทรง/ความยาวจริงของโมเดล: ลายที่ปลายเล็บทรงยาว (long/extra, almond/stiletto) ถูกยืดตามแนวยาวแบบเดียวกับที่ผู้ใช้เห็น',
   "- lighting 'scene' (ค่าเริ่มต้น) = สีที่ผู้ใช้เห็นบนโมเดล, 'flat' = สี hex ตรงตัว",
   "- zoom 'nail' ขยายทีละนิ้ว (ไม่เกิน 3 นิ้ว) ไว้ดูเส้นบาง เกล็ด และของตกแต่ง",
@@ -108,6 +115,7 @@ export function createNailStudioServer({ api, webUrl, oauth = false }: ServerOpt
       instructions: `เครื่องมือออกแบบลายเล็บของ NailStudio — แก้งานได้ด้วยข้อมูล schema เท่านั้น
 ลำดับที่แนะนำ: list_patterns/list_presets → preview_recipe หรือ tool แก้งานด้วย dryRun: true (ดูภาพ + คำเตือน) → ปรับจนคำเตือนหมด → บันทึก → render_preview (ตรวจ)
 ภาพตัวอย่างแสดงทรงเล็บจริงและแสงแบบในเว็บ; zoom: 'nail' ขยายทีละนิ้ว (ไม่เกิน 3) ไว้ดูเส้นบาง/เกล็ด; lighting: 'flat' ดูสี hex ตรงตัว
+ลายที่ไม่มีใน catalog ใช้ add_path หรือ recipe type: 'path' เขียน SVG d ใน viewBox [0,0,100,100] แล้ววาง region ใน u 0.2–0.8, v 0.05–0.95; เลี่ยงรายละเอียดสำคัญช่วงปลายเล็บทรงยาว; วน dryRun + render_preview zoom: 'nail' เพื่อปรับ
 ทุกการบันทึกสร้างเวอร์ชันใหม่ ผู้ใช้ย้อนกลับได้เสมอ
 ปรับทรง/ความยาว/สีพื้นโดยเก็บลายเดิม: set_nail_properties
 เมื่อผู้ใช้ต้องเปิดเว็บ: open_page คืนลิงก์ให้ client เปิดด้วยเครื่องมือเบราว์เซอร์ ถ้าต้องล็อกอินให้ผู้ใช้ทำในเบราว์เซอร์ของตนเอง
@@ -484,6 +492,38 @@ ${DESIGN_RULES}`,
   }, async ({ projectId, from, dryRun, preview }) => {
     try {
       return await updateDesign(projectId, (document) => mirrorHand(document, from), { dryRun, preview })
+    } catch (error) { return errorResult(error) }
+  })
+
+  server.registerTool('add_path', {
+    ...authMetadata,
+    title: 'เพิ่มลายอิสระจาก SVG path',
+    description: 'ต่อ SVG path (M L H V C S Q T A Z) บนเล็บเดิม ใช้ fill/stroke และ viewBox [0,0,100,100]; dryRun ดูภาพและคำเตือนก่อนบันทึก',
+    inputSchema: {
+      projectId: z.string().uuid(),
+      nails: z.array(nailTarget).min(1),
+      paths: z.array(pathSpecSchema).min(1).max(40),
+      mirrorLeft: z.boolean().default(true),
+      dryRun: dryRunInput,
+      preview: previewInput,
+    },
+  }, async ({ projectId, nails, paths, mirrorLeft, dryRun, preview }) => {
+    try {
+      const strokes: Stroke[] = []
+      for (const [i, path] of paths.entries()) {
+        try {
+          const generated = renderPattern({ type: 'path', ...path })
+          if (strokes.length + generated.length > MAX_LAYERS_PER_NAIL * MAX_STROKES_PER_LAYER) throw new Error('stroke รวมต่อเล็บเกิน 3,000 — แบ่ง path หรือลดรายละเอียด')
+          strokes.push(...generated)
+        } catch (error) { throw new Error(`paths[${i}]: ${error instanceof Error ? error.message : String(error)}`) }
+      }
+      if (strokes.length === 0) throw new Error('ไม่มีรูปที่วาดได้')
+      const targets = expandTargets(nails)
+      return await updateDesign(projectId, (document) => targets.reduce((doc, key) => {
+        // คีย์เต็มชนะคีย์ชื่อนิ้วเหมือน buildFromRecipe
+        const mirror = mirrorLeft && key.startsWith('left.') && !nails.includes(key)
+        return addStrokes(doc, key, mirror ? strokes.map(mirrorStroke) : strokes)
+      }, document), { dryRun, preview })
     } catch (error) { return errorResult(error) }
   })
 

@@ -6,6 +6,7 @@ const DENSE_MIN_STROKES = 150
 
 /** ฟิลด์บังคับที่ไม่มีค่าเริ่มต้นและเดาจากชนิดไม่ได้ */
 const OVERRIDES: Record<string, Record<string, unknown>> = {
+  path: { d: 'M.3 .3 L.7 .7', stroke: '#888888' },
   curve: { points: [[0.3, 0.3], [0.7, 0.7]] },
 }
 

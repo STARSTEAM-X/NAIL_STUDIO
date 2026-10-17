@@ -1,4 +1,4 @@
-import type { Stroke } from '@nail-studio/contracts'
+import { MAX_POINTS_PER_STROKE, type Stroke } from '@nail-studio/contracts'
 
 /**
  * รูปทรงพื้นฐานสำหรับวาดลายด้วยข้อมูลล้วน — ทุกฟังก์ชันรับพิกัดเป็น UV ของผิวเล็บ
@@ -117,27 +117,63 @@ export interface FillOptions {
  * ไม่ใส่เส้นขอบเมื่อทึบไม่เต็ม เพราะสีจะสะสมเป็นวงเข้มกว่าเนื้อใน
  */
 export function fill(poly: readonly Pt[], color: string, opts: FillOptions = {}): BrushStroke[] {
-  const { brushWidth = 0.02, opacity = 1, softness = 0.05 } = opts
+  return fillPolygons([poly], color, { ...opts, rule: 'evenodd' })
+}
+
+/** Active edge list: O(E log E + R · k log k) ไม่ตรวจขอบที่ไม่ตัดแถวซ้ำ */
+export function fillPolygons(polys: readonly (readonly Pt[])[], color: string, opts: FillOptions & { rule?: 'nonzero' | 'evenodd'; maxStrokes?: number } = {}): BrushStroke[] {
+  const { brushWidth = 0.02, opacity = 1, softness = 0.05, rule = 'nonzero', maxStrokes = Infinity } = opts
+  if (!Number.isFinite(brushWidth) || brushWidth <= 0) throw new Error('brushWidth ต้องเป็นจำนวนบวก finite')
+  if (opts.maxStrokes !== undefined && (!Number.isSafeInteger(maxStrokes) || maxStrokes < 0)) throw new Error('maxStrokes ต้องเป็นจำนวนเต็มไม่ติดลบที่ปลอดภัย')
   const step = brushWidth * 0.45
   const radius = brushWidth / 2
-  const vs = poly.map((p) => p[1])
+  type Edge = { u1: number; v1: number; u2: number; v2: number; min: number; max: number; winding: number }
+  const edges: Edge[] = []
+  let minV = Infinity, maxV = -Infinity
+  for (const poly of polys) for (let i = 0; i < poly.length; i++) {
+    const [u1, v1] = poly[i]!, [u2, v2] = poly[(i + 1) % poly.length]!
+    minV = Math.min(minV, v1); maxV = Math.max(maxV, v1)
+    if (v1 !== v2) edges.push({ u1, v1, u2, v2, min: Math.min(v1, v2), max: Math.max(v1, v2), winding: v2 > v1 ? 1 : -1 })
+  }
+  edges.sort((a, b) => a.min - b.min)
   const strokes: BrushStroke[] = []
-  for (let v = Math.min(...vs) + step / 2; v <= Math.max(...vs); v += step) {
-    const xs: number[] = []
-    for (let i = 0; i < poly.length; i++) {
-      const [u1, v1] = poly[i]!
-      const [u2, v2] = poly[(i + 1) % poly.length]!
-      if ((v1 <= v && v2 > v) || (v2 <= v && v1 > v)) xs.push(u1 + ((v - v1) / (v2 - v1)) * (u2 - u1))
-    }
-    xs.sort((a, b) => a - b)
-    for (let i = 0; i + 1 < xs.length; i += 2) {
-      const a = xs[i]! + radius
-      const b = xs[i + 1]! - radius
-      const pts: Pt[] = a < b ? [[a, v], [b, v]] : [[(xs[i]! + xs[i + 1]!) / 2, v]]
+  // ตรวจงบก่อนสร้างทั้งแถวระบายและเส้นขอบ ไม่สะสมผลเกินเพดานแล้วค่อยปฏิเสธ
+  const checkLimit = (): void => {
+    if (strokes.length >= maxStrokes) throw new Error(`ลายระบายใช้ stroke เกิน ${maxStrokes.toLocaleString('en-US')} — ลดจำนวนจุดหยัก/รายละเอียดของ path`)
+  }
+  let active: Edge[] = []
+  let next = 0
+  for (let v = minV + step / 2; v <= maxV; v = v + step > v ? v + step : Infinity) {
+    while (next < edges.length && edges[next]!.min <= v) active.push(edges[next++]!)
+    active = active.filter((e) => e.max > v)
+    const hits = active.map((e) => ({ u: e.u1 + ((v - e.v1) / (e.v2 - e.v1)) * (e.u2 - e.u1), winding: e.winding }))
+    hits.sort((a, b) => a.u - b.u)
+    const span = (left: number, right: number): void => {
+      checkLimit()
+      const a = left + radius, b = right - radius
+      const pts: Pt[] = a < b ? [[a, v], [b, v]] : [[(left + right) / 2, v]]
       strokes.push(line(pts, color, brushWidth, { opacity, softness }))
     }
+    if (rule === 'evenodd') {
+      for (let i = 0; i + 1 < hits.length; i += 2) span(hits[i]!.u, hits[i + 1]!.u)
+    } else {
+      let winding = 0, left = 0
+      for (let i = 0; i < hits.length;) {
+        const u = hits[i]!.u
+        const before = winding
+        do { winding += hits[i++]!.winding } while (i < hits.length && hits[i]!.u === u)
+        if (before === 0 && winding !== 0) left = u
+        if (before !== 0 && winding === 0) span(left, u)
+      }
+    }
   }
-  if (opacity >= 1 && poly.length >= 2) strokes.push(line([...poly, poly[0]!], color, brushWidth, { opacity, softness }))
+  if (opacity >= 1) for (const poly of polys) if (poly.length >= 2) {
+    const closed = [...poly, poly[0]!]
+    for (let i = 0; i < closed.length - 1; i += MAX_POINTS_PER_STROKE - 1) {
+      checkLimit()
+      strokes.push(line(closed.slice(i, i + MAX_POINTS_PER_STROKE), color, brushWidth, { opacity, softness }))
+    }
+  }
   return strokes
 }
 
