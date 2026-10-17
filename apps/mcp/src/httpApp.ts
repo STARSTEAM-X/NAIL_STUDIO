@@ -8,7 +8,7 @@ import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 import { API_TOKEN_PREFIX } from '@nail-studio/contracts'
 import { apiFromEnv, loadConfig } from './config.ts'
 import { createNailStudioServer } from './server.ts'
-import { DESIGN_SCOPE, NailStudioOAuth, type OAuthOptions } from './oauth.ts'
+import { CONSENT_FORM_ACTIONS, DESIGN_SCOPE, NailStudioOAuth, OFFLINE_SCOPE, type OAuthOptions } from './oauth.ts'
 
 export interface HttpOptions {
   env?: NodeJS.ProcessEnv
@@ -22,7 +22,7 @@ export function createMcpApp({ env = process.env, validateApiToken }: HttpOption
   // Render places one trusted reverse proxy in front of this service.
   if (env.RENDER === 'true') app.set('trust proxy', 1)
   app.use(helmet({ contentSecurityPolicy: { directives: {
-    defaultSrc: ["'none'"], styleSrc: ["'unsafe-inline'"], formAction: ["'self'", 'https://chatgpt.com'], frameAncestors: ["'none'"],
+    defaultSrc: ["'none'"], styleSrc: ["'unsafe-inline'"], formAction: CONSENT_FORM_ACTIONS, frameAncestors: ["'none'"],
   } }, referrerPolicy: { policy: 'no-referrer' } }))
   app.get('/health', (_request, response) => { response.json({ status: 'ok' }) })
 
@@ -37,7 +37,8 @@ export function createMcpApp({ env = process.env, validateApiToken }: HttpOption
   if (oauth) {
     // The SDK provides DCR, PKCE validation, OAuth discovery and endpoint rate limits.
     app.use(mcpAuthRouter({ provider: oauth, issuerUrl: oauth.issuer, resourceServerUrl: oauth.resource,
-      scopesSupported: [DESIGN_SCOPE], resourceName: 'NailStudio',
+      // offline_access ใน metadata = Claude จะขอ refresh token ด้วย
+      scopesSupported: [DESIGN_SCOPE, OFFLINE_SCOPE], resourceName: 'NailStudio',
       clientRegistrationOptions: { clientSecretExpirySeconds: 0 },
     }))
     app.post('/consent', rateLimit({ windowMs: 15 * 60 * 1000, limit: 30 }),

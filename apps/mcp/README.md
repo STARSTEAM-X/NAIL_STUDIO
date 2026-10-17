@@ -63,10 +63,26 @@ Render กำหนด `RENDER_EXTERNAL_URL` ให้เอง จึงไม�
 ตอนเชื่อมบัญชี หน้าอนุญาตของ NailStudio จะให้วาง API token ที่สร้างจากหน้าโปรไฟล์
 token ต้องเป็นของบัญชีบนเว็บ/API ที่ตั้งไว้ด้านบน; ไม่ต้องส่ง token ในข้อความแชต
 
+### เชื่อมกับ Claude (custom connector)
+
+claude.ai / Claude Desktop / มือถือ: **Settings → Connectors → Add custom connector** แล้วใส่
+**URL ของบริการ MCP ตามด้วย `/mcp`** (เช่น `https://nail-studio-mcp.onrender.com/mcp`) — ไม่ต้องกรอก
+client ID/secret ใน Advanced settings เพราะ Claude ลงทะเบียนเองผ่าน DCR จากนั้นกด Connect แล้ววาง API token
+ในหน้าอนุญาตของ NailStudio เหมือนฝั่ง ChatGPT
+
+Claude Code ต่อแบบ OAuth ได้เช่นกัน (`claude mcp add --transport http nail-studio <URL>/mcp` แล้ว `/mcp` เพื่อ
+authenticate) — redirect กลับมาที่ `http://localhost:<พอร์ต>/callback` บนเครื่องผู้ใช้ หน้าอนุญาตจะแสดงคำเตือนเพิ่ม
+
+### รายละเอียด OAuth
+
 OAuth ใช้ authorization code + PKCE S256, callback อนุญาตเฉพาะ `chatgpt.com`,
-scope `nails:design`, และตรวจ API token กับ backend ทั้งก่อนอนุญาตและทุกคำขอ MCP
-access token มีอายุ 1 ชั่วโมง; confidential clients ได้ refresh token อายุ 30 วัน
-public clients ต้องเชื่อมบัญชีใหม่เมื่อ access token หมดอายุ
+`https://claude.ai/api/mcp/auth_callback` (และ `claude.com` สำหรับอนาคต) และ loopback
+`http://localhost|127.0.0.1:<พอร์ต>/callback`; หน้าอนุญาตแสดง hostname ปลายทางเสมอ
+scope `nails:design` (+ `offline_access` ที่ Claude ขอเพื่อรับ refresh token) และตรวจ API token กับ backend
+ทั้งก่อนอนุญาตและทุกคำขอ MCP
+access token มีอายุ 1 ชั่วโมง; confidential clients (ChatGPT) ได้ refresh token อายุ 30 วันที่ใช้ซ้ำได้
+public clients (Claude ผ่าน DCR) ได้ refresh token แบบ **หมุน** อายุ 14 วัน — ใช้ได้ครั้งเดียว ใช้ซ้ำจะได้
+`invalid_grant`; รายการ token ที่ใช้แล้วเก็บในหน่วยความจำ (หลัง restart token เก่าที่ยังไม่หมดอายุจะใช้ได้อีกครั้ง)
 ยกเลิกสิทธิ์ทันทีได้โดยยกเลิก API token จากหน้าโปรไฟล์
 
 client registrations และ OAuth tokens เข้ารหัสด้วย AES-256-GCM และใช้งานต่อได้หลัง restart

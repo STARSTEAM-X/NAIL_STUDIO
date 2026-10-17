@@ -181,11 +181,21 @@ describe('HTTP MCP and OAuth', () => {
     await request(app).post('/consent').set('Origin', ORIGIN).set('Cookie', cookie).type('form').send({ request: flow, token: API_TOKEN }).expect(400)
   })
 
-  it('does not issue reusable refresh tokens to public clients', async () => {
+  it('rotates refresh tokens for public clients and rejects a reused one', async () => {
     const app = appFor()
     const client = await register(app, 'none')
     const token = await exchange(app, client, await consent(app, client)).expect(200)
-    expect(token.body.refresh_token).toBeUndefined()
+    expect(token.body.refresh_token).toBeTypeOf('string')
+    const refresh = (refreshToken: string) => request(app).post('/token').type('form').send({
+      client_id: client.client_id, grant_type: 'refresh_token', refresh_token: refreshToken, resource: `${ORIGIN}/mcp`,
+    })
+    const first = await refresh(token.body.refresh_token).expect(200)
+    expect(first.body.refresh_token).not.toBe(token.body.refresh_token)
+    await mcp(app, first.body.access_token).expect(200)
+    // ใช้ซ้ำ = ถูกปฏิเสธด้วย invalid_grant (Claude จะให้ผู้ใช้เชื่อมต่อใหม่)
+    const reused = await refresh(token.body.refresh_token).expect(400)
+    expect(reused.body.error).toBe('invalid_grant')
+    await refresh(first.body.refresh_token).expect(200)
   })
 
   it('rejects tampered tokens and tokens from another issuer or encryption key', async () => {
@@ -206,5 +216,70 @@ describe('HTTP MCP and OAuth', () => {
     await request(app).post('/mcp').set('Authorization', `Bearer ${API_TOKEN}`).set('Content-Type', 'application/json').send('{').expect(400)
     await request(app).post('/mcp').set('Authorization', `Bearer ${API_TOKEN}`).send({ data: 'x'.repeat(6 * 1024 * 1024) }).expect(413)
     await mcp(app).expect(401)
+  })
+})
+
+describe('Claude custom connector OAuth', () => {
+  const CLAUDE = 'https://claude.ai/api/mcp/auth_callback'
+  const LOOPBACK = 'http://localhost:3118/callback'
+
+  /** flow แบบที่ Claude ทำจริง: DCR เป็น public client → authorize (ขอ offline_access ด้วย) → consent → token */
+  async function connect(app: App, redirect: string) {
+    const client = (await request(app).post('/register').send({
+      client_name: 'Claude', redirect_uris: [redirect], token_endpoint_auth_method: 'none', grant_types: ['authorization_code', 'refresh_token'],
+    }).expect(201)).body as { client_id: string }
+    const page = await request(app).get('/authorize').query({
+      client_id: client.client_id, redirect_uri: redirect, response_type: 'code', scope: 'nails:design offline_access',
+      state: 's', code_challenge: CHALLENGE, code_challenge_method: 'S256', resource: `${ORIGIN}/mcp`,
+    }).expect(200)
+    const cookie = (page.headers['set-cookie'] as unknown as string[])[0]!.split(';')[0]!
+    const flow = /name="request" value="([^"]+)"/.exec(page.text)![1]!
+    const consented = await request(app).post('/consent').set('Origin', ORIGIN).set('Cookie', cookie)
+      .type('form').send({ request: flow, token: API_TOKEN }).expect(303)
+    const location = new URL(consented.headers.location as string)
+    expect(location.origin + location.pathname).toBe(redirect)
+    const token = await request(app).post('/token').type('form').send({
+      client_id: client.client_id, grant_type: 'authorization_code', code: location.searchParams.get('code'),
+      code_verifier: VERIFIER, redirect_uri: redirect, resource: `${ORIGIN}/mcp`,
+    }).expect(200)
+    return { page, consented, token }
+  }
+
+  it('connects from claude.ai, shows the destination host and returns a refresh token', async () => {
+    const app = appFor()
+    const { page, consented, token } = await connect(app, CLAUDE)
+    expect(page.text).toContain('claude.ai')
+    expect(page.text).not.toContain('localhost')
+    expect(consented.headers['content-security-policy']).toContain('https://claude.ai')
+    expect(token.body.refresh_token).toBeTypeOf('string')
+    await mcp(app, token.body.access_token).expect(200)
+  })
+
+  it('accepts the future claude.com callback and Claude Code loopback on any port, with a local-app warning', async () => {
+    const app = appFor()
+    await connect(app, 'https://claude.com/api/mcp/auth_callback')
+    for (const uri of [LOOPBACK, 'http://127.0.0.1:51234/callback']) {
+      const { page, token } = await connect(app, uri)
+      expect(page.text).toContain('คำเตือน')
+      await mcp(app, token.body.access_token).expect(200)
+    }
+  })
+
+  it('advertises offline_access so Claude asks for refresh tokens', async () => {
+    const metadata = await request(appFor()).get('/.well-known/oauth-authorization-server').expect(200)
+    expect(metadata.body.scopes_supported).toContain('offline_access')
+    expect(metadata.body.token_endpoint_auth_methods_supported).toContain('none')
+  })
+
+  it('rejects look-alike Claude and loopback callbacks', async () => {
+    const app = appFor()
+    for (const uri of [
+      'https://claude.ai/api/mcp/auth_callback/extra', 'https://claude.ai.evil.test/api/mcp/auth_callback',
+      'https://claude.ai/api/mcp/auth_callback?x=1', 'http://claude.ai/api/mcp/auth_callback',
+      'https://localhost:3118/callback', 'http://localhost:3118/other', 'http://localhost.evil.test:3118/callback',
+      'http://user@localhost:3118/callback', 'http://10.0.0.5:3118/callback',
+    ]) {
+      await request(app).post('/register').send({ redirect_uris: [uri], token_endpoint_auth_method: 'none' }).expect(400)
+    }
   })
 })

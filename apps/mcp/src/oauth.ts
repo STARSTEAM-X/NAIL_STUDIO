@@ -9,8 +9,14 @@ import type { OAuthClientInformationFull, OAuthTokens } from '@modelcontextproto
 import { API_TOKEN_PREFIX } from '@nail-studio/contracts'
 
 export const DESIGN_SCOPE = 'nails:design'
+/** Claude ขอ scope นี้เพิ่มเมื่อเห็นใน metadata เพื่อรับ refresh token */
+export const OFFLINE_SCOPE = 'offline_access'
+const KNOWN_SCOPES = new Set([DESIGN_SCOPE, OFFLINE_SCOPE])
 const ACCESS_SECONDS = 60 * 60
 const REFRESH_SECONDS = 30 * 24 * 60 * 60
+// public client (Claude) ได้ refresh token แบบหมุน — อายุสั้นกว่าเพราะการกันใช้ซ้ำเก็บในหน่วยความจำ
+const PUBLIC_REFRESH_SECONDS = 14 * 24 * 60 * 60
+const MAX_USED_REFRESH = 10000
 const FLOW_SECONDS = 5 * 60
 const MAX_CODES = 1000
 const COOKIE = '__Host-nailstudio-oauth'
@@ -74,17 +80,39 @@ const flowSchema = z.object({
 const accessSchema = z.object({
   clientId: z.string(), apiToken: tokenSchema, expiresAt: z.number(),
 })
+const refreshSchema = accessSchema.extend({ jti: z.string().optional() })
 type Flow = z.infer<typeof flowSchema>
 type Code = Flow & { apiToken: string }
 
-/** Only ChatGPT callbacks may receive credentials from this deployment. No arbitrary redirect/SSRF. */
+/** callback ของ Claude ที่โฮสต์ไว้ (claude.ai, Desktop, มือถือ, Cowork) — claude.com เผื่อย้ายในอนาคตตามเอกสารของ Anthropic */
+const CLAUDE_CALLBACKS = new Set(['https://claude.ai/api/mcp/auth_callback', 'https://claude.com/api/mcp/auth_callback'])
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1'])
+
+/** loopback redirect ของแอปบนเครื่อง (Claude Code, RFC 8252) — พอร์ตเปลี่ยนทุกครั้ง จึงไม่ผูกพอร์ต */
+export function isLoopbackRedirect(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return url.protocol === 'http:' && LOOPBACK_HOSTS.has(url.hostname) && url.pathname === '/callback'
+      && !url.search && !url.hash && !url.username && !url.password
+  } catch { return false }
+}
+
+/**
+ * Only known AI-client callbacks may receive credentials from this deployment. No arbitrary redirect/SSRF.
+ * ChatGPT connectors, Claude custom connectors (hosted callback) and Claude Code (loopback).
+ */
 function allowedRedirect(value: string): boolean {
   try {
     const url = new URL(value)
-    return url.origin === 'https://chatgpt.com' && !url.search && !url.hash && !url.username && !url.password
+    if (url.search || url.hash || url.username || url.password) return false
+    if (CLAUDE_CALLBACKS.has(url.href) || isLoopbackRedirect(value)) return true
+    return url.origin === 'https://chatgpt.com'
       && (url.pathname === '/connector_platform_oauth_redirect' || /^\/connector\/oauth\/[A-Za-z0-9_-]+$/.test(url.pathname))
   } catch { return false }
 }
+
+/** CSP form-action ต้องอนุญาตทุกปลายทางที่หน้า consent redirect ไปได้ (Chrome ตรวจ form-action กับ redirect ด้วย) */
+export const CONSENT_FORM_ACTIONS = ["'self'", 'https://chatgpt.com', 'https://claude.ai', 'https://claude.com', 'http://localhost:*', 'http://127.0.0.1:*']
 
 export class NailStudioOAuth implements OAuthServerProvider {
   readonly issuer: URL
@@ -94,6 +122,9 @@ export class NailStudioOAuth implements OAuthServerProvider {
   private readonly options: OAuthOptions
   // Codes are single-use and short-lived. A restart safely cancels pending authorization flows.
   private readonly codes = new Map<string, Code>()
+  // refresh token ของ public client ที่ถูกใช้แล้ว (jti → หมดอายุ) — กันใช้ซ้ำตาม OAuth 2.1 rotation
+  // อยู่ในหน่วยความจำ: หลังรีสตาร์ท token เก่าที่ยังไม่หมดอายุใช้ได้อีกครั้ง จึงจำกัดอายุไว้ที่ 14 วัน
+  private readonly usedRefresh = new Map<string, number>()
 
   constructor(options: OAuthOptions) {
     const url = new URL(options.publicUrl)
@@ -110,8 +141,8 @@ export class NailStudioOAuth implements OAuthServerProvider {
           const metadata = clientSchema.parse(this.sealed.open('client', id))
           return {
             ...metadata, client_id: id,
-            grant_types: ['authorization_code', ...(metadata.token_endpoint_auth_method === 'none' ? [] : ['refresh_token'])],
-            response_types: ['code'], scope: DESIGN_SCOPE,
+            grant_types: ['authorization_code', 'refresh_token'],
+            response_types: ['code'], scope: `${DESIGN_SCOPE} ${OFFLINE_SCOPE}`,
             ...(metadata.token_endpoint_auth_method === 'none' ? {} : {
               client_secret: this.sealed.clientSecret(id), client_secret_expires_at: 0,
             }),
@@ -120,11 +151,11 @@ export class NailStudioOAuth implements OAuthServerProvider {
       },
       registerClient: (client) => {
         if (client.redirect_uris.some((uri) => !allowedRedirect(uri))) {
-          throw new InvalidClientMetadataError('Only HTTPS ChatGPT OAuth callbacks are allowed')
+          throw new InvalidClientMetadataError('Only ChatGPT, Claude or loopback OAuth callbacks are allowed')
         }
         const result = clientSchema.safeParse({
           redirect_uris: client.redirect_uris,
-          client_name: client.client_name ?? 'ChatGPT',
+          client_name: client.client_name ?? 'AI client',
           token_endpoint_auth_method: client.token_endpoint_auth_method ?? 'client_secret_post',
           client_id_issued_at: this.now(),
         })
@@ -143,7 +174,7 @@ export class NailStudioOAuth implements OAuthServerProvider {
 
   async authorize(client: OAuthClientInformationFull, params: AuthorizationParams, response: Response): Promise<void> {
     this.checkResource(params.resource)
-    if (params.scopes?.some((scope) => scope !== DESIGN_SCOPE)) throw new InvalidScopeError('Unknown scope')
+    if (params.scopes?.some((scope) => !KNOWN_SCOPES.has(scope))) throw new InvalidScopeError('Unknown scope')
     if (!/^[A-Za-z0-9_-]{43}$/.test(params.codeChallenge)) throw new InvalidRequestError('Invalid S256 challenge')
     const flow: Flow = {
       clientId: client.client_id, redirectUri: params.redirectUri, challenge: params.codeChallenge,
@@ -152,11 +183,17 @@ export class NailStudioOAuth implements OAuthServerProvider {
     }
     response.cookie(COOKIE, flow.csrf, { httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: FLOW_SECONDS * 1000 })
     const request = this.sealed.seal('flow', flow)
+    // แสดง hostname ปลายทางเสมอ (MCP authorization spec) — ชื่อ client ผู้ลงทะเบียนตั้งเองได้ จึงเชื่อไม่ได้
+    const redirectHost = new URL(params.redirectUri).host
+    const loopbackWarning = isLoopbackRedirect(params.redirectUri)
+      ? '<p><strong>คำเตือน:</strong> ปลายทางเป็นโปรแกรมบนเครื่องนี้ (localhost) อนุญาตเฉพาะเมื่อคุณเพิ่งสั่งเชื่อมต่อจากแอปบนเครื่อง เช่น Claude Code</p>'
+      : ''
     response.type('html').send(`<!doctype html><html lang="th"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>เชื่อมต่อ NailStudio</title>
 <style>body{font:17px system-ui;background:#f8f4ec;color:#452230;margin:0;padding:24px}main{max-width:480px;margin:8vh auto;background:white;padding:32px;border-radius:20px}h1{font-size:26px}p{line-height:1.7}input,button{box-sizing:border-box;width:100%;padding:14px;margin-top:12px;font:inherit;border:1px solid #c9b9bf;border-radius:10px}button{background:#6b1e2b;color:white;cursor:pointer}a{color:#6b1e2b}small{display:block;margin-top:16px;line-height:1.6}</style>
-<main><h1>เชื่อมต่อ NailStudio กับ ${escapeHtml(client.client_name ?? 'ChatGPT')}</h1>
+<main><h1>เชื่อมต่อ NailStudio กับ ${escapeHtml(client.client_name ?? 'AI client')}</h1>
 <p>อนุญาตให้ AI อ่าน สร้าง และแก้ไขงานออกแบบของบัญชีคุณ ทุกการบันทึกเป็นเวอร์ชันใหม่ ย้อนกลับได้จากประวัติงาน</p>
+<p>หลังอนุญาต ระบบจะส่งกลับไปที่ <strong>${escapeHtml(redirectHost)}</strong> — ตรวจว่าเป็นแอปที่คุณกำลังเชื่อมต่ออยู่จริง</p>${loopbackWarning}
 <p>เปิด <a href="${escapeHtml(this.options.webUrl)}/profile" target="_blank" rel="noopener noreferrer">โปรไฟล์ NailStudio</a> → แก้ไขโปรไฟล์ → เชื่อมต่อ AI แล้วสร้าง API token สำหรับการเชื่อมต่อนี้</p>
 <form action="/consent" method="post"><input type="hidden" name="request" value="${escapeHtml(request)}">
 <label for="token">API token ของคุณ</label><input id="token" type="password" name="token" required autocomplete="off" spellcheck="false" placeholder="nsk_…" maxlength="100">
@@ -221,22 +258,55 @@ export class NailStudioOAuth implements OAuthServerProvider {
     if (redirectUri !== value.redirectUri) throw new InvalidGrantError('redirect_uri must match the authorization request')
     this.codes.delete(code)
     const tokens = this.tokens(client.client_id, value.apiToken)
-    // Public clients must reauthorize; reusable refresh tokens are only issued to confidential clients.
-    if (client.client_secret) {
-      tokens.refresh_token = this.sealed.seal('refresh', { clientId: client.client_id, apiToken: value.apiToken, expiresAt: this.now() + REFRESH_SECONDS })
-    }
+    tokens.refresh_token = this.refreshFor(client, value.apiToken)
     return tokens
+  }
+
+  /**
+   * confidential client (ChatGPT): refresh token ใช้ซ้ำได้ 30 วันและอยู่รอดข้ามการรีสตาร์ท
+   * public client (Claude ผ่าน DCR): หมุนค่าใหม่ทุกครั้งที่ใช้ (OAuth 2.1 / MCP spec) มี jti กันใช้ซ้ำ
+   */
+  private refreshFor(client: OAuthClientInformationFull, apiToken: string): string {
+    if (client.client_secret) {
+      return this.sealed.seal('refresh', { clientId: client.client_id, apiToken, expiresAt: this.now() + REFRESH_SECONDS })
+    }
+    return this.sealed.seal('refresh', {
+      clientId: client.client_id, apiToken, expiresAt: this.now() + PUBLIC_REFRESH_SECONDS, jti: randomBytes(16).toString('base64url'),
+    })
+  }
+
+  /** บันทึกว่า jti นี้ถูกใช้แล้ว — คืน false ถ้าเคยถูกใช้ (ถือว่า token รั่วหรือถูกเล่นซ้ำ) */
+  private consumeRefresh(jti: string, expiresAt: number): boolean {
+    const now = this.now()
+    for (const [id, expiry] of this.usedRefresh) {
+      if (expiry > now) break
+      this.usedRefresh.delete(id)
+    }
+    if (this.usedRefresh.has(jti)) return false
+    if (this.usedRefresh.size >= MAX_USED_REFRESH) throw new TemporarilyUnavailableError('Please try again later')
+    this.usedRefresh.set(jti, expiresAt)
+    return true
   }
 
   async exchangeRefreshToken(client: OAuthClientInformationFull, refreshToken: string, scopes?: string[], resource?: URL): Promise<OAuthTokens> {
     this.checkResource(resource)
-    if (scopes?.some((scope) => scope !== DESIGN_SCOPE)) throw new InvalidScopeError('Unknown scope')
+    if (scopes?.some((scope) => !KNOWN_SCOPES.has(scope))) throw new InvalidScopeError('Unknown scope')
     try {
-      const value = accessSchema.parse(this.sealed.open('refresh', refreshToken))
-      if (!client.client_secret || value.clientId !== client.client_id || value.expiresAt <= this.now()) throw new Error('Invalid refresh')
+      const value = refreshSchema.parse(this.sealed.open('refresh', refreshToken))
+      if (value.clientId !== client.client_id || value.expiresAt <= this.now()) throw new Error('Invalid refresh')
+      // token ของ public client ต้องมี jti และใช้ได้ครั้งเดียว ส่วนของ confidential client ต้องไม่มี jti
+      if (Boolean(client.client_secret) === Boolean(value.jti)) throw new Error('Wrong refresh kind')
+      // ทำเครื่องหมายก่อนเรียก API — คำขอซ้ำที่เข้ามาพร้อมกันระหว่างรอ API จะไม่ผ่านทั้งคู่
+      if (value.jti && !this.consumeRefresh(value.jti, value.expiresAt)) throw new Error('Refresh token reused')
       await this.options.validateApiToken(value.apiToken)
-      return { ...this.tokens(client.client_id, value.apiToken), refresh_token: refreshToken }
-    } catch { throw new InvalidGrantError('Invalid, revoked or expired refresh token') }
+      return {
+        ...this.tokens(client.client_id, value.apiToken),
+        refresh_token: value.jti ? this.refreshFor(client, value.apiToken) : refreshToken,
+      }
+    } catch (error) {
+      if (error instanceof TemporarilyUnavailableError) throw error
+      throw new InvalidGrantError('Invalid, revoked or expired refresh token')
+    }
   }
 
   async verifyAccessToken(token: string): Promise<AuthInfo> {
