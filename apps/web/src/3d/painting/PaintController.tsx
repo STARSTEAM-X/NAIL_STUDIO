@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useThree } from '@react-three/fiber'
-import { Raycaster, Vector2 } from 'three'
+import { Raycaster, Vector2, type Object3D } from 'three'
 import type { NailKey, Point } from '@nail-studio/contracts'
 import { useDesignStoreApi } from '@/features/design/DesignStoreProvider.tsx'
 import type { HandParts } from '@/3d/models/HandModel.tsx'
@@ -40,7 +40,7 @@ export function PaintController({ parts, textures }: Props) {
     const raycaster = new Raycaster()
     const ndc = new Vector2()
     // ใส่ mesh มือเข้าไปด้วย ไม่งั้นรังสีจะทะลุนิ้วที่บังอยู่ไปโดนหลังเล็บที่มองไม่เห็น
-    const targets = [...parts.nails.values(), ...parts.occluders]
+    const pickTargets = [...parts.nails.values(), ...parts.occluders]
 
     let painting: NailKey | null = null
     let points: Point[] = []
@@ -51,7 +51,7 @@ export function PaintController({ parts, textures }: Props) {
     let lastPointerY = 0
     let lastPressure = 0.5
 
-    const hit = (event: PointerEvent) => {
+    const hit = (event: PointerEvent, targets: Object3D[]) => {
       const rect = strokeRect ?? canvas.getBoundingClientRect()
       const screen = pointerToNdc(event.clientX, event.clientY, rect)
       ndc.set(screen.x, screen.y)
@@ -118,7 +118,7 @@ export function PaintController({ parts, textures }: Props) {
       if (textures.strokeOwner() === OWNER) textures.endStroke(OWNER)
       if (textures.isPainting()) return
       strokeRect = canvas.getBoundingClientRect()
-      const target = hit(event)
+      const target = hit(event, pickTargets)
       if (!target) {
         strokeRect = null
         return
@@ -170,7 +170,9 @@ export function PaintController({ parts, textures }: Props) {
       const dy = event.clientY - lastPointerY
       if (dx * dx + dy * dy < MIN_POINTER_DISTANCE_PX ** 2
         && Math.abs(pressure - lastPressure) < 0.03) return
-      const target = hit(event)
+      const targetMesh = parts.nails.get(painting)
+      if (!targetMesh) return
+      const target = hit(event, [targetMesh])
       // ลากออกนอกเล็บที่เริ่มไว้แล้วเงียบไว้ ไม่ใช่จบเส้น — ผู้ใช้ลากกลับเข้ามาต่อได้
       if (!target || target.key !== painting) return
       lastPointerX = event.clientX

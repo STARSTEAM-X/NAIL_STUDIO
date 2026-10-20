@@ -1,4 +1,5 @@
 import type { HandSettings } from '@nail-studio/contracts'
+import { Link } from 'react-router-dom'
 import { useDesign } from './DesignStoreProvider.tsx'
 
 const PROPORTION_RANGES: Record<keyof HandSettings['proportions'], { min: number; max: number }> = {
@@ -28,6 +29,7 @@ export function HandPanel() {
   return (
     <aside className="toolbar" aria-label="สัดส่วนมือและสีผิว">
       <h2>มือ</h2>
+      <Link to="/hand-studio">เปิด Hand Atelier · โมเดลมือใหม่</Link>
 
       <label className="field">
         สีผิว

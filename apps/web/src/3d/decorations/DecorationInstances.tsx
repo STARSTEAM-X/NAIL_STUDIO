@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { InstancedMesh, Matrix4, MeshStandardMaterial, Object3D, Vector3 } from 'three'
 import { EDITABLE_NAILS } from '@/features/design/designStore.ts'
 import { useDesignStoreApi } from '@/features/design/DesignStoreProvider.tsx'
@@ -37,6 +37,7 @@ const MAX_INSTANCES_PER_CATALOG_ENTRY = 30 * 5
  */
 export function DecorationInstances({ parts }: Props) {
   const store = useDesignStoreApi()
+  const invalidate = useThree((state) => state.invalidate)
   const needsRebuildRef = useRef(false)
   const rebuildRef = useRef<() => void>(() => {})
 
@@ -129,9 +130,10 @@ export function DecorationInstances({ parts }: Props) {
       if (state.document === previous) return
       previous = state.document
       needsRebuildRef.current = true
+      invalidate()
     })
     return unsubscribe
-  }, [parts, store, meshes, meshByCatalogId])
+  }, [parts, store, meshes, meshByCatalogId, invalidate])
 
   useFrame(() => {
     if (!needsRebuildRef.current) return

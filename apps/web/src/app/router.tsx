@@ -17,6 +17,7 @@ import { LoadingScreen } from '@/components/Loading.tsx'
 const CommunityPage = lazy(() => import('@/pages/CommunityPage.tsx').then((module) => ({ default: module.CommunityPage })))
 const TemplatePreviewPage = lazy(() => import('@/pages/TemplatePreviewPage.tsx').then((module) => ({ default: module.TemplatePreviewPage })))
 const EditorPage = lazy(() => import('@/pages/EditorPage.tsx').then((module) => ({ default: module.EditorPage })))
+const HandStudioPage = lazy(() => import('@/pages/HandStudioPage.tsx').then((module) => ({ default: module.HandStudioPage })))
 const AppointmentsPage = lazy(() => import('@/pages/AppointmentsPage.tsx').then((module) => ({ default: module.AppointmentsPage })))
 const AppointmentDetailPage = lazy(() => import('@/pages/AppointmentDetailPage.tsx').then((module) => ({ default: module.AppointmentDetailPage })))
 const ShopsPage = lazy(() => import('@/pages/ShopsPage.tsx').then((module) => ({ default: module.ShopsPage })))
@@ -102,6 +103,7 @@ export function AppRouter() {
         />
 
         <Route path="/editor/:projectId" element={<Page><EditorPage /></Page>} />
+        <Route path="/hand-studio" element={<ErrorBoundary><HandStudioPage /></ErrorBoundary>} />
 
         {/* /profile ถูกรวมเข้ากับโปรไฟล์สาธารณะแล้ว — ลิงก์เก่ายังต้องพาไปที่ถูก */}
         <Route path="/profile" element={<Protected><ProfileRedirect /></Protected>} />

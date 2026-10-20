@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useThree } from '@react-three/fiber'
 import { MeshStandardMaterial, type SkinnedMesh } from 'three'
 import type { HandSettings } from '@nail-studio/contracts'
 import { useDesignStoreApi } from '@/features/design/DesignStoreProvider.tsx'
@@ -19,6 +20,7 @@ export function shouldApplyHand(current: HandSettings, last: HandSettings | unde
  */
 export function useHandProportions(parts: HandParts | null): void {
   const store = useDesignStoreApi()
+  const invalidate = useThree((state) => state.invalidate)
 
   useEffect(() => {
     if (!parts) return undefined
@@ -41,7 +43,10 @@ export function useHandProportions(parts: HandParts | null): void {
     }
 
     apply(store.getState().document.hand)
-    const unsubscribe = store.subscribe((state) => apply(state.document.hand))
+    const unsubscribe = store.subscribe((state) => {
+      apply(state.document.hand)
+      invalidate()
+    })
     return unsubscribe
-  }, [parts, store])
+  }, [parts, store, invalidate])
 }

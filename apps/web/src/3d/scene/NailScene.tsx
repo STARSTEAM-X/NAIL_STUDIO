@@ -18,6 +18,7 @@ interface Props {
 export function NailScene({ children, fallback }: Props) {
   return (
     <Canvas
+      frameloop="demand"
       shadows={false}
       // A 2x DPR makes every frame (and every live paint texture upload) up to
       // four times more expensive on HiDPI screens. Keep the editor responsive

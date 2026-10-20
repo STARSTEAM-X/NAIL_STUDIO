@@ -1,0 +1,177 @@
+{
+  "open": {
+    "joints": {
+      "index": {
+        "mcp": 0,
+        "pip": 0,
+        "dip": 0,
+        "spread": 0
+      },
+      "middle": {
+        "mcp": 0,
+        "pip": 0,
+        "dip": 0,
+        "spread": 0
+      },
+      "ring": {
+        "mcp": 0,
+        "pip": 0,
+        "dip": 0,
+        "spread": 0
+      },
+      "little": {
+        "mcp": 0,
+        "pip": 0,
+        "dip": 0,
+        "spread": 0
+      },
+      "thumb": {
+        "mcp": 0,
+        "pip": 0,
+        "dip": 0,
+        "spread": 0
+      }
+    },
+    "opposition": 0
+  },
+  "relaxed": {
+    "joints": {
+      "index": {
+        "mcp": 10,
+        "pip": 14,
+        "dip": 7,
+        "spread": 0
+      },
+      "middle": {
+        "mcp": 12,
+        "pip": 16,
+        "dip": 8,
+        "spread": 0
+      },
+      "ring": {
+        "mcp": 14,
+        "pip": 18,
+        "dip": 9,
+        "spread": 0
+      },
+      "little": {
+        "mcp": 16,
+        "pip": 20,
+        "dip": 10,
+        "spread": 0
+      },
+      "thumb": {
+        "mcp": 8,
+        "pip": 12,
+        "dip": 6,
+        "spread": 0
+      }
+    },
+    "opposition": 0
+  },
+  "soft_fist": {
+    "joints": {
+      "index": {
+        "mcp": 48,
+        "pip": 65,
+        "dip": 38,
+        "spread": 0
+      },
+      "middle": {
+        "mcp": 48,
+        "pip": 65,
+        "dip": 38,
+        "spread": 0
+      },
+      "ring": {
+        "mcp": 48,
+        "pip": 65,
+        "dip": 38,
+        "spread": 0
+      },
+      "little": {
+        "mcp": 48,
+        "pip": 65,
+        "dip": 38,
+        "spread": 0
+      },
+      "thumb": {
+        "mcp": 12,
+        "pip": 20,
+        "dip": 12,
+        "spread": 0
+      }
+    },
+    "opposition": 28
+  },
+  "pinch": {
+    "joints": {
+      "index": {
+        "mcp": 20,
+        "pip": 80,
+        "dip": 35,
+        "spread": 0
+      },
+      "middle": {
+        "mcp": 16,
+        "pip": 24,
+        "dip": 12,
+        "spread": 0
+      },
+      "ring": {
+        "mcp": 16,
+        "pip": 24,
+        "dip": 12,
+        "spread": 0
+      },
+      "little": {
+        "mcp": 16,
+        "pip": 24,
+        "dip": 12,
+        "spread": 0
+      },
+      "thumb": {
+        "mcp": 35,
+        "pip": 12,
+        "dip": 6,
+        "spread": -12
+      }
+    },
+    "opposition": 45
+  },
+  "v": {
+    "joints": {
+      "index": {
+        "mcp": 0,
+        "pip": 0,
+        "dip": 0,
+        "spread": 10
+      },
+      "middle": {
+        "mcp": 0,
+        "pip": 0,
+        "dip": 0,
+        "spread": -8
+      },
+      "ring": {
+        "mcp": 52,
+        "pip": 72,
+        "dip": 42,
+        "spread": 0
+      },
+      "little": {
+        "mcp": 55,
+        "pip": 76,
+        "dip": 45,
+        "spread": 0
+      },
+      "thumb": {
+        "mcp": 16,
+        "pip": 25,
+        "dip": 18,
+        "spread": 0
+      }
+    },
+    "opposition": 22
+  }
+}

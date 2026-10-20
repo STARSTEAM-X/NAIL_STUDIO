@@ -35,6 +35,7 @@ export function NailFocus({ parts }: Props) {
   const camera = useThree((state) => state.camera)
   const gl = useThree((state) => state.gl)
   const controls = useThree((state) => state.controls) as Controls | null
+  const invalidate = useThree((state) => state.invalidate)
   const focus = useDesign((state) => state.focus)
   const clearFocus = useDesign((state) => state.clearFocus)
   const goal = useRef<{ position: Vector3; target: Vector3 } | null>(null)
@@ -46,6 +47,7 @@ export function NailFocus({ parts }: Props) {
         position: new Vector3(...HOME_POSITION),
         target: new Vector3(...HOME_TARGET),
       }
+      invalidate()
       return
     }
     const mesh = parts.nails.get(focus.key)
@@ -56,12 +58,13 @@ export function NailFocus({ parts }: Props) {
         position: cameraForNail(view, (camera as { fov?: number }).fov ?? 35),
         target: view.center.clone(),
       }
+      invalidate()
     } catch (error) {
       // คำนวณมุมมองไม่ได้ = โมเดลไม่ตรงกับที่ pipeline รับปากไว้ ซึ่งควรรู้
       // แต่ต้องไม่ทำให้ทั้งฉากล่ม เพราะการจ่อเป็นความสะดวก ไม่ใช่แกนของการวาด
       console.error('[3d] คำนวณมุมมองเล็บไม่ได้', focus.key, error)
     }
-  }, [focus, parts, camera])
+  }, [focus, parts, camera, invalidate])
 
   // ผู้ใช้แตะเมื่อไรยกเลิกทันที การหมุนด้วยมือต้องชนะเสมอ ไม่ใช่กล้องดึงกลับสู้กับคน
   useEffect(() => {
@@ -95,6 +98,7 @@ export function NailFocus({ parts }: Props) {
       controls.update()
       goal.current = null
     }
+    if (!settled) invalidate()
   })
 
   return null

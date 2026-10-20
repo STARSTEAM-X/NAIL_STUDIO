@@ -1,0 +1,40 @@
+{
+  "modelId": "realistic-hand-v1",
+  "schemaVersion": "1.0",
+  "units": "metres",
+  "authorship": "Original procedural mesh, rig, UVs and textures authored from scratch for Nail Studio.",
+  "source": "model/realistic-hand-v1.blend",
+  "generator": "tools/realistic_hand_anatomy.py",
+  "bones": 23,
+  "basis": "X: palm width, Y: fingers, Z: dorsum; metres",
+  "externalAssets": [],
+  "rightHandAsset": "realistic-hand-v1.glb",
+  "leftHand": "Independent skeleton clone, mirrored across X at runtime.",
+  "nails": {
+    "index": {
+      "mesh": "Nail_index",
+      "distalBone": "Index4",
+      "socket": "Index_NailRoot"
+    },
+    "middle": {
+      "mesh": "Nail_middle",
+      "distalBone": "Middle4",
+      "socket": "Middle_NailRoot"
+    },
+    "ring": {
+      "mesh": "Nail_ring",
+      "distalBone": "Ring4",
+      "socket": "Ring_NailRoot"
+    },
+    "little": {
+      "mesh": "Nail_little",
+      "distalBone": "Pinky4",
+      "socket": "Little_NailRoot"
+    },
+    "thumb": {
+      "mesh": "Nail_thumb",
+      "distalBone": "Thumb4",
+      "socket": "Thumb_NailRoot"
+    }
+  }
+}
