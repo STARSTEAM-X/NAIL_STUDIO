@@ -16,11 +16,12 @@ export interface BlobClient {
  * ใน DB เหมือนกันทุก driver และย้ายไฟล์ข้าม driver ได้โดยไม่ต้องแก้ข้อมูล
  */
 export class VercelBlobProvider implements StorageProvider {
-  private readonly token: string
+  // ไม่มี token = ให้ @vercel/blob ใช้ OIDC ของ Vercel Function กับ BLOB_STORE_ID เอง
+  private readonly auth: { token?: string }
   private readonly client: BlobClient
 
-  constructor(token: string, client: BlobClient = { put, get, del }) {
-    this.token = token
+  constructor(token: string | undefined, client: BlobClient = { put, get, del }) {
+    this.auth = token ? { token } : {}
     this.client = client
   }
 
@@ -38,13 +39,13 @@ export class VercelBlobProvider implements StorageProvider {
       addRandomSuffix: false,
       allowOverwrite: true,
       contentType: meta.contentType,
-      token: this.token,
+      ...this.auth,
     })
     return { key, sizeBytes: data.byteLength }
   }
 
   async get(key: string): Promise<Buffer> {
-    const result = await this.client.get(this.checkKey(key), { access: 'private', useCache: false, token: this.token })
+    const result = await this.client.get(this.checkKey(key), { access: 'private', useCache: false, ...this.auth })
     if (!result || result.statusCode !== 200) {
       // ให้หน้าตาเหมือน readFile ของ LocalDiskProvider เมื่อไม่มีไฟล์
       throw Object.assign(new Error(`ไม่พบไฟล์ใน storage: ${key}`), { code: 'ENOENT' })
@@ -54,6 +55,6 @@ export class VercelBlobProvider implements StorageProvider {
 
   async delete(key: string): Promise<void> {
     // del ของ Blob ไม่ error เมื่อไม่มีไฟล์อยู่แล้ว — idempotent เหมือน rm({ force: true })
-    await this.client.del(this.checkKey(key), { token: this.token })
+    await this.client.del(this.checkKey(key), { ...this.auth })
   }
 }

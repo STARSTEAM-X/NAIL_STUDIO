@@ -23,7 +23,10 @@ const envSchema = z
     SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
     // vercel-blob: ดิสก์ของ Vercel Function เป็น ephemeral จึงต้องเก็บไฟล์นอกเครื่อง
     STORAGE_DRIVER: z.enum(['local', 'vercel-blob']).default('local'),
+    // vercel-blob ยืนยันตัวตนได้สองแบบ: OIDC (BLOB_STORE_ID ที่ Vercel ใส่ให้เมื่อเชื่อม store — ไม่มี
+    // secret ค้างใน env) หรือ token แบบเดิม (BLOB_READ_WRITE_TOKEN) — @vercel/blob เลือกเองตามที่มี
     BLOB_READ_WRITE_TOKEN: z.string().min(1).optional(),
+    BLOB_STORE_ID: z.string().min(1).optional(),
     STORAGE_ROOT: z.string().min(1).default('./storage'),
     AI_SERVICE_URL: z.string().url().default('http://localhost:4100'),
     AI_INTERNAL_TOKEN: z.string().default(''),
@@ -34,8 +37,12 @@ const envSchema = z
     VERCEL: z.string().optional(),
   })
   .superRefine((value, context) => {
-    if (value.STORAGE_DRIVER === 'vercel-blob' && !value.BLOB_READ_WRITE_TOKEN) {
-      context.addIssue({ code: 'custom', path: ['BLOB_READ_WRITE_TOKEN'], message: 'STORAGE_DRIVER=vercel-blob ต้องตั้ง BLOB_READ_WRITE_TOKEN' })
+    if (value.STORAGE_DRIVER === 'vercel-blob' && !value.BLOB_READ_WRITE_TOKEN && !value.BLOB_STORE_ID) {
+      context.addIssue({
+        code: 'custom',
+        path: ['BLOB_STORE_ID'],
+        message: 'STORAGE_DRIVER=vercel-blob ต้องเชื่อม Blob store (BLOB_STORE_ID) หรือตั้ง BLOB_READ_WRITE_TOKEN',
+      })
     }
     if (value.VERCEL && value.STORAGE_DRIVER === 'local') {
       context.addIssue({ code: 'custom', path: ['STORAGE_DRIVER'], message: 'บน Vercel ดิสก์ไม่ถาวร — ต้องใช้ STORAGE_DRIVER=vercel-blob' })

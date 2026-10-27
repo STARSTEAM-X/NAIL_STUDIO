@@ -34,7 +34,8 @@ smoke test โหลด function ที่ bundle แล้วด้วยค่
 | `WEB_ORIGIN` | โดเมน production เช่น `https://nail-studio.vercel.app` |
 | `SESSION_SECRET` | สุ่มใหม่ ≥ 32 ตัวอักษร — ห้ามใช้ค่าเดียวกับเครื่อง dev |
 | `STORAGE_DRIVER` | `vercel-blob` |
-| `BLOB_READ_WRITE_TOKEN` | จาก Blob store แบบ **private** ที่เชื่อมกับ project |
+| `BLOB_STORE_ID` | Vercel ใส่ให้เองเมื่อเชื่อม Blob store แบบ **private** กับ project (ยืนยันตัวตนด้วย OIDC ไม่มี secret) |
+| `BLOB_READ_WRITE_TOKEN` | ไม่บังคับ — ใช้แทน OIDC ได้ (เช่นรันนอก Vercel) |
 
 ## ข้อจำกัดที่ทราบ
 

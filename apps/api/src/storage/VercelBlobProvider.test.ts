@@ -38,6 +38,17 @@ describe('VercelBlobProvider', () => {
     expect(blob.calls.get[0]).toMatchObject({ access: 'private', token: 'token-x' })
   })
 
+  it('omits the token so @vercel/blob falls back to OIDC + BLOB_STORE_ID', async () => {
+    const blob = fakeBlob()
+    const provider = new VercelBlobProvider(undefined, blob.client)
+    await provider.put('a/b.webp', Buffer.from('x'), { contentType: 'image/webp' })
+    await provider.get('a/b.webp')
+    await provider.delete('a/b.webp')
+    for (const options of [blob.calls.put[0], blob.calls.get[0], blob.calls.del[0]]) {
+      expect(options).not.toHaveProperty('token')
+    }
+  })
+
   it('get of a missing key throws an ENOENT error like the local driver', async () => {
     const provider = new VercelBlobProvider('t', fakeBlob().client)
     await expect(provider.get('thumbnails/missing.webp')).rejects.toMatchObject({ code: 'ENOENT' })

@@ -17,8 +17,13 @@ describe('loadEnv storage driver', () => {
       .toMatchObject({ STORAGE_DRIVER: 'vercel-blob', BLOB_READ_WRITE_TOKEN: 'tok' })
   })
 
-  it('fails fast when vercel-blob has no token', () => {
-    expect(() => loadEnv({ ...base, STORAGE_DRIVER: 'vercel-blob' })).toThrow('BLOB_READ_WRITE_TOKEN')
+  it('accepts vercel-blob connected through OIDC (store id, no token)', () => {
+    expect(loadEnv({ ...base, STORAGE_DRIVER: 'vercel-blob', BLOB_STORE_ID: 'store_x', VERCEL: '1' }))
+      .toMatchObject({ STORAGE_DRIVER: 'vercel-blob', BLOB_STORE_ID: 'store_x' })
+  })
+
+  it('fails fast when vercel-blob has neither a store id nor a token', () => {
+    expect(() => loadEnv({ ...base, STORAGE_DRIVER: 'vercel-blob' })).toThrow('BLOB_STORE_ID')
   })
 
   it('fails fast when running on Vercel with local disk storage', () => {

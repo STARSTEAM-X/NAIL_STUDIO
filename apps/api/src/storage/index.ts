@@ -8,8 +8,8 @@ export function createStorageProvider(): StorageProvider {
     case 'local':
       return new LocalDiskProvider(env.STORAGE_ROOT)
     case 'vercel-blob':
-      // env.ts บังคับให้มี token เมื่อเลือก driver นี้แล้ว
-      return new VercelBlobProvider(env.BLOB_READ_WRITE_TOKEN ?? '')
+      // env.ts บังคับให้มี BLOB_STORE_ID (OIDC) หรือ token อย่างใดอย่างหนึ่งแล้ว
+      return new VercelBlobProvider(env.BLOB_READ_WRITE_TOKEN)
     default: {
       // exhaustiveness check — ถ้าเพิ่มค่าใน STORAGE_DRIVER union แล้วลืมเพิ่มเคสตรงนี้
       // TypeScript จะฟ้องตอน build ไม่ใช่ runtime
