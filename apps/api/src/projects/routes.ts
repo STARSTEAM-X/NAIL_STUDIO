@@ -121,10 +121,21 @@ projectsRouter.post('/:id/versions', async (request, response) => {
 /**
  * Server-Sent Events: แจ้ง editor ที่เปิดงานนี้อยู่เมื่อมีเวอร์ชันใหม่ (เช่น AI บันทึกผ่าน MCP)
  * ส่ง comment ทุก 25 วินาทีกัน proxy ตัดการเชื่อมต่อที่เงียบนานเกินไป
+ * และปิดสตรีมเองก่อนเพดานเวลาของ Vercel Function — EventSource ฝั่งเว็บต่อใหม่ให้อัตโนมัติ
  */
+const SSE_MAX_LIFETIME_MS = 270_000
+
 projectsRouter.get('/:id/events', async (request, response) => {
   const { id } = idParamSchema.parse(request.params)
   await service.assertOwner(currentUser(request).id, id)
+  // รอให้ LISTEN พร้อมก่อนตอบ header — ผู้เรียกจะไม่พลาดเวอร์ชันที่บันทึกหลังเชื่อมต่อสำเร็จ
+  const unsubscribe = await subscribeProject(id, (event) => {
+    response.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`)
+  })
+  if (request.destroyed) {
+    unsubscribe()
+    return
+  }
   response.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
     'Cache-Control': 'no-cache, no-transform',
@@ -132,12 +143,11 @@ projectsRouter.get('/:id/events', async (request, response) => {
     'X-Accel-Buffering': 'no',
   })
   response.write(': connected\n\n')
-  const unsubscribe = subscribeProject(id, (event) => {
-    response.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`)
-  })
   const heartbeat = setInterval(() => response.write(': ping\n\n'), 25_000)
+  const lifetime = setTimeout(() => response.end(), SSE_MAX_LIFETIME_MS)
   request.on('close', () => {
     clearInterval(heartbeat)
+    clearTimeout(lifetime)
     unsubscribe()
   })
 })

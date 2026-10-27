@@ -14,7 +14,9 @@ import { env } from './config/env.ts'
  */
 const pool = new pg.Pool({
   connectionString: env.DATABASE_URL,
-  max: 10,
+  max: env.DB_POOL_MAX,
+  // serverless: instance ที่ว่างต้องคืน connection เร็ว ไม่งั้นหลาย instance รวมกันจะชนเพดานของ DB
+  idleTimeoutMillis: 10_000,
   // ตัด query ที่ค้างนานผิดปกติ ไม่ให้ล็อกทรัพยากรไว้ (database.md §7)
   statement_timeout: 5_000,
 })
@@ -26,4 +28,17 @@ export const prisma: PrismaClient = new PrismaClient({ adapter })
 export async function disconnectDb(): Promise<void> {
   await prisma.$disconnect()
   await pool.end()
+}
+
+/** ส่ง NOTIFY ผ่าน pool เดิม — pooler โหมด transaction ส่ง NOTIFY ได้ (ที่รับไม่ได้คือ LISTEN) */
+export async function notify(channel: string, payload: string): Promise<void> {
+  await pool.query('SELECT pg_notify($1, $2)', [channel, payload])
+}
+
+/**
+ * connection เฉพาะสำหรับ LISTEN — ต้องเป็น connection ยาวที่ไม่ผ่าน pooler
+ * จึงใช้ DATABASE_URL_UNPOOLED ถ้ามี (บน Neon) และไม่ใส่ statement_timeout เพราะไม่ได้รัน query ยาว
+ */
+export function createListenClient(): pg.Client {
+  return new pg.Client({ connectionString: env.DATABASE_URL_UNPOOLED ?? env.DATABASE_URL })
 }

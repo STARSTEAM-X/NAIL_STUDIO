@@ -13,7 +13,7 @@ import {
 } from '@nail-studio/contracts'
 import { AppError } from '../errors/AppError.ts'
 import { sniffThumbnailMime, MAX_THUMBNAIL_BYTES } from '../storage/mimeSniff.ts'
-import { storage } from '../storage/index.ts'
+import { readIfExists, storage } from '../storage/index.ts'
 import * as repository from './repository.ts'
 
 interface ProjectRow {
@@ -327,6 +327,6 @@ export async function loadThumbnail(
   if (!project.thumbnailAssetId) return null
   const asset = await repository.findAsset(project.thumbnailAssetId)
   if (!asset) return null
-  const data = await storage.get(asset.storageKey)
-  return { data, mimeType: asset.mimeType }
+  const data = await readIfExists(asset.storageKey)
+  return data ? { data, mimeType: asset.mimeType } : null
 }

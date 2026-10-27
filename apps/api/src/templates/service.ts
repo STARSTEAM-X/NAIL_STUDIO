@@ -16,7 +16,7 @@ import type {
 } from '@nail-studio/contracts'
 import { designDocumentSchema } from '@nail-studio/contracts'
 import { AppError } from '../errors/AppError.ts'
-import { storage } from '../storage/index.ts'
+import { readIfExists } from '../storage/index.ts'
 import * as repository from './repository.ts'
 import { decodeTemplateCursor, encodeTemplateCursor } from './cursor.ts'
 
@@ -108,7 +108,8 @@ export async function detail(templateId: string, viewerId: string | null): Promi
 export async function loadThumbnail(templateId: string): Promise<{ data: Buffer; mimeType: string } | null> {
   const asset = await repository.findPublicTemplateThumbnail(templateId)
   if (!asset) return null
-  return { data: await storage.get(asset.storageKey), mimeType: asset.mimeType }
+  const data = await readIfExists(asset.storageKey)
+  return data ? { data, mimeType: asset.mimeType } : null
 }
 
 export async function like(userId: string, templateId: string): Promise<TemplateLikeResult> {

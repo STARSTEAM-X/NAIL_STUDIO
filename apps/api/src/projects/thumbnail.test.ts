@@ -13,9 +13,21 @@ vi.mock('./repository.ts', () => ({
   replaceThumbnail: replaceThumbnailMock,
   findAsset: findAssetMock,
 }))
-vi.mock('../storage/index.ts', () => ({
-  storage: { put: storagePutMock, get: storageGetMock, delete: storageDeleteMock },
-}))
+vi.mock('../storage/index.ts', () => {
+  const storage = { put: storagePutMock, get: storageGetMock, delete: storageDeleteMock }
+  return {
+    storage,
+    // ใช้ตรรกะจริงของ readIfExists แต่ผ่าน storage ตัวปลอม
+    readIfExists: async (key: string) => {
+      try {
+        return await storage.get(key)
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
+        throw error
+      }
+    },
+  }
+})
 
 const VALID_WEBP = Buffer.from([
   0x52, 0x49, 0x46, 0x46, 0x1a, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50,
@@ -92,6 +104,14 @@ describe('loadThumbnail', () => {
 
     const result = await loadThumbnail('user-1', 'project-1')
     expect(result).toEqual({ data: Buffer.from('bytes'), mimeType: 'image/webp' })
+  })
+
+  it('returns null when the asset row exists but its file is gone', async () => {
+    findProjectMock.mockResolvedValue({ id: 'project-1', thumbnailAssetId: 'asset-1' })
+    findAssetMock.mockResolvedValue({ storageKey: 'thumbnails/2026/lost.webp', mimeType: 'image/webp' })
+    storageGetMock.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }))
+
+    expect(await loadThumbnail('user-1', 'project-1')).toBeNull()
   })
 
   it('rejects a project that does not belong to the user (404)', async () => {

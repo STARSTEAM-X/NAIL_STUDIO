@@ -1,0 +1,33 @@
+/**
+ * ตรวจว่า function ที่ bundle แล้ว (.vercel/output/functions/api.func) โหลดและตอบได้จริง
+ * ใช้ค่า env จาก .env ของเครื่อง — รันหลัง `node tools/vercel-build.mjs`
+ */
+import { createServer } from 'node:http'
+import path from 'node:path'
+import { pathToFileURL } from 'node:url'
+
+process.loadEnvFile(path.resolve(import.meta.dirname, '../.env'))
+process.env.NODE_ENV = 'production'
+
+const entry = path.resolve(import.meta.dirname, '../.vercel/output/functions/api.func/index.mjs')
+const { default: handler } = await import(pathToFileURL(entry).href)
+const server = createServer(handler).listen(0)
+await new Promise((resolve) => server.once('listening', resolve))
+const base = `http://127.0.0.1:${server.address().port}/api/v1`
+
+try {
+  const health = await fetch(`${base}/health`)
+  const body = await health.json()
+  if (health.status !== 200 || body.success !== true) throw new Error(`health: ${health.status} ${JSON.stringify(body)}`)
+  // เส้นทางที่ต้องใช้ DB + argon2 (native addon) — ต้องไม่ 500
+  const login = await fetch(`${base}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: `nscsrf=smoke`, 'x-csrf-token': 'smoke' },
+    body: JSON.stringify({ email: 'nobody@example.test', password: 'wrong-password-123' }),
+  })
+  if (login.status >= 500) throw new Error(`login: ${login.status} ${await login.text()}`)
+  console.log(`smoke ok — health 200, login ${login.status}`)
+} finally {
+  server.close()
+}
+process.exit(0)
