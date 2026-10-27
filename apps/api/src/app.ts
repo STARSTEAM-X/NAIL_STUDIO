@@ -56,7 +56,9 @@ export function createApp(options: AppOptions = { webDist: env.WEB_DIST }): Expr
             frameAncestors: ["'none'"],
             imgSrc: ["'self'", 'data:', 'blob:'],
             styleSrc: ["'self'", "'unsafe-inline'"],
-            scriptSrc: ["'self'"],
+            // wasm-unsafe-eval: ตัวถอดรหัส meshopt ของ three.js คอมไพล์ WebAssembly ตอนโหลด hand.glb
+            // อนุญาตเฉพาะ WASM — eval()/new Function() ของ JS ยังถูกบล็อกตามเดิม
+            scriptSrc: ["'self'", "'wasm-unsafe-eval'"],
             // blob:/data: — three.js โหลด texture ที่ฝังใน hand.glb ผ่าน fetch ของ blob URL
             connectSrc: ["'self'", env.WEB_ORIGIN, 'blob:', 'data:'],
           },

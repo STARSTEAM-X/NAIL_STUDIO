@@ -78,7 +78,7 @@ await cp(webDist, path.join(output, 'static'), { recursive: true })
 const securityHeaders = {
   'Content-Security-Policy': [
     "default-src 'self'", "base-uri 'self'", "font-src 'self' https: data:", "form-action 'self'",
-    "frame-ancestors 'none'", "img-src 'self' data: blob:", "object-src 'none'", "script-src 'self'",
+    "frame-ancestors 'none'", "img-src 'self' data: blob:", "object-src 'none'", "script-src 'self' 'wasm-unsafe-eval'",
     "script-src-attr 'none'", "style-src 'self' 'unsafe-inline'", 'upgrade-insecure-requests',
     "connect-src 'self' blob: data:",
   ].join(';'),
