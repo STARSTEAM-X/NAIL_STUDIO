@@ -19,8 +19,8 @@ export function createMcpApp({ env = process.env, validateApiToken }: HttpOption
   const config = loadConfig(env)
   const app = express()
   app.disable('x-powered-by')
-  // Render and Vercel place one trusted reverse proxy in front of this service.
-  if (env.RENDER === 'true' || env.VERCEL === '1') app.set('trust proxy', 1)
+  // Render places one trusted reverse proxy in front of this service.
+  if (env.RENDER === 'true') app.set('trust proxy', 1)
   app.use(helmet({ contentSecurityPolicy: { directives: {
     defaultSrc: ["'none'"], styleSrc: ["'unsafe-inline'"], formAction: CONSENT_FORM_ACTIONS, frameAncestors: ["'none'"],
   } }, referrerPolicy: { policy: 'no-referrer' } }))

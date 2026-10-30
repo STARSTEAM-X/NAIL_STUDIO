@@ -39,6 +39,3 @@ backup/
 Thumbs.db
 .claude/
 .worktrees/
-
-# Vercel build output / project link
-.vercel/

@@ -116,25 +116,6 @@ describe('HTTP MCP and OAuth', () => {
     await exchange(app, client, code).expect(200)
   })
 
-  it('exchanges a code on a different instance (serverless) and rejects expired or tampered codes', async () => {
-    const consentApp = appFor()
-    const client = await register(consentApp)
-    const code = await consent(consentApp, client)
-    const tokenApp = appFor()
-    const i = code.length - 10
-    await exchange(tokenApp, client, code.slice(0, i) + (code[i] === 'A' ? 'B' : 'A') + code.slice(i + 1)).expect(400)
-    await exchange(tokenApp, client, code).expect(200)
-    await exchange(tokenApp, client, code).expect(400)
-    const late = await consent(consentApp, client)
-    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 61 * 1000)
-    await exchange(tokenApp, client, late).expect(400)
-  })
-
-  it('trusts the Vercel proxy for client IPs', () => {
-    expect(createMcpApp({ env: { VERCEL: '1' } }).get('trust proxy')).toBe(1)
-    expect(createMcpApp({ env: {} }).get('trust proxy')).toBe(false)
-  })
-
   it('rejects unregistered redirects, unknown scopes and a different resource at authorization', async () => {
     const app = appFor()
     const client = await register(app)

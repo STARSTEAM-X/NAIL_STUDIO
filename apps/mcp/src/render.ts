@@ -25,16 +25,14 @@ const CELL_W = 200
 const CELL_H = 226
 const LABEL_H = 26
 
-// NAIL_STUDIO_HAND_GLB: path หลัง bundle (Vercel) ที่ path สัมพัทธ์กับ source ใช้ไม่ได้
-const glbPath = (): string => process.env.NAIL_STUDIO_HAND_GLB
-  ?? fileURLToPath(new URL('../../web/public/models/hand.glb', import.meta.url))
+const GLB_PATH = fileURLToPath(new URL('../../web/public/models/hand.glb', import.meta.url))
 
 let cachedHulls: Map<string, Pt2[]> | null = null
 
 /** อ่าน UV ของ mesh เล็บทุกนิ้วจาก hand.glb แล้วหา convex hull (ทำครั้งเดียวแล้วจำไว้) */
 export function nailHulls(): Map<string, Pt2[]> {
   if (cachedHulls) return cachedHulls
-  const buffer = readFileSync(glbPath())
+  const buffer = readFileSync(GLB_PATH)
   const jsonLength = buffer.readUInt32LE(12)
   const gltf = JSON.parse(buffer.subarray(20, 20 + jsonLength).toString('utf8')) as {
     nodes: { name?: string; mesh?: number }[]

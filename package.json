@@ -30,7 +30,6 @@
   "devDependencies": {
     "dotenv": "^17.4.2",
     "prisma": "^7.9.1",
-    "rolldown": "^1.2.4",
     "typescript": "7.0.2"
   }
 }
