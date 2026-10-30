@@ -16,6 +16,7 @@ import { rolldown } from 'rolldown'
 const root = path.resolve(import.meta.dirname, '..')
 const output = path.join(root, '.vercel/output')
 const fn = path.join(output, 'functions/api.func')
+const mcpFn = path.join(output, 'functions/mcp.func')
 
 function run(command, env = {}) {
   console.log(`> ${command}`)
@@ -36,39 +37,45 @@ if (process.env.VERCEL_ENV === 'production') {
 run('npm run build --workspace @nail-studio/web', { VITE_API_URL: '' })
 
 await rm(output, { recursive: true, force: true })
-await mkdir(fn, { recursive: true })
 
-const bundle = await rolldown({
-  input: path.join(root, 'apps/api/src/vercel.ts'),
-  platform: 'node',
-  // native addon โหลดจาก node_modules ที่คัดลอกไปด้านล่าง; pg-native เป็น optional ที่ไม่ได้ใช้
-  external: [/^@node-rs\/argon2/, 'pg-native'],
-  logLevel: 'warn',
-})
-await bundle.write({
-  dir: fn,
-  format: 'esm',
-  entryFileNames: 'index.mjs',
-  chunkFileNames: 'chunks/[name]-[hash].mjs',
-  // dependency แบบ CJS ใน bundle ESM ยังเรียก require() ของ built-in อยู่
-  banner: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);",
-})
-await bundle.close()
-
-const nodeRs = path.join(root, 'node_modules/@node-rs')
-for (const name of readdirSync(nodeRs).filter((entry) => entry.startsWith('argon2'))) {
-  await cp(path.join(nodeRs, name), path.join(fn, 'node_modules/@node-rs', name), { recursive: true, dereference: true })
+async function bundleFunction(input, dir, external) {
+  await mkdir(dir, { recursive: true })
+  const bundle = await rolldown({ input: path.join(root, input), platform: 'node', external, logLevel: 'warn' })
+  await bundle.write({
+    dir,
+    format: 'esm',
+    entryFileNames: 'index.mjs',
+    chunkFileNames: 'chunks/[name]-[hash].mjs',
+    // dependency แบบ CJS ใน bundle ESM ยังเรียก require() ของ built-in อยู่
+    banner: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);",
+  })
+  await bundle.close()
+  await writeFile(path.join(dir, 'package.json'), JSON.stringify({ type: 'module' }))
+  await writeFile(path.join(dir, '.vc-config.json'), JSON.stringify({
+    runtime: 'nodejs24.x',
+    handler: 'index.mjs',
+    launcherType: 'Nodejs',
+    shouldAddHelpers: false,
+    supportsResponseStreaming: true,
+    maxDuration: 300,
+  }, null, 2))
 }
 
-await writeFile(path.join(fn, 'package.json'), JSON.stringify({ type: 'module' }))
-await writeFile(path.join(fn, '.vc-config.json'), JSON.stringify({
-  runtime: 'nodejs24.x',
-  handler: 'index.mjs',
-  launcherType: 'Nodejs',
-  shouldAddHelpers: false,
-  supportsResponseStreaming: true,
-  maxDuration: 300,
-}, null, 2))
+/** native addon โหลดจาก node_modules ข้าง function — คัดลอกแพ็กเกจหลักและแพ็กเกจของแพลตฟอร์ม (เช่น canvas-linux-x64-gnu) */
+async function copyNative(dir, scope, base) {
+  const source = path.join(root, 'node_modules', scope)
+  for (const name of readdirSync(source).filter((entry) => entry.startsWith(base))) {
+    await cp(path.join(source, name), path.join(dir, 'node_modules', scope, name), { recursive: true, dereference: true })
+  }
+}
+
+// pg-native เป็น optional ที่ไม่ได้ใช้
+await bundleFunction('apps/api/src/vercel.ts', fn, [/^@node-rs\/argon2/, 'pg-native'])
+await copyNative(fn, '@node-rs', 'argon2')
+
+await bundleFunction('apps/mcp/src/vercel.ts', mcpFn, [/^@napi-rs\/canvas/])
+await copyNative(mcpFn, '@napi-rs', 'canvas')
+await cp(path.join(root, 'apps/web/public/models/hand.glb'), path.join(mcpFn, 'hand.glb'))
 
 const webDist = path.join(root, 'apps/web/dist')
 if (!existsSync(path.join(webDist, 'index.html'))) throw new Error('ไม่พบ apps/web/dist/index.html')
@@ -100,6 +107,11 @@ await writeFile(path.join(output, 'config.json'), JSON.stringify({
   routes: [
     // API ส่ง header ความปลอดภัยของตัวเองผ่าน helmet อยู่แล้ว
     { src: '^/api/(.*)$', dest: '/api' },
+    // MCP + OAuth ของ MCP — helmet ของ MCP ตั้ง CSP เอง (form-action ไป claude.ai/chatgpt.com) จึงต้องอยู่ก่อน securityHeaders
+    { src: '^/(mcp|consent|authorize|token|revoke)/?$', dest: '/mcp' },
+    // GET /register เป็นหน้าสมัครสมาชิกของ SPA — DCR ของ MCP ใช้แค่ POST
+    { src: '^/register/?$', methods: ['POST'], dest: '/mcp' },
+    { src: '^/\\.well-known/(oauth-authorization-server|oauth-protected-resource)(/.*)?$', dest: '/mcp' },
     { src: '^/assets/(.*)$', headers: { 'Cache-Control': 'public, max-age=31536000, immutable' }, continue: true },
     { src: '^/(.*)$', headers: securityHeaders, continue: true },
     { handle: 'filesystem' },

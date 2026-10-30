@@ -44,7 +44,26 @@ npm install
 | `NAIL_STUDIO_MCP_URL` | `RENDER_EXTERNAL_URL` บน Render | HTTPS origin ของบริการ MCP สำหรับ OAuth discovery |
 | `NAIL_STUDIO_OAUTH_SECRET` | – | secret สุ่มอย่างน้อย 32 ตัวอักษรสำหรับเข้ารหัส OAuth credentials; ต้องคงเดิมข้าม deploy |
 
-## Deploy บน Render และเชื่อมกับ ChatGPT
+## Deploy บน Vercel (ค่าเริ่มต้น)
+
+`node tools/vercel-build.mjs` สร้าง function `mcp.func` ใน deployment เดียวกับเว็บและ API
+(`/mcp`, `/authorize`, `/token`, `POST /register`, `/revoke`, `/consent`, `/.well-known/oauth-*` วิ่งไปที่ function นี้)
+URL สำหรับ AI client คือ `https://nail-studio-sand.vercel.app/mcp`
+
+ตั้ง env ใน Vercel (Production):
+
+- `NAIL_STUDIO_API_URL=https://nail-studio-sand.vercel.app/api/v1`
+- `NAIL_STUDIO_WEB_URL=https://nail-studio-sand.vercel.app`
+- `NAIL_STUDIO_MCP_URL=https://nail-studio-sand.vercel.app`
+- `NAIL_STUDIO_OAUTH_SECRET`: ค่าสุ่มอย่างน้อย 32 ตัวอักษร (ห้าม commit)
+
+ต้องตั้ง `NAIL_STUDIO_MCP_URL` กับ `NAIL_STUDIO_OAUTH_SECRET` คู่กันเสมอ — ถ้าไม่ตั้งทั้งคู่ (เช่น Preview) OAuth ปิด
+ใช้ได้แค่ API token `nsk_...` เป็น Bearer
+
+ข้อจำกัดบน Vercel: request body สูงสุดราว 4.5 MB, rate limit นับแยกต่อ instance และการกันใช้ code/refresh token
+ซ้ำทำได้แค่ภายใน instance (ดู "รายละเอียด OAuth")
+
+## Deploy บน Render (ทางเลือกเดิม) และเชื่อมกับ ChatGPT
 
 สร้าง Web Service แยกจากเว็บ/API โดยใช้ repo นี้, Node **24**, แผน Free, region Singapore:
 
@@ -87,8 +106,8 @@ public clients (Claude ผ่าน DCR) ได้ refresh token แบบ **ห
 
 client registrations และ OAuth tokens เข้ารหัสด้วย AES-256-GCM และใช้งานต่อได้หลัง restart
 เมื่อเก็บ secret เดิมไว้; การเปลี่ยน secret จะยกเลิกการเชื่อมต่อเดิมทั้งหมด
-authorization codes อายุ 5 นาที ใช้ได้ครั้งเดียวและเก็บในหน่วยความจำ จึงใช้ **หนึ่ง instance**
-(หาก restart ระหว่างอนุญาต ผู้ใช้เริ่มเชื่อมต่อใหม่ได้)
+authorization codes เข้ารหัสแบบเดียวกัน (ไม่ต้องเก็บ state จึงรันหลาย instance / serverless ได้) อายุ 60 วินาที
+การกันใช้ code ซ้ำทำได้แค่ภายใน instance — PKCE S256 และ redirect_uri ที่ต้องตรงเป็นแนวป้องกันหลัก
 แผน Free อาจพัก service เมื่อไม่มีการใช้งาน; เปิด `/health` รอให้พร้อมก่อนเพิ่มใน ChatGPT
 
 ## ใช้กับ Claude Code

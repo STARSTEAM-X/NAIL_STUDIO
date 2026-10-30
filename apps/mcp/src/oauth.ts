@@ -18,6 +18,8 @@ const REFRESH_SECONDS = 30 * 24 * 60 * 60
 const PUBLIC_REFRESH_SECONDS = 14 * 24 * 60 * 60
 const MAX_USED_REFRESH = 10000
 const FLOW_SECONDS = 5 * 60
+// code ใช้แค่ตอน redirect กลับทันที — อายุสั้นเพราะกันใช้ซ้ำได้แค่ภายใน instance
+const CODE_SECONDS = 60
 const MAX_CODES = 1000
 const COOKIE = '__Host-nailstudio-oauth'
 const tokenSchema = z.string().regex(new RegExp(`^${API_TOKEN_PREFIX}[A-Za-z0-9_-]{43}$`))
@@ -81,8 +83,9 @@ const accessSchema = z.object({
   clientId: z.string(), apiToken: tokenSchema, expiresAt: z.number(),
 })
 const refreshSchema = accessSchema.extend({ jti: z.string().optional() })
+const codeSchema = accessSchema.extend({ redirectUri: z.string(), challenge: z.string(), jti: z.string() })
 type Flow = z.infer<typeof flowSchema>
-type Code = Flow & { apiToken: string }
+type Code = z.infer<typeof codeSchema>
 
 /** callback ของ Claude ที่โฮสต์ไว้ (claude.ai, Desktop, มือถือ, Cowork) — claude.com เผื่อย้ายในอนาคตตามเอกสารของ Anthropic */
 const CLAUDE_CALLBACKS = new Set(['https://claude.ai/api/mcp/auth_callback', 'https://claude.com/api/mcp/auth_callback'])
@@ -120,8 +123,9 @@ export class NailStudioOAuth implements OAuthServerProvider {
   readonly clientsStore: OAuthRegisteredClientsStore
   private readonly sealed: SealedValues
   private readonly options: OAuthOptions
-  // Codes are single-use and short-lived. A restart safely cancels pending authorization flows.
-  private readonly codes = new Map<string, Code>()
+  // code เป็นค่า sealed (stateless) เพราะ /consent กับ /token อาจวิ่งคนละ instance บน serverless
+  // shortcut: กันใช้ code ซ้ำได้แค่ภายใน instance (jti → หมดอายุ) — PKCE + อายุ 60 วินาทีเป็นแนวป้องกันหลัก, ย้ายไป store กลางถ้าต้องการ single-use จริง
+  private readonly usedCodes = new Map<string, number>()
   // refresh token ของ public client ที่ถูกใช้แล้ว (jti → หมดอายุ) — กันใช้ซ้ำตาม OAuth 2.1 rotation
   // อยู่ในหน่วยความจำ: หลังรีสตาร์ท token เก่าที่ยังไม่หมดอายุใช้ได้อีกครั้ง จึงจำกัดอายุไว้ที่ 14 วัน
   private readonly usedRefresh = new Map<string, number>()
@@ -219,14 +223,10 @@ export class NailStudioOAuth implements OAuthServerProvider {
         throw new Error('Invalid consent')
       }
       await this.options.validateApiToken(input.data.token)
-      // Entries are ordered by expiry; each expired code is visited only once (amortized O(1)).
-      for (const [code, value] of this.codes) {
-        if (value.expiresAt > this.now()) break
-        this.codes.delete(code)
-      }
-      if (this.codes.size >= MAX_CODES) throw new TemporarilyUnavailableError('Please try again later')
-      const code = randomBytes(32).toString('base64url')
-      this.codes.set(code, { ...flow, apiToken: input.data.token, expiresAt: this.now() + FLOW_SECONDS })
+      const code = this.sealed.seal('code', {
+        clientId: flow.clientId, redirectUri: flow.redirectUri, challenge: flow.challenge,
+        apiToken: input.data.token, expiresAt: this.now() + CODE_SECONDS, jti: randomBytes(16).toString('base64url'),
+      } satisfies Code)
       response.clearCookie(COOKIE, { httpOnly: true, secure: true, sameSite: 'lax', path: '/' })
       const redirect = new URL(flow.redirectUri)
       redirect.searchParams.set('code', code)
@@ -239,8 +239,11 @@ export class NailStudioOAuth implements OAuthServerProvider {
   }
 
   private codeFor(clientId: string, code: string): Code {
-    const value = this.codes.get(code)
-    if (!value || value.expiresAt <= this.now() || value.clientId !== clientId) throw new InvalidGrantError('Invalid or expired code')
+    let value: Code
+    try { value = codeSchema.parse(this.sealed.open('code', code)) } catch { throw new InvalidGrantError('Invalid or expired code') }
+    if (value.expiresAt <= this.now() || value.clientId !== clientId || this.usedCodes.has(value.jti)) {
+      throw new InvalidGrantError('Invalid or expired code')
+    }
     return value
   }
 
@@ -259,7 +262,13 @@ export class NailStudioOAuth implements OAuthServerProvider {
     this.checkResource(resource)
     const value = this.codeFor(client.client_id, code)
     if (redirectUri !== value.redirectUri) throw new InvalidGrantError('redirect_uri must match the authorization request')
-    this.codes.delete(code)
+    // Entries are ordered by expiry (fixed TTL); each expired jti is visited only once (amortized O(1)).
+    for (const [jti, expiry] of this.usedCodes) {
+      if (expiry > this.now()) break
+      this.usedCodes.delete(jti)
+    }
+    if (this.usedCodes.size >= MAX_CODES) throw new TemporarilyUnavailableError('Please try again later')
+    this.usedCodes.set(value.jti, value.expiresAt)
     const tokens = this.tokens(client.client_id, value.apiToken)
     tokens.refresh_token = this.refreshFor(client, value.apiToken)
     return tokens
